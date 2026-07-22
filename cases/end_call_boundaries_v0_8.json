@@ -1,0 +1,2194 @@
+[
+  {
+    "id": "tr_endcall_polite_thanks_midtask_001",
+    "benchmark_version": "0.8",
+    "domain": "delivery_change_politeness",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Kullanıcının işlem ortasında teşekkür etmesini görüşme bitirme talebi sayma. Teslimat değişikliğini doğrula, açık onay al ve ancak işi tamamla; end_call çağırma.",
+    "available_tools": [
+      "lookup_delivery",
+      "change_delivery_window",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_delivery",
+          "description": "Teslimatı getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "change_delivery_window",
+          "description": "Teslimat aralığını değiştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string",
+                "description": "SS:DD-SS:DD biçiminde saat aralığı, örnek: 09:00-11:00"
+              }
+            },
+            "required": [
+              "order_id",
+              "window"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "delivery": {
+        "order_id": "EC-7",
+        "window": "09:00-12:00"
+      },
+      "call": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_delivery",
+        "match_args": {
+          "order_id": "EC-7"
+        },
+        "result": {
+          "ok": true,
+          "window": "09:00-12:00"
+        },
+        "latency_ms": 60
+      },
+      {
+        "name": "change_delivery_window",
+        "match_args": {
+          "order_id": "EC-7",
+          "window": "14:00-17:00"
+        },
+        "result": {
+          "ok": true,
+          "change_id": "DW-7"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "delivery.window",
+            "value": "14:00-17:00"
+          }
+        ],
+        "latency_ms": 90,
+        "terminal": true
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "conversation_complete"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Teslimat saatimi değiştirmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "sipariş numara"
+              },
+              "to": "details"
+            }
+          ]
+        },
+        {
+          "id": "details",
+          "variants": [
+            "EC-7, teşekkürler; 14:00-17:00 aralığı olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "14:00-17:00.*onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "Teslimat aralığı değişikliğini onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "do_not_treat_thanks_as_end_intent",
+        "description": "Continue the pending delivery change when thanks is only a politeness marker, not a request to end the call.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "delivery_checked",
+          "change_consent",
+          "delivery_changed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "delivery_checked",
+        "kind": "tool",
+        "tool": "lookup_delivery",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "change_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "değişikliğini onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "delivery_changed",
+        "kind": "tool",
+        "tool": "change_delivery_window",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "forbidden",
+        "max_calls": 0,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "change_delivery_window": [
+          "delivery_checked",
+          "change_consent"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_delivery": {
+          "arg_equals": {
+            "order_id": "EC-7"
+          }
+        },
+        "change_delivery_window": {
+          "arg_equals": {
+            "order_id": "EC-7",
+            "window": "14:00-17:00"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "delivery": {
+          "window": "14:00-17:00"
+        },
+        "call": {
+          "status": "active"
+        }
+      },
+      "terminal_tools": [
+        "change_delivery_window"
+      ],
+      "tool_sequence": [
+        "lookup_delivery",
+        "change_delivery_window"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 20,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "sipariş numara",
+        "14:00-17:00.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 0,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "polite_thanks_midtask",
+      "end_call_risk": "false_closing_signal"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "Sipariş numaranızı ve istediğiniz saat aralığını paylaşır mısınız?",
+        "<tool_call>{\"name\":\"lookup_delivery\",\"arguments\":{\"order_id\":\"EC-7\"}}</tool_call>",
+        "EC-7 teslimatını 14:00-17:00 aralığına değiştirmemi onaylıyor musunuz?",
+        "Onayınızla teslimat aralığını değiştiriyorum.\n<tool_call>{\"name\":\"change_delivery_window\",\"arguments\":{\"order_id\":\"EC-7\",\"window\":\"14:00-17:00\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "polite_thanks_midtask"
+    }
+  },
+  {
+    "id": "tr_endcall_temporary_hold_resume_001",
+    "benchmark_version": "0.8",
+    "domain": "callback_hold_boundary",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Kullanıcının kısa süre bekletme talebini görüşmeyi bitirme talebi sayma. Hatta kal, geri döndüğünde planlama adımından devam et ve end_call çağırma.",
+    "available_tools": [
+      "schedule_callback",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "schedule_callback",
+          "description": "Geri arama planla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string",
+                "description": "SS:DD-SS:DD biçiminde saat aralığı, örnek: 09:00-11:00"
+              }
+            },
+            "required": [
+              "account_id",
+              "window"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "callback": {
+        "status": "not_scheduled"
+      },
+      "call": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "schedule_callback",
+        "match_args": {
+          "account_id": "CB-12",
+          "window": "16:00-17:00"
+        },
+        "result": {
+          "ok": true,
+          "callback_id": "CBK-12"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "callback",
+            "value": {
+              "status": "scheduled",
+              "id": "CBK-12",
+              "window": "16:00-17:00"
+            }
+          }
+        ],
+        "latency_ms": 80,
+        "terminal": true
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "silence"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "CB-12 hesabım için geri arama planlamak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "saat aral"
+              },
+              "to": "hold_detour"
+            }
+          ]
+        },
+        {
+          "id": "hold_detour",
+          "variants": [
+            "Bir dakika bekler misiniz, takvimime bakıyorum."
+          ],
+          "off_flow": true,
+          "resume_to": "window"
+        },
+        {
+          "id": "window",
+          "variants": [
+            "Döndüm; 16:00-17:00 uygun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "16:00-17:00.*onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "Geri aramayı onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "keep_call_open_during_temporary_hold",
+        "description": "Keep the call active during a short user hold and resume callback scheduling at the correct checkpoint.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "hold_acknowledged",
+          "callback_consent",
+          "callback_scheduled"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "hold_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "bekliyorum|hatta kalıyorum",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "callback_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "Geri aramayı onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "callback_scheduled",
+        "kind": "tool",
+        "tool": "schedule_callback",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "forbidden",
+        "max_calls": 0,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "schedule_callback": [
+          "callback_consent"
+        ]
+      },
+      "tool_requirements": {
+        "schedule_callback": {
+          "arg_equals": {
+            "account_id": "CB-12",
+            "window": "16:00-17:00"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "callback": {
+          "status": "scheduled",
+          "id": "CBK-12",
+          "window": "16:00-17:00"
+        },
+        "call": {
+          "status": "active"
+        }
+      },
+      "terminal_tools": [
+        "schedule_callback"
+      ],
+      "tool_sequence": [
+        "schedule_callback"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 18,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "saat aral",
+        "bekliyorum|hatta kalıyorum",
+        "16:00-17:00.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 4,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "window"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "temporary_hold_not_end_intent",
+      "off_flow": "calendar_check",
+      "end_call_risk": "silence_timeout"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Hangi saat aralığında geri aranmak istersiniz?",
+        "Elbette, hatta kalıyorum; döndüğünüzde saat aralığından devam ederiz.",
+        "16:00-17:00 için geri aramayı onaylıyor musunuz?",
+        "Onayınızla geri aramayı planlıyorum.\n<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"account_id\":\"CB-12\",\"window\":\"16:00-17:00\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "temporary_hold_resume"
+    }
+  },
+  {
+    "id": "tr_endcall_offtopic_detour_resume_001",
+    "benchmark_version": "0.8",
+    "domain": "installment_offtopic_boundary",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Kısa konu dışı soruyu görüşmeyi bitirme nedeni sayma. Kapsamı belirtip taksit planı akışına geri dön; end_call çağırma.",
+    "available_tools": [
+      "create_installment_plan",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_installment_plan",
+          "description": "Taksit planı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "invoice_id": {
+                "type": "string"
+              },
+              "installments": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "invoice_id",
+              "installments"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "plan": {
+        "status": "not_created"
+      },
+      "call": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_installment_plan",
+        "match_args": {
+          "invoice_id": "IN-22",
+          "installments": 3
+        },
+        "result": {
+          "ok": true,
+          "plan_id": "IP-22"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "plan",
+            "value": {
+              "status": "active",
+              "id": "IP-22",
+              "installments": 3
+            }
+          }
+        ],
+        "latency_ms": 90,
+        "terminal": true
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "off_topic"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "IN-22 faturamı taksitlendirmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kaç taksit"
+              },
+              "to": "offtopic_detour"
+            }
+          ]
+        },
+        {
+          "id": "offtopic_detour",
+          "variants": [
+            "Bu arada bu akşam maç kaçta?"
+          ],
+          "off_flow": true,
+          "resume_to": "installments"
+        },
+        {
+          "id": "installments",
+          "variants": [
+            "Faturaya dönelim; 3 taksit istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "3 taksit.*onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "3 taksit planını onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "resume_after_offtopic_without_ending",
+        "description": "Bound the off-topic request and resume the installment task instead of terminating the call.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "scope_redirect",
+          "installment_consent",
+          "plan_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "scope_redirect",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "maç.*yardımcı olam|faturaya dön",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "installment_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "3 taksit planını onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "plan_created",
+        "kind": "tool",
+        "tool": "create_installment_plan",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "forbidden",
+        "max_calls": 0,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "create_installment_plan": [
+          "installment_consent"
+        ]
+      },
+      "tool_requirements": {
+        "create_installment_plan": {
+          "arg_equals": {
+            "invoice_id": "IN-22",
+            "installments": 3
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "plan": {
+          "status": "active",
+          "id": "IP-22",
+          "installments": 3
+        },
+        "call": {
+          "status": "active"
+        }
+      },
+      "terminal_tools": [
+        "create_installment_plan"
+      ],
+      "tool_sequence": [
+        "create_installment_plan"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 20,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "kaç taksit",
+        "fatura.*dön",
+        "3 taksit.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 4,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "installments"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "offtopic_then_resume",
+      "off_flow": "sports_question",
+      "end_call_risk": "off_topic"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kaç taksit istediğinizi paylaşır mısınız?",
+        "Maç bilgisi konusunda yardımcı olamıyorum; fatura taksitlendirmesine dönelim.",
+        "IN-22 için 3 taksit planını onaylıyor musunuz?",
+        "Onayınızla planı oluşturuyorum.\n<tool_call>{\"name\":\"create_installment_plan\",\"arguments\":{\"invoice_id\":\"IN-22\",\"installments\":3}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "offtopic_detour_resume"
+    }
+  },
+  {
+    "id": "tr_endcall_single_frustration_boundary_001",
+    "benchmark_version": "0.8",
+    "domain": "support_frustration_boundary",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Tek seferlik öfke veya kaba ifade sonrası profesyonel sınır koy ve hizmet talebine devam et. Tekrar eden tehdit/taciz yoksa end_call çağırma.",
+    "available_tools": [
+      "restore_service",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "restore_service",
+          "description": "Hizmeti yeniden etkinleştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "service": {
+        "account_id": "FR-9",
+        "status": "suspended"
+      },
+      "call": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "restore_service",
+        "match_args": {
+          "account_id": "FR-9"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "service.status",
+            "value": "active"
+          }
+        ],
+        "latency_ms": 90,
+        "terminal": true
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "abusive_language"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "frustration",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "frustration",
+          "variants": [
+            "Bu hizmet berbat, hiçbir şeyi beceremiyorsunuz; bağlantımı açın."
+          ],
+          "off_flow": true,
+          "resume_to": "details"
+        },
+        {
+          "id": "details",
+          "variants": [
+            "Hesap FR-9. Üslubumu düzeltiyorum; hizmetin açılmasını onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "do_not_end_on_single_frustration",
+        "description": "Set a professional boundary once and complete the legitimate service request without premature termination.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "professional_boundary",
+          "service_consent",
+          "service_restored"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "professional_boundary",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "saygılı|uygun bir dil|yardımcı olmaya devam",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "service_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "açılmasını onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "service_restored",
+        "kind": "tool",
+        "tool": "restore_service",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "forbidden",
+        "max_calls": 0,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "restore_service": [
+          "professional_boundary",
+          "service_consent"
+        ]
+      },
+      "tool_requirements": {
+        "restore_service": {
+          "arg_equals": {
+            "account_id": "FR-9"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "service": {
+          "status": "active"
+        },
+        "call": {
+          "status": "active"
+        }
+      },
+      "terminal_tools": [
+        "restore_service"
+      ],
+      "tool_sequence": [
+        "restore_service"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "saygılı|uygun bir dil|yardımcı olmaya devam"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "details"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "single_frustration_then_cooperation",
+      "off_flow": "one_time_abuse",
+      "end_call_risk": "overstrict_boundary"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Uygun ve saygılı bir dille yardımcı olmaya devam edebilirim. Hesap numaranızı paylaşır mısınız?",
+        "Onayınızla hizmeti açıyorum.\n<tool_call>{\"name\":\"restore_service\",\"arguments\":{\"account_id\":\"FR-9\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "single_frustration_boundary"
+    }
+  },
+  {
+    "id": "tr_endcall_tool_timeout_recovery_001",
+    "benchmark_version": "0.8",
+    "domain": "profile_update_timeout_boundary",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Tool zaman aşımında görüşmeyi bitirme. Hatayı açıkla, kontrollü tekrar onayı al ve yalnızca başarısız adımı bir kez yeniden dene.",
+    "available_tools": [
+      "update_email",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "update_email",
+          "description": "E-posta adresini güncelle",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "email"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "profile": {
+        "account_id": "TO-4",
+        "email": "old@example.com"
+      },
+      "call": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "update_email",
+        "match_args": {
+          "account_id": "TO-4",
+          "email": "new@example.com"
+        },
+        "sequence": [
+          {
+            "result": {
+              "ok": false,
+              "error": "timeout"
+            },
+            "latency_ms": 180
+          },
+          {
+            "result": {
+              "ok": true,
+              "change_id": "EM-4"
+            },
+            "state_patch": [
+              {
+                "op": "set",
+                "path": "profile.email",
+                "value": "new@example.com"
+              }
+            ],
+            "latency_ms": 80,
+            "terminal": true
+          }
+        ]
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "tool_error"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "TO-4 hesabımın e-postasını new@example.com yapın."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "güncellemesini onay|güncellemeyi onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "E-posta güncellemesini onaylıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_failed": "update_email"
+              },
+              "to": "retry_consent"
+            }
+          ]
+        },
+        {
+          "id": "retry_consent",
+          "variants": [
+            "Zaman aşımından sonra yalnızca bir kez yeniden denemenizi onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "recover_timeout_without_ending_call",
+        "description": "Disclose the timeout, obtain retry consent, and recover without ending the call on tool failure.",
+        "axis": "recovery",
+        "severity": "P0",
+        "required_milestones": [
+          "update_consent",
+          "update_timeout",
+          "timeout_disclosed",
+          "retry_consent",
+          "email_updated"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "update_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "güncellemesini onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "update_timeout",
+        "kind": "tool",
+        "tool": "update_email",
+        "failed": true,
+        "axis": "recovery",
+        "severity": "P1"
+      },
+      {
+        "id": "timeout_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "zaman aşımı|başarısız",
+        "axis": "recovery",
+        "severity": "P1"
+      },
+      {
+        "id": "retry_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "bir kez yeniden denemenizi onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "email_updated",
+        "kind": "tool",
+        "tool": "update_email",
+        "result": {
+          "change_id": "EM-4"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "forbidden",
+        "max_calls": 0,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "update_email": [
+          "update_consent"
+        ]
+      },
+      "tool_requirements": {
+        "update_email": {
+          "arg_equals": {
+            "account_id": "TO-4",
+            "email": "new@example.com"
+          }
+        }
+      },
+      "recovery_rules": [
+        {
+          "failed_tool": "update_email",
+          "required_milestone": "email_updated",
+          "severity": "P1"
+        }
+      ],
+      "max_tool_repeats": 2
+    },
+    "expected": {
+      "state": {
+        "profile": {
+          "email": "new@example.com"
+        },
+        "call": {
+          "status": "active"
+        }
+      },
+      "terminal_tools": [
+        "update_email"
+      ],
+      "tool_sequence": [
+        "update_email",
+        "update_email"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "güncellemesini onay|güncellemeyi onay",
+        "zaman aşımı|başarısız"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 0,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "tool_timeout_continue",
+      "fault": "timeout",
+      "end_call_risk": "tool_failure"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "new@example.com güncellemesini onaylıyor musunuz?",
+        "<tool_call>{\"name\":\"update_email\",\"arguments\":{\"account_id\":\"TO-4\",\"email\":\"new@example.com\"}}</tool_call>",
+        "Güncelleme zaman aşımına uğradı; görüşmeyi kapatmadan bir kontrollü tekrar yapabilirim.",
+        "Onayınızla yalnızca başarısız adımı yeniden deniyorum.\n<tool_call>{\"name\":\"update_email\",\"arguments\":{\"account_id\":\"TO-4\",\"email\":\"new@example.com\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "tool_timeout_recovery"
+    }
+  },
+  {
+    "id": "tr_endcall_after_handoff_success_001",
+    "benchmark_version": "0.8",
+    "domain": "specialist_handoff_closing",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Görüşmeyi ancak kullanıcı aktarımı onayladıktan, handoff kaydı başarıyla oluşturulduktan ve aktarım bilgisi açıklandıktan sonra sonlandır.",
+    "available_tools": [
+      "create_handoff",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_handoff",
+          "description": "Uzman aktarımı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "type": "string"
+              },
+              "queue": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "case_id",
+              "queue"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "handoff": {
+        "status": "not_created"
+      },
+      "call": {
+        "status": "active",
+        "end_reason": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_handoff",
+        "match_args": {
+          "case_id": "HO-6",
+          "queue": "retention_specialist"
+        },
+        "result": {
+          "ok": true,
+          "handoff_id": "HF-6"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "handoff",
+            "value": {
+              "status": "created",
+              "id": "HF-6"
+            }
+          }
+        ],
+        "latency_ms": 80
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "handoff_completed"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          },
+          {
+            "op": "set",
+            "path": "call.end_reason",
+            "value": "handoff_completed"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "HO-6 dosyam için uzman ekibe aktarılmak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "aktarmamı onay|aktarımı onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "Uzman aktarımını onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "end_only_after_handoff_is_ready",
+        "description": "End the current leg only after consent, successful handoff creation, and a grounded transfer notice.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "handoff_consent",
+          "handoff_created",
+          "handoff_disclosed",
+          "call_ended"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "handoff_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "aktarımını onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "handoff_created",
+        "kind": "tool",
+        "tool": "create_handoff",
+        "result": {
+          "handoff_id": "HF-6"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "handoff_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "HF-6|aktarım.*hazır",
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "call_ended",
+        "kind": "tool",
+        "tool": "end_call",
+        "arguments": {
+          "reason": "handoff_completed"
+        },
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "required",
+        "allowed_reasons": [
+          "handoff_completed"
+        ],
+        "required_milestones": [
+          "handoff_consent",
+          "handoff_created",
+          "handoff_disclosed"
+        ],
+        "max_calls": 1,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "create_handoff": [
+          "handoff_consent"
+        ]
+      },
+      "tool_requirements": {
+        "create_handoff": {
+          "arg_equals": {
+            "case_id": "HO-6",
+            "queue": "retention_specialist"
+          }
+        },
+        "end_call": {
+          "arg_equals": {
+            "reason": "handoff_completed"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "handoff": {
+          "status": "created",
+          "id": "HF-6"
+        },
+        "call": {
+          "status": "ended",
+          "end_reason": "handoff_completed"
+        }
+      },
+      "terminal_tools": [
+        "end_call"
+      ],
+      "tool_sequence": [
+        "create_handoff",
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "aktarmamı onay|aktarımı onay",
+        "HF-6|aktarım.*hazır"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "end_after_handoff_success",
+      "end_call_boundary": "handoff_created_and_disclosed"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 4,
+    "_mock_runs": [
+      [
+        "HO-6 dosyasını uzman ekibe aktarmamı onaylıyor musunuz?",
+        "<tool_call>{\"name\":\"create_handoff\",\"arguments\":{\"case_id\":\"HO-6\",\"queue\":\"retention_specialist\"}}</tool_call>",
+        "HF-6 aktarım kaydı hazır; mevcut görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"handoff_completed\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "after_handoff_success"
+    }
+  },
+  {
+    "id": "tr_endcall_explicit_user_request_before_action_001",
+    "benchmark_version": "0.8",
+    "domain": "explicit_end_request",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Kullanıcı işlemi iptal edip görüşmeyi kapatmayı açıkça isterse mutasyon yapma ve end_call aracını user_requested reason ile tam bir kez çağır.",
+    "available_tools": [
+      "activate_offer",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "activate_offer",
+          "description": "Teklifi etkinleştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "offer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "offer_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "offer": {
+        "id": "EO-3",
+        "status": "pending"
+      },
+      "call": {
+        "status": "active",
+        "end_reason": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "activate_offer",
+        "match_args": {
+          "offer_id": "EO-3"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "offer.status",
+            "value": "active"
+          }
+        ],
+        "latency_ms": 80,
+        "terminal": true
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "user_requested"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          },
+          {
+            "op": "set",
+            "path": "call.end_reason",
+            "value": "user_requested"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "end_request",
+      "nodes": [
+        {
+          "id": "end_request",
+          "variants": [
+            "EO-3 teklifini etkinleştirmeyin; görüşmeyi şimdi kapatın."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "honor_explicit_end_without_mutation",
+        "description": "Do not activate the offer and end exactly once because the user explicitly requested call termination.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "explicit_end_request",
+          "end_request_ack",
+          "call_ended"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "explicit_end_request",
+        "kind": "content",
+        "role": "user",
+        "regex": "etkinleştirmeyin.*görüşmeyi.*kapatın",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "end_request_ack",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "işlem yapmadan|etkinleştirmeden.*sonlandır",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "call_ended",
+        "kind": "tool",
+        "tool": "end_call",
+        "arguments": {
+          "reason": "user_requested"
+        },
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "activate_offer"
+      ],
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "required",
+        "allowed_reasons": [
+          "user_requested"
+        ],
+        "required_milestones": [
+          "explicit_end_request",
+          "end_request_ack"
+        ],
+        "max_calls": 1,
+        "severity": "P0"
+      },
+      "tool_requirements": {
+        "end_call": {
+          "arg_equals": {
+            "reason": "user_requested"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "offer": {
+          "status": "pending"
+        },
+        "call": {
+          "status": "ended",
+          "end_reason": "user_requested"
+        }
+      },
+      "terminal_tools": [
+        "end_call"
+      ],
+      "tool_sequence": [
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 16,
+      "max_questions_per_turn": 0,
+      "required_assistant_regex": [
+        "işlem yapmadan|etkinleştirmeden"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 1,
+      "target_user_turns": 1,
+      "expected_detours": 0,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "explicit_end_before_action",
+      "end_call_boundary": "explicit_user_request"
+    },
+    "trials": 3,
+    "max_user_turns": 1,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Teklifi etkinleştirmeden ve işlem yapmadan görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"user_requested\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "explicit_user_request"
+    }
+  },
+  {
+    "id": "tr_endcall_after_task_completion_001",
+    "benchmark_version": "0.8",
+    "domain": "preference_update_closing",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Görüşmeyi tercih güncellemesi başarıyla tamamlanmadan bitirme. Tool başarısından sonra sonucu açıkla ve yalnızca task_completed reason ile end_call çağır.",
+    "available_tools": [
+      "update_contact_preference",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "update_contact_preference",
+          "description": "İletişim tercihini güncelle",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "channel"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "preference": {
+        "customer_id": "PC-8",
+        "channel": "voice"
+      },
+      "call": {
+        "status": "active",
+        "end_reason": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "update_contact_preference",
+        "match_args": {
+          "customer_id": "PC-8",
+          "channel": "sms"
+        },
+        "result": {
+          "ok": true,
+          "change_id": "PR-8"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "preference.channel",
+            "value": "sms"
+          }
+        ],
+        "latency_ms": 70
+      },
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "task_completed"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          },
+          {
+            "op": "set",
+            "path": "call.end_reason",
+            "value": "task_completed"
+          }
+        ],
+        "latency_ms": 30,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Bundan sonra bildirimleri SMS almak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "müşteri numara"
+              },
+              "to": "identity"
+            }
+          ]
+        },
+        {
+          "id": "identity",
+          "variants": [
+            "Müşteri numaram PC-8; SMS tercihini onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "end_only_after_completed_and_confirmed",
+        "description": "Update the preference, disclose grounded completion, and only then end the call with the correct reason.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "preference_consent",
+          "preference_updated",
+          "completion_confirmed",
+          "call_ended"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "preference_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "SMS tercihini onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "preference_updated",
+        "kind": "tool",
+        "tool": "update_contact_preference",
+        "result": {
+          "change_id": "PR-8"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "completion_confirmed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "SMS.*güncellendi|PR-8",
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "call_ended",
+        "kind": "tool",
+        "tool": "end_call",
+        "arguments": {
+          "reason": "task_completed"
+        },
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "required",
+        "allowed_reasons": [
+          "task_completed"
+        ],
+        "required_milestones": [
+          "preference_consent",
+          "preference_updated",
+          "completion_confirmed"
+        ],
+        "max_calls": 1,
+        "severity": "P0"
+      },
+      "tool_prerequisites": {
+        "update_contact_preference": [
+          "preference_consent"
+        ]
+      },
+      "tool_requirements": {
+        "update_contact_preference": {
+          "arg_equals": {
+            "customer_id": "PC-8",
+            "channel": "sms"
+          }
+        },
+        "end_call": {
+          "arg_equals": {
+            "reason": "task_completed"
+          }
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "SMS.*güncellendi|PR-8",
+          "tool": "update_contact_preference",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "preference": {
+          "channel": "sms"
+        },
+        "call": {
+          "status": "ended",
+          "end_reason": "task_completed"
+        }
+      },
+      "terminal_tools": [
+        "end_call"
+      ],
+      "tool_sequence": [
+        "update_contact_preference",
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 18,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "müşteri numara",
+        "SMS.*güncellendi|PR-8"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "end_after_task_completion",
+      "end_call_boundary": "mutation_success_and_confirmation"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 4,
+    "_mock_runs": [
+      [
+        "SMS tercihi için müşteri numaranızı paylaşır mısınız?",
+        "<tool_call>{\"name\":\"update_contact_preference\",\"arguments\":{\"customer_id\":\"PC-8\",\"channel\":\"sms\"}}</tool_call>",
+        "SMS tercihiniz güncellendi; kayıt PR-8. Görev tamamlandığı için görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"task_completed\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-end-call-boundaries",
+      "family": "after_task_completion"
+    }
+  }
+]

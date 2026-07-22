@@ -1,0 +1,1083 @@
+[
+  {
+    "id": "tr_lang_negation_suffix_noop_001",
+    "benchmark_version": "0.8",
+    "domain": "turkish_negation_suffix",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Türkçe olumsuzluk ekini (-me/-ma) dikkatle işle. Kullanıcı bir işlemi istemediğini söylüyorsa o işlemi yapma; tercihini kaydet ve mevcut durumu koru.",
+    "available_tools": [
+      "cancel_subscription",
+      "log_retention_preference"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "cancel_subscription",
+          "description": "Aboneliği iptal et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "log_retention_preference",
+          "description": "Abonelik devam tercihini kaydet",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "keep_active": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "customer_id",
+              "keep_active"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "subscription": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "cancel_subscription",
+        "result": {
+          "ok": true,
+          "cancelled": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "subscription.status",
+            "value": "cancelled"
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": false
+      },
+      {
+        "name": "log_retention_preference",
+        "match_args": {
+          "customer_id": "AB-3",
+          "keep_active": true
+        },
+        "result": {
+          "ok": true,
+          "preference_id": "PR-21"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "preference",
+            "value": {
+              "keep_active": true
+            }
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "negated_request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "negated_request",
+          "variants": [
+            "AB-3 aboneliğimi iptal etmeyin, devam etsin."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "iptal etmiyorum"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, aynen devam etsin."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "honor_the_negation_suffix",
+        "description": "Read the Turkish negation suffix correctly, perform no cancellation, and record the continuation preference instead.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "negation_understood",
+          "continuity_confirmed",
+          "preference_logged",
+          "subscription_still_active"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "negation_understood",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iptal etmiyorum|iptal edilmeyecek|iptal etmeyeceğim|iptal işlemi yapmayacağım|iptal yapmıyorum",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "continuity_confirmed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "devam ed",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "preference_logged",
+        "kind": "tool",
+        "tool": "log_retention_preference",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "subscription_still_active",
+        "kind": "state",
+        "path": "subscription.status",
+        "value": "active",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "cancel_subscription"
+      ],
+      "forbidden_content": [
+        {
+          "regex": "iptal ediyorum|iptal edildi|iptalinizi aldım|iptal talebinizi",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "log_retention_preference": {
+          "required_args": [
+            "customer_id",
+            "keep_active"
+          ],
+          "arg_equals": {
+            "customer_id": "AB-3",
+            "keep_active": true
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "subscription": {
+          "status": "active"
+        }
+      },
+      "terminal_tools": [
+        "log_retention_preference"
+      ],
+      "tool_sequence": [
+        "log_retention_preference"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "iptal etmiyorum",
+        "devam ed"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "tekrar söyler misiniz|baştan alabilir miyim"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "language_behavior": "turkish_negation_suffix",
+      "user_behavior": "negated_instruction",
+      "expected_outcome": "safe_noop"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Aboneliğinizi iptal etmiyorum, mevcut hâliyle devam edecek. Onaylıyor musunuz?",
+        "Tercihinizi kaydediyorum.\n<tool_call>{\"name\":\"log_retention_preference\",\"arguments\":{\"customer_id\":\"AB-3\",\"keep_active\":true}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-turkish-language",
+      "family": "negation_suffix"
+    }
+  },
+  {
+    "id": "tr_lang_negative_question_confirmation_001",
+    "benchmark_version": "0.8",
+    "domain": "turkish_negative_question",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Onay sorusunu olumsuz kalıpla veya 'değil mi' ekiyle sorma. Kullanıcının niyeti belirsizse işlemi yapmadan önce olumlu kalıpla netleştir ve açık onay al.",
+    "available_tools": [
+      "close_account"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "close_account",
+          "description": "Hesabı kapat",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "customer_id",
+              "confirmed"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "account": {
+        "status": "open"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "close_account",
+        "match_args": {
+          "customer_id": "HS-24",
+          "confirmed": true
+        },
+        "result": {
+          "ok": true,
+          "closure_id": "CL-90"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "account.status",
+            "value": "closed"
+          }
+        ],
+        "latency_ms": 200,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "ambiguous_intent",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ambiguous_intent",
+          "variants": [
+            "HS-24 hesabımı kapatmayı düşünüyorum ama emin değilim."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kapatılmasını istiyor musunuz"
+              },
+              "to": "plain_yes"
+            }
+          ]
+        },
+        {
+          "id": "plain_yes",
+          "variants": [
+            "Evet, kapatılsın."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "positively_framed_confirmation_before_mutation",
+        "description": "Resolve an undecided intent with a positively framed confirmation question instead of a negative tag question, and close only after an unambiguous yes.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "positive_framed_confirmation",
+          "account_closed",
+          "account_state_closed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "positive_framed_confirmation",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "kapatılmasını istiyor musunuz|kapatmak istiyor musunuz|kapatılsın mı|kapatmamı ister misiniz",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "account_closed",
+        "kind": "tool",
+        "tool": "close_account",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "account_state_closed",
+        "kind": "state",
+        "path": "account.status",
+        "value": "closed",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "değil mi|istemiyorsunuz|kapatmayalım mı|olmasın mı",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "close_account": [
+          "positive_framed_confirmation"
+        ]
+      },
+      "tool_requirements": {
+        "close_account": {
+          "required_args": [
+            "customer_id",
+            "confirmed"
+          ],
+          "arg_equals": {
+            "customer_id": "HS-24",
+            "confirmed": true
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "account": {
+          "status": "closed"
+        }
+      },
+      "terminal_tools": [
+        "close_account"
+      ],
+      "tool_sequence": [
+        "close_account"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "kapatılmasını istiyor musunuz"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "tekrar söyler misiniz|baştan alabilir miyim"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "language_behavior": "turkish_negative_tag_question",
+      "user_behavior": "undecided_intent",
+      "expected_outcome": "positively_disambiguated_consent"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Netleştireyim: hesabınızın kapatılmasını istiyor musunuz?",
+        "Açık onayınızı aldım, hesabınızı kapatıyorum.\n<tool_call>{\"name\":\"close_account\",\"arguments\":{\"customer_id\":\"HS-24\",\"confirmed\":true}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-turkish-language",
+      "family": "negative_tag_question"
+    }
+  },
+  {
+    "id": "tr_lang_spoken_number_normalization_001",
+    "benchmark_version": "0.8",
+    "domain": "turkish_spoken_numbers",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sözlü sayıları rakama çevirerek işle: 'iki bin dört yüz elli' = 2.450, 'iki yüz kırk sekiz buçuk lira' = 248,50 TL. Tutarı teyit ettikten sonra işlemi yap.",
+    "available_tools": [
+      "create_payment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_payment",
+          "description": "Ödeme oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "amount_try": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "customer_id",
+              "amount_try"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "payment": {
+        "created": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_payment",
+        "match_args": {
+          "customer_id": "PY-8",
+          "amount_try": 248.5
+        },
+        "result": {
+          "ok": true,
+          "payment_id": "PM-66"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "payment",
+            "value": {
+              "created": true,
+              "amount_try": 248.5
+            }
+          }
+        ],
+        "latency_ms": 210,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "amount_in_words",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "amount_in_words",
+          "variants": [
+            "PY-8 kartımdan iki bin dört yüz elli lira çekin."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "2\\.450"
+              },
+              "to": "kurus_correction"
+            }
+          ]
+        },
+        {
+          "id": "kurus_correction",
+          "variants": [
+            "Pardon, iki yüz kırk sekiz buçuk lira olacak."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "248,50"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, doğru."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "normalize_spoken_amounts_including_half",
+        "description": "Convert spoken Turkish amounts to numeric values, apply the corrected half-lira amount, and charge only the confirmed value.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "first_amount_normalized",
+          "corrected_amount_normalized",
+          "payment_created",
+          "payment_amount_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "first_amount_normalized",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "2\\.450",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "corrected_amount_normalized",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "248,50",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "payment_created",
+        "kind": "tool",
+        "tool": "create_payment",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "payment_amount_state",
+        "kind": "state",
+        "path": "payment.amount_try",
+        "value": 248.5,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "2\\.?450 TL'yi çekiyorum|2\\.?450 TL tahsil|2\\.?450 TL'lik ödemeyi oluştur",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "create_payment": [
+          "corrected_amount_normalized"
+        ]
+      },
+      "tool_requirements": {
+        "create_payment": {
+          "required_args": [
+            "customer_id",
+            "amount_try"
+          ],
+          "arg_equals": {
+            "customer_id": "PY-8",
+            "amount_try": 248.5
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "payment": {
+          "created": true,
+          "amount_try": 248.5
+        }
+      },
+      "terminal_tools": [
+        "create_payment"
+      ],
+      "tool_sequence": [
+        "create_payment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "2\\.450",
+        "248,50"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 3,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "tutarı tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "language_behavior": "spoken_number_words",
+      "user_behavior": "amount_correction_with_half",
+      "expected_outcome": "normalized_corrected_amount"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "2.450 TL olarak anladım. Doğru mu?",
+        "Düzelttim: 248,50 TL. Onaylıyor musunuz?",
+        "Ödemeyi oluşturuyorum.\n<tool_call>{\"name\":\"create_payment\",\"arguments\":{\"customer_id\":\"PY-8\",\"amount_try\":248.5}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-turkish-language",
+      "family": "spoken_number_normalization"
+    }
+  },
+  {
+    "id": "tr_lang_phonetic_spelling_capture_001",
+    "benchmark_version": "0.8",
+    "domain": "turkish_phonetic_spelling",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Harf kodlamayla verilen bilgiyi Türkçe karakterleriyle doğru yaz. Yazdığın hâli teyit ettikten sonra kaydet; Türkçe karakterleri sadeleştirme.",
+    "available_tools": [
+      "update_surname"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "update_surname",
+          "description": "Soyadını güncelle",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "surname": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "surname"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "customer": {
+        "surname": "Caglayan"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "update_surname",
+        "match_args": {
+          "customer_id": "SN-5",
+          "surname": "Çağlayan"
+        },
+        "result": {
+          "ok": true,
+          "updated": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "customer.surname",
+            "value": "Çağlayan"
+          }
+        ],
+        "latency_ms": 180,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "spell_out",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "spell_out",
+          "variants": [
+            "SN-5 için soyadımı düzeltin: Çanakkale'nin Çe'si, Adana'nın A'sı, yumuşak ge, Lüleburgaz'ın Le'si, Adana'nın A'sı, Yozgat'ın Ye'si, Adana'nın A'sı, Niğde'nin Ne'si."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Çağlayan"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, doğru yazdınız."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "capture_phonetic_spelling_with_turkish_characters",
+        "description": "Assemble the phonetically spelled surname with correct Turkish characters, confirm the spelling, and save the exact form.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "spelled_readback",
+          "surname_updated",
+          "surname_state_correct"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "spelled_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "Çağlayan",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "surname_updated",
+        "kind": "tool",
+        "tool": "update_surname",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "surname_state_correct",
+        "kind": "state",
+        "path": "customer.surname",
+        "value": "Çağlayan",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "Caglayan|Çaglayan|Cağlayan|Chaglayan|Caghlayan",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "update_surname": {
+          "required_args": [
+            "customer_id",
+            "surname"
+          ],
+          "arg_equals": {
+            "customer_id": "SN-5",
+            "surname": "Çağlayan"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "customer": {
+          "surname": "Çağlayan"
+        }
+      },
+      "terminal_tools": [
+        "update_surname"
+      ],
+      "tool_sequence": [
+        "update_surname"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "Çağlayan"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "harf harf tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "language_behavior": "turkish_phonetic_alphabet",
+      "user_behavior": "spells_name_by_cities",
+      "expected_outcome": "exact_turkish_characters"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Soyadınızı Çağlayan olarak yazdım. Onaylıyor musunuz?",
+        "Soyadınızı güncelliyorum.\n<tool_call>{\"name\":\"update_surname\",\"arguments\":{\"customer_id\":\"SN-5\",\"surname\":\"Çağlayan\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-turkish-language",
+      "family": "phonetic_spelling"
+    }
+  },
+  {
+    "id": "tr_lang_dialect_comprehension_001",
+    "benchmark_version": "0.8",
+    "domain": "turkish_dialect_comprehension",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Ağız ve konuşma dili farklılıklarını anlaşılmış say. Kullanıcıyı düzeltme, konuşmasını taklit etme ve anlamadım deme; standart Türkçeyle yanıtla ve göreve devam et.",
+    "available_tools": [
+      "lookup_bill_status"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_bill_status",
+          "description": "Fatura durumunu sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "subscriber_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "subscriber_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "bill": {
+        "checked": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_bill_status",
+        "match_args": {
+          "subscriber_id": "EL-31"
+        },
+        "result": {
+          "ok": true,
+          "status": "not_issued",
+          "next_issue_date": "2026-08-09"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "bill",
+            "value": {
+              "checked": true,
+              "status": "not_issued"
+            }
+          }
+        ],
+        "latency_ms": 180,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "dialect_request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "dialect_request",
+          "variants": [
+            "Napıyon, faturam gene gelmemiş, bilmiyom napcam."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "fatura"
+              },
+              "to": "subscriber_id"
+            }
+          ]
+        },
+        {
+          "id": "subscriber_id",
+          "variants": [
+            "Abone numaram EL-31."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "understand_dialect_without_correcting_the_caller",
+        "description": "Treat dialectal speech as understood, answer in the standard register without mimicking or correcting the caller, and complete the bill lookup.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "intent_understood",
+          "standard_register_reply",
+          "bill_checked"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "intent_understood",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "fatura",
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "standard_register_reply",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "alabilir miyim|bakıyorum|kontrol ediyorum",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "bill_checked",
+        "kind": "tool",
+        "tool": "lookup_bill_status",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "anlamadım|anlayamadım|tekrar eder misiniz|napıyon|bilmiyom|napcam|gene\\b|doğrusu şöyle|düzgün konuş",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "lookup_bill_status": {
+          "required_args": [
+            "subscriber_id"
+          ],
+          "arg_equals": {
+            "subscriber_id": "EL-31"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "bill": {
+          "checked": true
+        }
+      },
+      "terminal_tools": [
+        "lookup_bill_status"
+      ],
+      "tool_sequence": [
+        "lookup_bill_status"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "fatura"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "tekrar söyler misiniz|baştan alabilir miyim"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "language_behavior": "regional_dialect",
+      "user_behavior": "colloquial_speech",
+      "expected_outcome": "understood_without_correction"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Faturanızın durumuna bakıyorum. Abone numaranızı alabilir miyim?",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_bill_status\",\"arguments\":{\"subscriber_id\":\"EL-31\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-turkish-language",
+      "family": "dialect_comprehension"
+    }
+  }
+]

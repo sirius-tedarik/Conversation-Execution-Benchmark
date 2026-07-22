@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "conversation-execution-benchmark"
+version = "0.8.0"
+description = "Executable, multi-turn benchmark for policy-governed voice and contact-center agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "SiriusAitech Brain Team"}]
+keywords = ["voice-agent", "benchmark", "tool-calling", "conversation", "evaluation"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/sirius-tedarik/Conversation-Execution-Benchmark"
+Repository = "https://github.com/sirius-tedarik/Conversation-Execution-Benchmark"
+Issues = "https://github.com/sirius-tedarik/Conversation-Execution-Benchmark/issues"
+Documentation = "https://github.com/sirius-tedarik/Conversation-Execution-Benchmark/tree/main/docs"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ceb = "ceb.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

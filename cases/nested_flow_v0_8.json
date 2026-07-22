@@ -1,0 +1,123 @@
+[
+  {
+    "id":"tr_flow_nested_detour_rejoin_001","benchmark_version":"0.8","domain":"nested_detour_flow","language":"tr-TR","call_direction":"inbound",
+    "system":"Poliçe yenileme akışını yürüt. Kullanıcı araya konu açarsa kısa cevap ver ve açılış sırasının tersine dön: önce bir önceki ara konuya, sonra ana akışa. Daha önce alınan bilgileri tekrar sorma.",
+    "available_tools":["get_renewal_quote","renew_policy"],
+    "tool_schemas":[
+      {"type":"function","function":{"name":"get_renewal_quote","description":"Yenileme primini sorgula","parameters":{"type":"object","properties":{"policy_id":{"type":"string"}},"required":["policy_id"]}}},
+      {"type":"function","function":{"name":"renew_policy","description":"Poliçeyi yenile","parameters":{"type":"object","properties":{"policy_id":{"type":"string"},"premium_try":{"type":"number"},"consent":{"type":"boolean"}},"required":["policy_id","premium_try","consent"]}}}
+    ],
+    "initial_state":{"policy":{"renewed":false}},
+    "tool_contracts":[
+      {"name":"get_renewal_quote","match_args":{"policy_id":"PL-90"},
+       "result":{"ok":true,"premium_try":4200},
+       "state_patch":[{"op":"set","path":"quote","value":{"premium_try":4200}}],"latency_ms":180,"terminal":false},
+      {"name":"renew_policy","match_args":{"policy_id":"PL-90","premium_try":4200,"consent":true},
+       "result":{"ok":true,"renewal_id":"RN-55"},
+       "state_patch":[{"op":"set","path":"policy","value":{"renewed":true,"renewal_id":"RN-55"}}],"latency_ms":220,"terminal":true}
+    ],
+    "user_plan":{"start":"renewal_request","max_detours":3,"nodes":[
+      {"id":"renewal_request","variants":["PL-90 poliçemi yenilemek istiyorum."],
+       "transitions":[{"when":{"tool_succeeded":"get_renewal_quote"},"to":"discount_detour"}]},
+      {"id":"discount_detour","variants":["Bir saniye, indirim hakkım var mı?"],"off_flow":true,"resume_to":"discount_return",
+       "transitions":[{"when":{"assistant_regex":"indirim"},"to":"app_detour"}]},
+      {"id":"app_detour","variants":["Bu arada uygulama şifremi de unuttum, nasıl sıfırlarım?"],"off_flow":true,"resume_to":"discount_return",
+       "transitions":[{"when":{"assistant_regex":"şifre"},"to":"discount_return"}]},
+      {"id":"discount_return","variants":["Tamam, indirim konusuna dönelim: net prim ne oldu?"],"off_flow":true,"resume_to":"renewal_consent",
+       "transitions":[{"when":{"assistant_regex":"net prim|4200"},"to":"renewal_consent"}]},
+      {"id":"renewal_consent","variants":["PL-90 yenilemesini 4200 TL ile onaylıyorum."],"terminal":true}
+    ]},
+    "objectives":[
+      {"id":"nested_detour_ordered_rejoin","description":"Answer a detour nested inside another detour, return to the outer detour topic first, and only then rejoin the renewal flow with the grounded premium.","axis":"flow_control","severity":"P0",
+       "required_milestones":["quote_retrieved","discount_answered","password_answered","discount_topic_resumed","policy_renewed"]}
+    ],
+    "milestones":[
+      {"id":"quote_retrieved","kind":"tool","tool":"get_renewal_quote","failed":false,"axis":"business_outcome","severity":"P0"},
+      {"id":"discount_answered","kind":"content","role":"assistant","regex":"indirim","axis":"flow_control","severity":"P1"},
+      {"id":"password_answered","kind":"content","role":"assistant","regex":"şifre","axis":"flow_control","severity":"P1"},
+      {"id":"discount_topic_resumed","kind":"content","role":"assistant","regex":"net prim","axis":"flow_control","severity":"P0"},
+      {"id":"policy_renewed","kind":"tool","tool":"renew_policy","failed":false,"axis":"business_outcome","severity":"P0"}
+    ],
+    "policies":{
+      "tool_prerequisites":{"renew_policy":["quote_retrieved","discount_topic_resumed"]},
+      "tool_requirements":{"renew_policy":{"required_args":["policy_id","premium_try","consent"],"arg_equals":{"policy_id":"PL-90","premium_try":4200,"consent":true},"severity":"P0"}},
+      "claim_requires_tool":[{"regex":"RN-55|yenilendi","tool":"renew_policy","severity":"P0"}],
+      "max_tool_repeats":1
+    },
+    "expected":{"state":{"policy":{"renewed":true}},"terminal_tools":["renew_policy"],"tool_sequence":["get_renewal_quote","renew_policy"]},
+    "conversation":{"max_words_per_turn":30,"max_questions_per_turn":1,"required_assistant_regex":["4200","indirim"]},
+    "flow":{"target_assistant_steps":6,"target_user_turns":5,"expected_detours":3,"expected_off_flow_span":3,"max_reasks":0,"required_resume_nodes":["discount_return","renewal_consent"],"reask_regex":"poliçe numaranızı tekrar|tekrar söyler misiniz"},
+    "runtime":{"max_model_latency_ms":8000},
+    "perturbations":{"flow":"nested_off_flow_detour","user_behavior":"interruption_inside_interruption","expected_outcome":"lifo_rejoin"},
+    "trials":3,"max_user_turns":5,"max_steps_per_turn":2,
+    "_mock_runs":[[
+      "Yenileme priminizi sorguluyorum.\n<tool_call>{\"name\":\"get_renewal_quote\",\"arguments\":{\"policy_id\":\"PL-90\"}}</tool_call>",
+      "PL-90 yenileme priminiz 4200 TL olarak göründü.",
+      "Evet, yıllık ödeme indirimi bu prime yansıtıldı.",
+      "Şifrenizi uygulamadaki şifremi unuttum adımından sıfırlayabilirsiniz.",
+      "İndirim uygulanmış hâliyle net prim 4200 TL.",
+      "Yenilemeyi tamamlıyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"PL-90\",\"premium_try\":4200,\"consent\":true}}</tool_call>"
+    ]],
+    "metadata":{"source":"synthetic-controlled","split":"public-nested-flow","family":"nested_detour_rejoin"}
+  },
+  {
+    "id":"tr_endcall_race_barge_in_before_close_001","benchmark_version":"0.8","domain":"endcall_race_control","language":"tr-TR","call_direction":"inbound",
+    "system":"Kapanış cümlesine başladıktan sonra kullanıcı araya girerse görüşmeyi kapatma. Yeni talebi karşıla, sonucu araç çıktısına dayanarak bildir ve ancak ondan sonra end_call çağır.",
+    "available_tools":["lookup_refund_eta","end_call"],
+    "tool_schemas":[
+      {"type":"function","function":{"name":"lookup_refund_eta","description":"İade tarihini sorgula","parameters":{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}}},
+      {"type":"function","function":{"name":"end_call","description":"Görüşmeyi sonlandır","parameters":{"type":"object","properties":{"reason":{"type":"string"}},"required":["reason"]}}}
+    ],
+    "initial_state":{"call":{"status":"active"}},
+    "tool_contracts":[
+      {"name":"lookup_refund_eta","match_args":{"order_id":"SP-14"},
+       "result":{"ok":true,"eta_days":3},
+       "state_patch":[{"op":"set","path":"refund","value":{"eta_days":3}}],"latency_ms":170,"terminal":false},
+      {"name":"end_call","result":{"ok":true},"state_patch":[{"op":"set","path":"call.status","value":"ended"}],"latency_ms":20,"terminal":true}
+    ],
+    "user_plan":{"start":"closing_thanks","max_detours":0,"nodes":[
+      {"id":"closing_thanks","variants":["İşlem tamam, teşekkürler."],
+       "transitions":[{"when":{"assistant_regex":"iyi günler"},"to":"barge_in_question"}]},
+      {"id":"barge_in_question","variants":["Bir saniye, sözünüzü kestim; SP-14 iadem ne zaman yatar?"],
+       "transitions":[{"when":{"tool_succeeded":"lookup_refund_eta"},"to":"satisfied"}]},
+      {"id":"satisfied","variants":["Anladım, teşekkürler, kapatabilirsiniz."],"terminal":true}
+    ]},
+    "objectives":[
+      {"id":"no_close_while_user_still_speaking","description":"Abandon the closing sequence when the user barges in, answer the new request from a tool result, and end the call only afterwards.","axis":"flow_control","severity":"P0",
+       "required_milestones":["close_started","refund_answered","eta_disclosed","call_ended"]}
+    ],
+    "milestones":[
+      {"id":"close_started","kind":"content","role":"assistant","regex":"iyi günler","axis":"conversation_experience","severity":"P2"},
+      {"id":"refund_answered","kind":"tool","tool":"lookup_refund_eta","failed":false,"axis":"business_outcome","severity":"P0"},
+      {"id":"eta_disclosed","kind":"content","role":"assistant","regex":"3 iş günü","axis":"business_outcome","severity":"P1"},
+      {"id":"call_ended","kind":"terminal","tools":["end_call"],"axis":"flow_control","severity":"P1"}
+    ],
+    "policies":{
+      "termination_policy":{"tool":"end_call","mode":"required","allowed_reasons":["task_completed"],"required_milestones":["refund_answered","eta_disclosed"],"max_calls":1,"severity":"P0"},
+      "claim_requires_tool":[{"regex":"3 iş günü","tool":"lookup_refund_eta","severity":"P0"}],
+      "tool_requirements":{"lookup_refund_eta":{"required_args":["order_id"],"arg_equals":{"order_id":"SP-14"},"severity":"P0"}},
+      "max_tool_repeats":1
+    },
+    "expected":{"state":{"call":{"status":"ended"},"refund":{"eta_days":3}},"terminal_tools":["end_call"],"tool_sequence":["lookup_refund_eta","end_call"]},
+    "conversation":{"max_words_per_turn":30,"max_questions_per_turn":1,"required_assistant_regex":["3 iş günü"]},
+    "flow":{"target_assistant_steps":4,"target_user_turns":3,"expected_detours":0,"max_reasks":0,"reask_regex":"sipariş numaranızı tekrar|tekrar söyler misiniz"},
+    "runtime":{"max_model_latency_ms":8000,"max_barge_in_stop_ms":250},
+    "perturbations":{"audio":"barge_in_during_closing","end_call_risk":"premature_close_race","expected_outcome":"answer_then_close"},
+    "trials":3,"max_user_turns":3,"max_steps_per_turn":2,
+    "_mock_runs":[[
+      "Rica ederim, iyi günler dilerim.",
+      "Tabii, hemen kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_refund_eta\",\"arguments\":{\"order_id\":\"SP-14\"}}</tool_call>",
+      "İadeniz 3 iş günü içinde hesabınıza geçecek.",
+      "Başka bir konu yoksa kapatıyorum, iyi günler.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"task_completed\"}}</tool_call>"
+    ]],
+    "_mock_audio_events":[
+      {"type":"user_speech_end","turn":0,"ts_ms":800},
+      {"type":"agent_speech_start","turn":0,"ts_ms":1150},
+      {"type":"user_barge_in","turn":1,"ts_ms":3100},
+      {"type":"agent_speech_stop","turn":1,"ts_ms":3190},
+      {"type":"user_speech_end","turn":1,"ts_ms":3800},
+      {"type":"agent_speech_start","turn":1,"ts_ms":4120}
+    ],
+    "metadata":{"source":"synthetic-controlled","split":"public-nested-flow","family":"endcall_barge_in_race"}
+  }
+]

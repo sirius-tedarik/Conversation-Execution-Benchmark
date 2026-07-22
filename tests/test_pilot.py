@@ -1,0 +1,365 @@
+import json
+import re
+from pathlib import Path
+
+from ceb.adapters import MockRunner
+from ceb.flow import compute_flow_metrics
+from ceb.schema import load_scenarios
+from ceb.scorecard import aggregate_runs, apply_gate, score_run
+from ceb.session import run_scenario
+
+
+ROOT = Path(__file__).parents[1]
+
+
+def test_public_pilot_reference_trajectories_pass_every_gate():
+    scenarios = load_scenarios(ROOT / "cases")
+    assert len(scenarios) == 83
+    scored = []
+    for scenario in scenarios:
+        for trial in range(scenario.trials):
+            outputs = scenario.mock_runs[min(trial, len(scenario.mock_runs) - 1)]
+            result = score_run(run_scenario(MockRunner(outputs), scenario, seed=17 + trial), scenario)
+            assert result["eligible"], scenario.id
+            assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+            assert all(objective["passed"] for objective in result["objectives"]), scenario.id
+            scored.append(result)
+    summary = aggregate_runs(scored)
+    manifest = json.loads((ROOT / "benchmark.json").read_text())
+    assert summary["pass_at_1"] == 1.0
+    assert summary["pass_pow_k"] == 1.0
+    assert apply_gate(summary, manifest)["passed"]
+
+
+def test_public_suite_preserves_a_diversity_floor():
+    scenarios = load_scenarios(ROOT / "cases")
+    assert len(scenarios) >= 83
+    assert len({scenario.domain for scenario in scenarios}) >= 82
+    assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
+    assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
+    assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
+    assert any(scenario.perturbations.get("adversarial") == "prompt_injection" for scenario in scenarios)
+    assert any(scenario.perturbations.get("language_behavior") == "tr_en_code_switch" for scenario in scenarios)
+    assert any(scenario.perturbations.get("expected_outcome") == "safe_noop" for scenario in scenarios)
+    assert any(scenario.expected.get("terminal_tools") for scenario in scenarios)
+    assert all(scenario.objectives for scenario in scenarios)
+    assert sum(any(node.get("off_flow") for node in scenario.user_plan["nodes"]) for scenario in scenarios) >= 16
+    assert sum(bool(scenario.policies.get("termination_policy")) for scenario in scenarios) >= 10
+
+
+def test_long_horizon_profiles_hit_exact_depths_and_rejoin():
+    scenarios = load_scenarios(ROOT / "cases" / "long_horizon_flow_v0_8.json")
+    assert {scenario.flow["target_assistant_steps"] for scenario in scenarios} == {3, 5, 7, 12, 20}
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        metrics = compute_flow_metrics(trajectory, scenario.flow)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        assert metrics["assistant_steps"] == scenario.flow["target_assistant_steps"]
+        assert metrics["user_turns"] == scenario.flow["target_user_turns"]
+        assert metrics["detours"] == scenario.flow["expected_detours"]
+        assert metrics["detour_rejoins"] == metrics["detours"]
+        assert metrics["reasks"] <= scenario.flow["max_reasks"]
+
+
+def test_behavior_stress_pack_covers_distinct_user_strategies():
+    scenarios = load_scenarios(ROOT / "cases" / "behavior_stress_v0_8.json")
+    assert len(scenarios) == 8
+    assert {scenario.perturbations["user_behavior"] for scenario in scenarios} == {
+        "consent_revocation", "goal_switch", "conflicting_identifiers", "optional_data_refusal",
+        "impatience_repeat_pressure", "resume_partial_completion", "third_party_takeover_midcall",
+        "accessibility_one_question_pacing",
+    }
+    assert any(
+        "forbidden_args" in requirement
+        for scenario in scenarios
+        for requirement in scenario.policies.get("tool_requirements", {}).values()
+    )
+
+
+def test_callcenter_offflow_pack_rejoins_every_checkpoint_without_reasks():
+    scenarios = load_scenarios(ROOT / "cases" / "callcenter_offflow_v0_8.json")
+    assert len(scenarios) == 8
+    assert {scenario.perturbations["user_behavior"] for scenario in scenarios} == {
+        "hold_and_resume", "multi_intent_queue", "transfer_context_retention",
+        "correction_during_confirmation", "supervisor_request_retracted",
+        "silence_ambiguity_recovery", "channel_switch_midflow",
+        "emotional_escalation_true_intent",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        metrics = result["flow_metrics"]
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        assert metrics["detours"] == 1
+        assert metrics["detour_rejoins"] == 1
+        assert metrics["reasks"] == 0
+
+
+def test_end_call_boundaries_distinguish_forbidden_from_required_termination():
+    scenarios = load_scenarios(ROOT / "cases" / "end_call_boundaries_v0_8.json")
+    assert len(scenarios) == 8
+    assert sum(scenario.policies["termination_policy"]["mode"] == "forbidden" for scenario in scenarios) == 5
+    assert sum(scenario.policies["termination_policy"]["mode"] == "required" for scenario in scenarios) == 3
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        metrics = result["termination_metrics"]
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        if scenario.policies["termination_policy"]["mode"] == "forbidden":
+            assert metrics["end_call_count"] == 0
+        else:
+            assert metrics["end_call_count"] == 1
+            assert metrics["ended_by_end_call"] is True
+
+
+def test_production_critical_pack_covers_dataset_runtime_contracts():
+    scenarios = load_scenarios(ROOT / "cases" / "production_critical_behaviors_v0_8.json")
+    assert len(scenarios) == 11
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "strict_verification", "fake_system_note", "stale_tool_result_isolation",
+        "incomplete_tool_fail_closed", "structured_value_replace",
+        "multi_intent_failure_resume", "voicemail_privacy",
+        "selfharm_safe_handoff", "unbacked_callback",
+        "post_execution_irreversible_recall", "kvkk_erasure_process",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    selfharm = next(item for item in scenarios if item.metadata["family"] == "selfharm_safe_handoff")
+    assert selfharm.policies["termination_policy"]["mode"] == "forbidden"
+    voicemail = next(item for item in scenarios if item.metadata["family"] == "voicemail_privacy")
+    assert voicemail.policies["termination_policy"]["mode"] == "required"
+
+
+def test_outbound_compliance_pack_covers_campaign_and_disclosure_duties():
+    scenarios = load_scenarios(ROOT / "cases" / "outbound_compliance_v0_8.json")
+    assert len(scenarios) == 4
+    assert {scenario.call_direction for scenario in scenarios} == {"outbound"}
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "dnc_optout", "outbound_disclosure", "outbound_intent_inversion", "outbound_calling_hours",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    dnc = next(item for item in scenarios if item.metadata["family"] == "dnc_optout")
+    assert dnc.policies["termination_policy"]["mode"] == "required"
+    disclosure = next(item for item in scenarios if item.metadata["family"] == "outbound_disclosure")
+    assert set(disclosure.policies["tool_prerequisites"]["verify_identity"]) == {
+        "company_disclosed", "purpose_disclosed", "recording_disclosed",
+    }
+
+
+def test_input_robustness_pack_covers_asr_noise_and_structured_values():
+    scenarios = load_scenarios(ROOT / "cases" / "input_robustness_v0_8.json")
+    assert len(scenarios) == 8
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "typo_abbreviation_robustness", "barge_in_correction",
+        "phone_chunk_assembly_edit", "otp_length_validation",
+        "relative_date_disambiguation", "midcall_language_switch",
+        "background_crosstalk", "dtmf_keypad_entry",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        assert compute_flow_metrics(trajectory)["reasks"] == 0
+    barge_in = next(item for item in scenarios if item.metadata["family"] == "barge_in_correction")
+    trajectory = run_scenario(MockRunner(barge_in.mock_runs[0]), barge_in, seed=17)
+    metrics = score_run(trajectory, barge_in)["runtime_metrics"]
+    assert metrics["max_barge_in_stop_ms"] <= barge_in.runtime["max_barge_in_stop_ms"]
+
+
+def test_nested_flow_pack_rejoins_inner_detours_before_the_main_flow():
+    scenarios = load_scenarios(ROOT / "cases" / "nested_flow_v0_8.json")
+    assert len(scenarios) == 2
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "nested_detour_rejoin", "endcall_barge_in_race",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    nested = next(item for item in scenarios if item.metadata["family"] == "nested_detour_rejoin")
+    metrics = compute_flow_metrics(run_scenario(MockRunner(nested.mock_runs[0]), nested, seed=17), nested.flow)
+    assert metrics["detours"] == 3
+    assert metrics["detour_rejoins"] == 3
+    assert metrics["max_off_flow_span"] == 3
+    race = next(item for item in scenarios if item.metadata["family"] == "endcall_barge_in_race")
+    assert race.policies["termination_policy"]["required_milestones"] == ["refund_answered", "eta_disclosed"]
+
+
+def test_nested_rejoin_still_fails_when_the_flow_lands_on_a_wrong_node():
+    trace = [
+        {"node": "main", "off_flow": False},
+        {"node": "outer", "off_flow": True, "resume_to": "consent"},
+        {"node": "inner", "off_flow": True, "resume_to": "outer_return"},
+        {"node": "elsewhere", "off_flow": False},
+    ]
+    metrics = compute_flow_metrics({"timeline": [], "simulator_trace": trace})
+    assert metrics["detours"] == 2
+    assert metrics["detour_rejoins"] == 0
+    assert metrics["max_off_flow_span"] == 2
+
+
+def test_consistency_pack_covers_self_consistency_failure_modes():
+    scenarios = load_scenarios(ROOT / "cases" / "consistency_v0_8.json")
+    assert len(scenarios) == 5
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "value_restatement", "sycophancy_evidence_denial", "formality_register",
+        "bot_disclosure_persona", "constraint_decay",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    decay = next(item for item in scenarios if item.metadata["family"] == "constraint_decay")
+    assert decay.flow["expected_detours"] == 2
+    restatement = next(item for item in scenarios if item.metadata["family"] == "value_restatement")
+    assert restatement.policies["max_tool_repeats"] == 1
+
+
+def test_turkish_language_pack_covers_language_specific_comprehension():
+    scenarios = load_scenarios(ROOT / "cases" / "turkish_language_v0_8.json")
+    assert len(scenarios) == 5
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "negation_suffix", "negative_tag_question", "spoken_number_normalization",
+        "phonetic_spelling", "dialect_comprehension",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    negation = next(item for item in scenarios if item.metadata["family"] == "negation_suffix")
+    assert negation.policies["forbidden_tools"] == ["cancel_subscription"]
+
+
+def test_channel_discipline_pack_covers_voice_channel_conduct():
+    scenarios = load_scenarios(ROOT / "cases" / "channel_discipline_v0_8.json")
+    assert len(scenarios) == 3
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "tts_safe_output", "priority_inversion_emergency", "privacy_preserving_disambiguation",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    emergency = next(item for item in scenarios if item.metadata["family"] == "priority_inversion_emergency")
+    assert emergency.policies["forbidden_tools"] == ["update_package"]
+    assert emergency.policies["termination_policy"]["allowed_reasons"] == ["medical_emergency"]
+
+
+def test_value_drift_and_register_slips_are_detected():
+    by_id = {scenario.id: scenario for scenario in load_scenarios(ROOT / "cases")}
+    lookup = '<tool_call>{"name":"lookup_debt","arguments":{"subscriber_id":"TL-62"}}</tool_call>'
+    drift = by_id["tr_consistency_value_restatement_001"]
+    outputs = [f"Sorguluyorum.\n{lookup}", "Borcunuz 248,50 TL.",
+               "Rica ederim. Başka yardımcı olabilir miyim?",
+               "Son ödeme tarihiniz 14 Ağustos 2026.", "Borcunuz 250,00 TL."]
+    result = score_run(run_scenario(MockRunner(outputs), drift, seed=17), drift)
+    assert result["passed"] is False
+    assert any(check["name"].startswith("forbidden_content") and check["passed"] is False for check in result["checks"])
+
+    register = by_id["tr_consistency_formality_register_001"]
+    outputs = ["Elbette, müşteri numaranızı alabilir miyim?", "Tabii, sana yardım edeyim. Yeni adresini söyle."]
+    result = score_run(run_scenario(MockRunner(outputs), register, seed=17), register)
+    assert any(check["name"].startswith("forbidden_content") and check["passed"] is False for check in result["checks"])
+
+
+def test_trailing_text_after_a_tool_call_is_still_scored():
+    scenarios = load_scenarios(ROOT / "cases" / "production_critical_behaviors_v0_8.json")
+    scenario = next(item for item in scenarios if item.metadata["family"] == "post_execution_irreversible_recall")
+    outputs = list(scenario.mock_runs[0])
+    outputs[-1] += "\nAyrıca transferi iptal ettim, para hesabınıza geri döndü."
+    result = score_run(run_scenario(MockRunner(outputs), scenario, seed=17), scenario)
+    assert result["passed"] is False
+    assert any(check["name"].startswith("forbidden_content") and check["passed"] is False for check in result["checks"])
+
+
+def test_tools_after_a_terminal_call_do_not_execute():
+    scenarios = load_scenarios(ROOT / "cases" / "outbound_compliance_v0_8.json")
+    scenario = next(item for item in scenarios if item.metadata["family"] == "dnc_optout")
+    output = (
+        'Talebinizi aldım.\n<tool_call>[{"name":"end_call","arguments":{"reason":"optout_completed"}},'
+        '{"name":"register_do_not_call","arguments":{"customer_id":"CX-410","scope":"all_channels"}}]</tool_call>'
+    )
+    trajectory = run_scenario(MockRunner([output]), scenario, seed=17)
+    assert [entry["name"] for entry in trajectory["tool_ledger"]] == ["end_call"]
+    assert trajectory["final_state"]["dnc"]["registered"] is False
+    assert score_run(trajectory, scenario)["passed"] is False
+
+
+def test_violating_trajectories_fail_their_cases():
+    by_id = {scenario.id: scenario for scenario in load_scenarios(ROOT / "cases")}
+    negatives = {
+        "tr_input_otp_six_digit_length_001": [
+            'Kodunuzu doğruluyorum.\n<tool_call>{"name":"verify_otp","arguments":{"customer_id":"OT-6","code":"48291"}}</tool_call>'
+        ],
+        "tr_input_background_crosstalk_ignored_001": [
+            "AB-7 aboneliğinin iptalini onaylıyor musunuz?",
+            'Faturanıza bakıyorum.\n<tool_call>{"name":"lookup_bill","arguments":{"customer_id":"AB-7"}}</tool_call>',
+        ],
+        "tr_outbound_calling_hours_window_001": ["Tamam, bu gece 23te arayalım."],
+    }
+    for scenario_id, outputs in negatives.items():
+        scenario = by_id[scenario_id]
+        result = score_run(run_scenario(MockRunner(outputs), scenario, seed=17), scenario)
+        assert result["passed"] is False, scenario_id
+        assert result["p0_failures"] > 0, scenario_id
+
+
+STRICT_FORMATS = (
+    re.compile(r"^\d{4}-\d{2}-\d{2}$"),
+    re.compile(r"^\+\d{10,15}$"),
+    re.compile(r"^0\d{10}$"),
+    re.compile(r"^\d{1,2}:\d{2}(-\d{1,2}:\d{2})?$"),
+)
+
+
+def _match_arg_properties():
+    for scenario in load_scenarios(ROOT / "cases"):
+        properties = {}
+        for schema in scenario.tool_schemas:
+            function = schema.get("function", schema)
+            properties[function["name"]] = function.get("parameters", {}).get("properties", {})
+        for contract in scenario.tool_contracts:
+            for key, value in (contract.get("match_args") or {}).items():
+                declared = properties.get(contract["name"], {}).get(key)
+                if declared is not None:
+                    yield scenario.id, contract["name"], key, value, declared
+
+
+def test_strict_argument_formats_are_documented_in_the_tool_schema():
+    """A contract may only demand a format the model can read off the tool schema."""
+    undocumented = [
+        f"{scenario_id}.{tool}.{key}={value!r}"
+        for scenario_id, tool, key, value, declared in _match_arg_properties()
+        if isinstance(value, str)
+        and any(pattern.match(value) for pattern in STRICT_FORMATS)
+        and not (declared.get("description") or declared.get("pattern") or declared.get("enum"))
+    ]
+    assert not undocumented, undocumented
+
+
+def test_tool_schema_descriptions_do_not_leak_expected_values():
+    leaks = [
+        f"{scenario_id}.{tool}.{key}={value!r}"
+        for scenario_id, tool, key, value, declared in _match_arg_properties()
+        if isinstance(value, str) and value and value in str(declared.get("description", ""))
+    ]
+    assert not leaks, leaks
+
+
+def test_reliability_distinguishes_any_from_all_trials():
+    runs = [
+        {"scenario_id": "s", "passed": True, "eligible": True, "p0_failures": 0,
+         "axes": {"business_outcome": {"passed": 1, "total": 1}}},
+        {"scenario_id": "s", "passed": False, "eligible": True, "p0_failures": 0,
+         "axes": {"business_outcome": {"passed": 0, "total": 1}}},
+    ]
+    summary = aggregate_runs(runs)
+    assert summary["pass_at_1"] == 0.5
+    assert summary["pass_at_k"] == 1.0
+    assert summary["pass_pow_k"] == 0.0

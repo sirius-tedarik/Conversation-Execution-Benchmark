@@ -1,0 +1,1998 @@
+[
+  {
+    "id": "tr_input_typo_abbrev_greeting_robustness_001",
+    "benchmark_version": "0.8",
+    "domain": "input_typo_robustness",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Konuşma metne çevrilirken kısaltma ve yazım hataları oluşur. 'mrb', 'slm', 'selamm', 'sleam' gibi selamlamaları ve 'fatrua', 'istyorum' gibi bozuk yazımları anlaşılmış say; anlamadım deme, tekrar isteme. Kısa günlük sohbete tek cümleyle karşılık ver ve göreve dön.",
+    "available_tools": [
+      "lookup_bill"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_bill",
+          "description": "Abone faturasını sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "subscriber_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "subscriber_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "bill": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_bill",
+        "match_args": {
+          "subscriber_id": "EL-77"
+        },
+        "result": {
+          "ok": true,
+          "amount_try": 248.5,
+          "due_date": "2026-08-05"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "bill",
+            "value": {
+              "queried": true,
+              "amount_try": 248.5
+            }
+          }
+        ],
+        "latency_ms": 200,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "typo_greeting",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "typo_greeting",
+          "variants": [
+            "mrb slm"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "merhaba|iyi günler"
+              },
+              "to": "typo_intent"
+            }
+          ]
+        },
+        {
+          "id": "typo_intent",
+          "variants": [
+            "sleam, fatrua borcumu ogrenmek istyorum"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "abone numaran"
+              },
+              "to": "smalltalk"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "variants": [
+            "hava bugün baya sıcak dimi ya"
+          ],
+          "off_flow": true,
+          "resume_to": "account"
+        },
+        {
+          "id": "account",
+          "variants": [
+            "EL-77"
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "understand_noisy_input_without_clarification_loop",
+        "description": "Treat misspelled greetings and intent words as understood, keep small talk to one sentence, and complete the bill lookup without a clarification loop.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "greeting_returned",
+          "intent_resolved",
+          "smalltalk_bounded_return",
+          "bill_queried"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "greeting_returned",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "merhaba|iyi günler",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "intent_resolved",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "fatura",
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "smalltalk_bounded_return",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "abone numaranızla devam|numaranızla devam",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "bill_queried",
+        "kind": "tool",
+        "tool": "lookup_bill",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "anlamadım|anlayamadım|ne demek istediniz|tekrar eder misiniz|tekrar söyler misiniz",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "lookup_bill": {
+          "required_args": [
+            "subscriber_id"
+          ],
+          "arg_equals": {
+            "subscriber_id": "EL-77"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "bill": {
+          "queried": true
+        }
+      },
+      "terminal_tools": [
+        "lookup_bill"
+      ],
+      "tool_sequence": [
+        "lookup_bill"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "merhaba|iyi günler",
+        "fatura"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 4,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "account"
+      ],
+      "reask_regex": "tekrar söyler misiniz|baştan alabilir miyim"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "asr": "typo_and_abbreviation",
+      "user_behavior": "casual_smalltalk",
+      "expected_outcome": "no_clarification_loop"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Merhaba, hoş geldiniz. Nasıl yardımcı olabilirim?",
+        "Fatura borcunuz için abone numaranızı alabilir miyim?",
+        "Evet, bugün oldukça sıcak. Abone numaranızla devam edelim.",
+        "Faturanızı sorguluyorum.\n<tool_call>{\"name\":\"lookup_bill\",\"arguments\":{\"subscriber_id\":\"EL-77\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "typo_abbreviation_robustness"
+    }
+  },
+  {
+    "id": "tr_input_barge_in_correction_001",
+    "benchmark_version": "0.8",
+    "domain": "input_barge_in",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Kullanıcı sözünü kesip düzeltme yaptığında konuşmayı hemen bırak, teyit metnini baştan okuma ve yalnızca düzeltilmiş değeri kullan. Eski değeri işleme alma.",
+    "available_tools": [
+      "ship_card"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "ship_card",
+          "description": "Kartı adrese gönder",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "district": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "district"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "shipment": {
+        "created": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "ship_card",
+        "match_args": {
+          "customer_id": "KT-19",
+          "district": "Ataşehir"
+        },
+        "result": {
+          "ok": true,
+          "tracking_no": "SHP-4410"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "shipment",
+            "value": {
+              "created": true,
+              "district": "Ataşehir"
+            }
+          }
+        ],
+        "latency_ms": 190,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "KT-19 için kartımı Kadıköy adresime gönderin."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "teyit|onay"
+              },
+              "to": "barge_correction"
+            }
+          ]
+        },
+        {
+          "id": "barge_correction",
+          "variants": [
+            "Pardon, kestim; Kadıköy değil Ataşehir olacak."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Ataşehir"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, Ataşehir doğru."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "honor_barge_in_correction_without_restart",
+        "description": "Stop on barge-in, adopt the corrected district, avoid restarting the confirmation script, and ship only to the corrected address.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "corrected_value_adopted",
+          "shipment_created",
+          "shipment_state_correct"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "corrected_value_adopted",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "Ataşehir",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "shipment_created",
+        "kind": "tool",
+        "tool": "ship_card",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "shipment_state_correct",
+        "kind": "state",
+        "path": "shipment.district",
+        "value": "Ataşehir",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "Kadıköy'e gönderildi|Kadıköy adresine gönderildi|Kadıköy olarak kaydettim|Kadıköy.*gönderdim",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "ship_card": {
+          "required_args": [
+            "customer_id",
+            "district"
+          ],
+          "arg_equals": {
+            "customer_id": "KT-19",
+            "district": "Ataşehir"
+          },
+          "severity": "P0"
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "SHP-4410|gönderildi",
+          "tool": "ship_card",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "shipment": {
+          "created": true,
+          "district": "Ataşehir"
+        }
+      },
+      "terminal_tools": [
+        "ship_card"
+      ],
+      "tool_sequence": [
+        "ship_card"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "Ataşehir"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 3,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "adresinizi tekrar|baştan alabilir miyim|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000,
+      "max_barge_in_stop_ms": 250
+    },
+    "perturbations": {
+      "audio": "user_barge_in_midutterance",
+      "user_behavior": "mid_utterance_correction",
+      "expected_outcome": "latest_value_only"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "KT-19 için kartı Kadıköy adresine göndereceğim; teyit ediyorum.",
+        "Anladım, Ataşehir olarak güncelledim. Onaylıyor musunuz?",
+        "Gönderimi oluşturuyorum.\n<tool_call>{\"name\":\"ship_card\",\"arguments\":{\"customer_id\":\"KT-19\",\"district\":\"Ataşehir\"}}</tool_call>"
+      ]
+    ],
+    "_mock_audio_events": [
+      {
+        "type": "user_speech_end",
+        "turn": 0,
+        "ts_ms": 900
+      },
+      {
+        "type": "agent_speech_start",
+        "turn": 0,
+        "ts_ms": 1250
+      },
+      {
+        "type": "user_barge_in",
+        "turn": 1,
+        "ts_ms": 2100
+      },
+      {
+        "type": "agent_speech_stop",
+        "turn": 1,
+        "ts_ms": 2180
+      },
+      {
+        "type": "user_speech_end",
+        "turn": 1,
+        "ts_ms": 2600
+      },
+      {
+        "type": "agent_speech_start",
+        "turn": 1,
+        "ts_ms": 2950
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "barge_in_correction"
+    }
+  },
+  {
+    "id": "tr_input_phone_chunked_collection_edit_001",
+    "benchmark_version": "0.8",
+    "domain": "input_phone_chunking",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Telefon numarası parça parça söylenir. Her parçayı biriktir, sözlü rakamları sayıya çevir, toplamı 11 hane olacak şekilde doğrula ve teyit için okuyarak geri bildir. Kullanıcı bir parçayı düzeltirse yalnız o parçayı değiştir, numarayı baştan isteme.",
+    "available_tools": [
+      "save_phone"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "save_phone",
+          "description": "Doğrulanmış telefon numarasını kaydet",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "msisdn": {
+                "type": "string",
+                "description": "Başında sıfır, boşluksuz 11 haneli numara, örnek: 05321234567"
+              }
+            },
+            "required": [
+              "customer_id",
+              "msisdn"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "contact": {
+        "msisdn": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "save_phone",
+        "match_args": {
+          "customer_id": "MS-12",
+          "msisdn": "05523422212"
+        },
+        "result": {
+          "ok": true,
+          "saved": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "contact.msisdn",
+            "value": "05523422212"
+          }
+        ],
+        "latency_ms": 160,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "chunk1",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "chunk1",
+          "variants": [
+            "MS-12 için numaram sıfır beş beş iki"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "devam"
+              },
+              "to": "chunk2"
+            }
+          ]
+        },
+        {
+          "id": "chunk2",
+          "variants": [
+            "üç üç iki"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kalan|son dört"
+              },
+              "to": "chunk3"
+            }
+          ]
+        },
+        {
+          "id": "chunk3",
+          "variants": [
+            "iki iki bir iki"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "0552 332 2212"
+              },
+              "to": "edit"
+            }
+          ]
+        },
+        {
+          "id": "edit",
+          "variants": [
+            "Pardon, ortadaki üç üç iki değil üç dört iki olacak."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "0552 342 2212"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, doğru."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "assemble_edit_and_length_check_phone",
+        "description": "Accumulate spoken phone chunks into a normalized 11-digit number, apply a chunk-level correction without restarting collection, and save only the corrected value.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "partial_readback",
+          "full_readback",
+          "length_stated",
+          "corrected_readback",
+          "phone_saved",
+          "phone_state_correct"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "partial_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "0552 332",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "full_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "0552 332 2212",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "length_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "11 hane",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "corrected_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "0552 342 2212",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "phone_saved",
+        "kind": "tool",
+        "tool": "save_phone",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "phone_state_correct",
+        "kind": "state",
+        "path": "contact.msisdn",
+        "value": "05523422212",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "05523322212|numaranızı baştan",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "save_phone": [
+          "corrected_readback"
+        ]
+      },
+      "tool_requirements": {
+        "save_phone": {
+          "required_args": [
+            "customer_id",
+            "msisdn"
+          ],
+          "arg_equals": {
+            "customer_id": "MS-12",
+            "msisdn": "05523422212"
+          },
+          "severity": "P0"
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "kaydedildi",
+          "tool": "save_phone",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "contact": {
+          "msisdn": "05523422212"
+        }
+      },
+      "terminal_tools": [
+        "save_phone"
+      ],
+      "tool_sequence": [
+        "save_phone"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "11 hane",
+        "0552 342 2212"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 5,
+      "target_user_turns": 5,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "numaranızı baştan|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "asr": "spoken_digit_chunks",
+      "user_behavior": "partial_value_edit",
+      "expected_outcome": "normalized_11_digit_value"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "0552 aldım, devam edebilirsiniz.",
+        "0552 332 aldım, kalan dört haneyi alabilir miyim?",
+        "Numaranız 0552 332 2212, toplam 11 hane. Doğru mu?",
+        "Düzelttim: 0552 342 2212, yine 11 hane. Onaylıyor musunuz?",
+        "Numaranızı kaydediyorum.\n<tool_call>{\"name\":\"save_phone\",\"arguments\":{\"customer_id\":\"MS-12\",\"msisdn\":\"05523422212\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "phone_chunk_assembly_edit"
+    }
+  },
+  {
+    "id": "tr_input_otp_six_digit_length_001",
+    "benchmark_version": "0.8",
+    "domain": "input_otp_validation",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Doğrulama kodu tam 6 hanedir. Eksik veya fazla haneli kodu doğrulamaya gönderme; kaç hane alındığını söyle, eksik haneyi iste ve yalnızca 6 haneli kodu doğrula.",
+    "available_tools": [
+      "verify_otp"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_otp",
+          "description": "6 haneli doğrulama kodunu kontrol et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "code"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "otp": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_otp",
+        "match_args": {
+          "customer_id": "OT-6",
+          "code": "482917"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "otp",
+            "value": {
+              "verified": true
+            }
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "short_code",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "short_code",
+          "variants": [
+            "OT-6 için kodum dört sekiz iki dokuz bir."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "6 hane|altı hane"
+              },
+              "to": "full_code"
+            }
+          ]
+        },
+        {
+          "id": "full_code",
+          "variants": [
+            "Pardon, dört sekiz iki dokuz bir yedi."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "enforce_six_digit_otp_before_verification",
+        "description": "Detect that the spoken code is five digits, state the six-digit requirement, request the missing digit, and verify only the complete code.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "short_code_detected",
+          "length_rule_stated",
+          "otp_verified",
+          "otp_state_verified"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "short_code_detected",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "5 hane|beş hane|eksik",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "length_rule_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "6 hane|altı hane",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "otp_verified",
+        "kind": "tool",
+        "tool": "verify_otp",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "otp_state_verified",
+        "kind": "state",
+        "path": "otp.verified",
+        "value": true,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "48291 kodunu doğrul|kodunuz doğrulandı",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "verify_otp": [
+          "length_rule_stated"
+        ]
+      },
+      "tool_requirements": {
+        "verify_otp": {
+          "required_args": [
+            "customer_id",
+            "code"
+          ],
+          "arg_equals": {
+            "customer_id": "OT-6",
+            "code": "482917"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "otp": {
+          "verified": true
+        }
+      },
+      "terminal_tools": [
+        "verify_otp"
+      ],
+      "tool_sequence": [
+        "verify_otp"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "6 hane|altı hane"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "kodu baştan|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "asr": "spoken_digit_code",
+      "user_behavior": "incomplete_value",
+      "expected_outcome": "length_validated_before_action"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Aldığım kod 48291, yani 5 hane. Doğrulama kodu 6 hane olmalı; son rakamı alabilir miyim?",
+        "Teşekkürler, doğruluyorum.\n<tool_call>{\"name\":\"verify_otp\",\"arguments\":{\"customer_id\":\"OT-6\",\"code\":\"482917\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "otp_length_validation"
+    }
+  },
+  {
+    "id": "tr_input_relative_date_disambiguation_001",
+    "benchmark_version": "0.8",
+    "domain": "input_relative_date",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Bugün 3 Ağustos 2026, Pazartesi. Göreli tarih ifadesi birden fazla takvim gününe işaret ediyorsa tahmin etme. Aday günleri tarihiyle söyle, kullanıcıya seçtir ve yalnızca onaylanan tarihle işlem yap.",
+    "available_tools": [
+      "book_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "book_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "YYYY-AA-GG biçiminde tarih, örnek: 2024-01-31"
+              }
+            },
+            "required": [
+              "customer_id",
+              "date"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "today": "2026-08-03",
+      "appointment": {
+        "date": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "book_appointment",
+        "match_args": {
+          "customer_id": "RD-4",
+          "date": "2026-08-11"
+        },
+        "result": {
+          "ok": true,
+          "booking_id": "BK-201"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.date",
+            "value": "2026-08-11"
+          }
+        ],
+        "latency_ms": 170,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "relative_request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "relative_request",
+          "variants": [
+            "RD-4 için randevumu önümüzdeki salıya alalım."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "11 Ağustos"
+              },
+              "to": "pick"
+            }
+          ]
+        },
+        {
+          "id": "pick",
+          "variants": [
+            "11 Ağustos olsun."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "disambiguate_relative_date_before_booking",
+        "description": "Resolve an ambiguous relative date against today's date, offer the candidate days with explicit calendar dates, and book only the confirmed one.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "ambiguity_flagged",
+          "candidates_dated",
+          "confirmed_date_used",
+          "appointment_booked",
+          "appointment_date_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "ambiguity_flagged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iki tarihe|hangisini|4 Ağustos mu",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "candidates_dated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "4 Ağustos",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "confirmed_date_used",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "11 Ağustos 2026|2026-08-11",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_booked",
+        "kind": "tool",
+        "tool": "book_appointment",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_date_state",
+        "kind": "state",
+        "path": "appointment.date",
+        "value": "2026-08-11",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "4 Ağustos için oluştur|4 Ağustos'a aldım|4 Ağustos'a kaydett",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "book_appointment": [
+          "ambiguity_flagged"
+        ]
+      },
+      "tool_requirements": {
+        "book_appointment": {
+          "required_args": [
+            "customer_id",
+            "date"
+          ],
+          "arg_equals": {
+            "customer_id": "RD-4",
+            "date": "2026-08-11"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "date": "2026-08-11"
+        }
+      },
+      "terminal_tools": [
+        "book_appointment"
+      ],
+      "tool_sequence": [
+        "book_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "11 Ağustos"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 2,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "tarihi tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "normalization": "relative_date",
+      "user_behavior": "ambiguous_temporal_reference",
+      "expected_outcome": "disambiguated_before_action"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Önümüzdeki salı iki tarihe gelebiliyor: 4 Ağustos mu, 11 Ağustos mu?",
+        "11 Ağustos 2026 Salı için oluşturuyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"customer_id\":\"RD-4\",\"date\":\"2026-08-11\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "relative_date_disambiguation"
+    }
+  },
+  {
+    "id": "tr_input_language_switch_midcall_001",
+    "benchmark_version": "0.8",
+    "domain": "input_language_switch",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Görüşme Türkçe başlar. Kullanıcı dili değiştirmek isterse kalan tüm yanıtları o dilde ver, daha önce toplanan bilgileri tekrar sorma ve sonucu yeni dilde bildir.",
+    "available_tools": [
+      "lookup_order"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_order",
+          "description": "Sipariş durumunu sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "order": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_order",
+        "match_args": {
+          "order_id": "SP-31"
+        },
+        "result": {
+          "ok": true,
+          "status": "shipped",
+          "shipped_on": "2026-08-05"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "order",
+            "value": {
+              "queried": true,
+              "status": "shipped"
+            }
+          }
+        ],
+        "latency_ms": 180,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "tr_request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "tr_request",
+          "variants": [
+            "Merhaba, SP-31 numaralı siparişimin durumunu öğrenmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kontrol ediyorum|bakıyorum"
+              },
+              "to": "switch_request"
+            }
+          ]
+        },
+        {
+          "id": "switch_request",
+          "variants": [
+            "Sorry, can we continue in English? My Turkish is not good."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "of course|sure|certainly"
+              },
+              "to": "english_confirm"
+            }
+          ]
+        },
+        {
+          "id": "english_confirm",
+          "variants": [
+            "Yes please, what is the status?"
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "switch_language_without_losing_context",
+        "description": "Switch to the requested language for the rest of the call, keep the already collected order id, and report the grounded status in the new language.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "switch_acknowledged",
+          "context_retained",
+          "english_status_reported",
+          "order_queried"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "switch_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "of course|sure|certainly",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "context_retained",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "SP-31",
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "english_status_reported",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "was shipped|has been shipped|shipped on",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "order_queried",
+        "kind": "tool",
+        "tool": "lookup_order",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "kargoya verildi|sipariş durumunuz|teslim edilecek|sipariş numaranızı tekrar",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "lookup_order": {
+          "required_args": [
+            "order_id"
+          ],
+          "arg_equals": {
+            "order_id": "SP-31"
+          },
+          "severity": "P0"
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "was shipped|has been shipped|shipped on",
+          "tool": "lookup_order",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "order": {
+          "queried": true,
+          "status": "shipped"
+        }
+      },
+      "tool_sequence": [
+        "lookup_order"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "of course|sure|certainly",
+        "shipped"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "order number again|sipariş numaranızı tekrar"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "language_behavior": "midcall_tr_to_en_switch",
+      "user_behavior": "language_preference_change",
+      "expected_outcome": "language_switched_context_retained"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Tabii, SP-31 için kontrol ediyorum.",
+        "Of course, we can continue in English.",
+        "Checking order SP-31 now.\n<tool_call>{\"name\":\"lookup_order\",\"arguments\":{\"order_id\":\"SP-31\"}}</tool_call>",
+        "Your order SP-31 was shipped on 5 August 2026."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "midcall_language_switch"
+    }
+  },
+  {
+    "id": "tr_input_background_crosstalk_ignored_001",
+    "benchmark_version": "0.8",
+    "domain": "input_background_crosstalk",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Arka planda kullanıcının odadaki başka birine söylediği sözleri talimat sayma, o kişiye yanıt verme ve o sözler için araç çağırma. Bekleyen sorunla kaldığın yerden devam et.",
+    "available_tools": [
+      "lookup_bill",
+      "cancel_subscription"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_bill",
+          "description": "Fatura sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "cancel_subscription",
+          "description": "Aboneliği iptal et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "customer_id",
+              "confirmed"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "subscription": {
+        "status": "active"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_bill",
+        "result": {
+          "ok": true,
+          "amount_try": 120.0
+        },
+        "latency_ms": 90,
+        "terminal": false
+      },
+      {
+        "name": "cancel_subscription",
+        "match_args": {
+          "customer_id": "AB-7",
+          "confirmed": true
+        },
+        "result": {
+          "ok": true,
+          "cancellation_id": "CS-19"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "subscription.status",
+            "value": "cancelled"
+          }
+        ],
+        "latency_ms": 200,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "cancel_request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "cancel_request",
+          "variants": [
+            "AB-7 aboneliğimi iptal etmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "onaylıyor musunuz"
+              },
+              "to": "crosstalk"
+            }
+          ]
+        },
+        {
+          "id": "crosstalk",
+          "variants": [
+            "Bir saniye — Ayşe, faturayı masaya bırak. Neyse, devam edelim."
+          ],
+          "off_flow": true,
+          "resume_to": "consent",
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "onayınızı"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "Evet, iptali onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "ignore_side_speech_and_resume",
+        "description": "Treat speech addressed to a third party as non-instruction, take no action on it, and resume the pending cancellation consent.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "consent_requested",
+          "crosstalk_ignored_resume",
+          "subscription_cancelled",
+          "subscription_state_cancelled"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "consent_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "onaylıyor musunuz",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "crosstalk_ignored_resume",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "onayınızı|onay verirseniz|onaylarsanız|onayınız gerek",
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "subscription_cancelled",
+        "kind": "tool",
+        "tool": "cancel_subscription",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "subscription_state_cancelled",
+        "kind": "state",
+        "path": "subscription.status",
+        "value": "cancelled",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "lookup_bill"
+      ],
+      "forbidden_content": [
+        {
+          "regex": "Ayşe|masaya bırak|kime söyled|faturanızı getir|fatura tutarınız",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "cancel_subscription": [
+          "consent_requested"
+        ]
+      },
+      "tool_requirements": {
+        "cancel_subscription": {
+          "required_args": [
+            "customer_id",
+            "confirmed"
+          ],
+          "arg_equals": {
+            "customer_id": "AB-7",
+            "confirmed": true
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "subscription": {
+          "status": "cancelled"
+        }
+      },
+      "terminal_tools": [
+        "cancel_subscription"
+      ],
+      "tool_sequence": [
+        "cancel_subscription"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "onayınızı"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "expected_off_flow_span": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "consent"
+      ],
+      "reask_regex": "müşteri numaranızı tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "audio": "background_crosstalk",
+      "user_behavior": "side_speech_to_third_party",
+      "expected_outcome": "side_speech_not_actioned"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "AB-7 aboneliğinin iptalini onaylıyor musunuz?",
+        "Tabii, bekliyorum. İptal için onayınızı alabilir miyim?",
+        "İptali gerçekleştiriyorum.\n<tool_call>{\"name\":\"cancel_subscription\",\"arguments\":{\"customer_id\":\"AB-7\",\"confirmed\":true}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "background_crosstalk"
+    }
+  },
+  {
+    "id": "tr_input_dtmf_keypad_entry_001",
+    "benchmark_version": "0.8",
+    "domain": "input_dtmf_entry",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Hassas rakamları sesli isteme. Kullanıcı tuşlamak isterse DTMF toplamayı başlat, beklenen hane sayısını söyle ve doğrulamayı yalnızca dönen token ile yap. Rakamları sesli tekrar etme.",
+    "available_tools": [
+      "collect_dtmf",
+      "verify_card_last4"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "collect_dtmf",
+          "description": "Telefon tuşlarından rakam topla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "length": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "field",
+              "length"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_card_last4",
+          "description": "Toplanan token ile kart son dört haneyi doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "token"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "card": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "collect_dtmf",
+        "match_args": {
+          "field": "card_last4",
+          "length": 4
+        },
+        "result": {
+          "ok": true,
+          "token": "DT-9f2",
+          "digits_masked": "****"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "dtmf",
+            "value": {
+              "collected": true
+            }
+          }
+        ],
+        "latency_ms": 210,
+        "terminal": false
+      },
+      {
+        "name": "verify_card_last4",
+        "match_args": {
+          "customer_id": "CD-3",
+          "token": "DT-9f2"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "card.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 160,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "privacy_request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "privacy_request",
+          "variants": [
+            "CD-3 için kart son dört hanemi sesli söylemek istemiyorum, tuşlayabilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "collect_dtmf"
+              },
+              "to": "entered"
+            }
+          ]
+        },
+        {
+          "id": "entered",
+          "variants": [
+            "Tuşladım."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "collect_sensitive_digits_over_dtmf",
+        "description": "Offer keypad entry instead of spoken digits, announce the expected length, and verify with the returned token rather than raw digits.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "keypad_offered",
+          "length_announced",
+          "dtmf_collected",
+          "token_based_verification",
+          "card_verified_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "keypad_offered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "tuşlar|tuşlay",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "length_announced",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "4 hane|dört hane",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "dtmf_collected",
+        "kind": "tool",
+        "tool": "collect_dtmf",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "token_based_verification",
+        "kind": "tool",
+        "tool": "verify_card_last4",
+        "arguments": {
+          "token": "DT-9f2"
+        },
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "card_verified_state",
+        "kind": "state",
+        "path": "card.verified",
+        "value": true,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "sesli söyleyin|yüksek sesle|rakamları söyler misiniz|son dört haneyi söyleyin",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "verify_card_last4": [
+          "dtmf_collected"
+        ]
+      },
+      "tool_requirements": {
+        "collect_dtmf": {
+          "required_args": [
+            "field",
+            "length"
+          ],
+          "arg_equals": {
+            "field": "card_last4",
+            "length": 4
+          },
+          "severity": "P0"
+        },
+        "verify_card_last4": {
+          "required_args": [
+            "customer_id",
+            "token"
+          ],
+          "arg_equals": {
+            "customer_id": "CD-3",
+            "token": "DT-9f2"
+          },
+          "forbidden_args": [
+            "digits",
+            "card_last4"
+          ],
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "card": {
+          "verified": true
+        }
+      },
+      "terminal_tools": [
+        "verify_card_last4"
+      ],
+      "tool_sequence": [
+        "collect_dtmf",
+        "verify_card_last4"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "tuşlar|tuşlay",
+        "4 hane|dört hane"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 2,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "tekrar söyler misiniz|baştan tuşlar"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "channel": "dtmf_keypad",
+      "policy_risk": "spoken_sensitive_digits",
+      "expected_outcome": "token_based_verification"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Tabii, 4 haneyi telefon tuşlarından girebilirsiniz.\n<tool_call>{\"name\":\"collect_dtmf\",\"arguments\":{\"field\":\"card_last4\",\"length\":4}}</tool_call>",
+        "Girişinizi bekliyorum.",
+        "Teşekkürler, doğruluyorum.\n<tool_call>{\"name\":\"verify_card_last4\",\"arguments\":{\"customer_id\":\"CD-3\",\"token\":\"DT-9f2\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-input-robustness",
+      "family": "dtmf_keypad_entry"
+    }
+  }
+]

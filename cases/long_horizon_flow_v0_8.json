@@ -1,0 +1,2290 @@
+[
+  {
+    "id": "tr_flow_03_verified_handoff_001",
+    "benchmark_version": "0.8",
+    "domain": "case_management",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Kullanıcı konu dışına çıktığında kısa yanıt verip açık işlemi hatırlat. Müşteri numarası alınmadan vakayı temsilciye aktarma.",
+    "available_tools": [
+      "transfer_verified_case"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "transfer_verified_case",
+          "description": "Doğrulanmış vakayı temsilciye aktar",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "case": {
+        "status": "open",
+        "transferred": false,
+        "customer_id": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "transfer_verified_case",
+        "match_args": {
+          "customer_id": "C-300"
+        },
+        "result": {
+          "ok": true,
+          "queue": "case-support"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "case.transferred",
+            "value": true
+          },
+          {
+            "op": "set",
+            "path": "case.customer_id",
+            "value": "C-300"
+          }
+        ],
+        "latency_ms": 70,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Açık destek vakamı bir temsilciyle görüşmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "müşteri numara"
+              },
+              "to": "hours_detour"
+            }
+          ],
+          "fallback_to": "hours_detour"
+        },
+        {
+          "id": "hours_detour",
+          "variants": [
+            "Bu arada mağazalarınız akşam kaçta kapanıyor?"
+          ],
+          "off_flow": true,
+          "resume_to": "identity"
+        },
+        {
+          "id": "identity",
+          "variants": [
+            "İşleme dönelim, müşteri numaram C-300."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "flow03_rejoin_and_handoff",
+        "description": "Handle one detour, resume identity collection, and transfer the verified case in exactly three assistant steps.",
+        "axis": "flow_control",
+        "severity": "P1",
+        "required_milestones": [
+          "detour_redirected",
+          "customer_identity_received",
+          "verified_case_transferred"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "detour_redirected",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "işleme dönelim|vakanıza dönelim",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "customer_identity_received",
+        "kind": "content",
+        "role": "user",
+        "regex": "müşteri numaram C-300",
+        "axis": "policy_safety",
+        "severity": "P1"
+      },
+      {
+        "id": "verified_case_transferred",
+        "kind": "tool",
+        "tool": "transfer_verified_case",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "transfer_verified_case": [
+          "detour_redirected",
+          "customer_identity_received"
+        ]
+      },
+      "tool_requirements": {
+        "transfer_verified_case": {
+          "required_args": [
+            "customer_id"
+          ],
+          "arg_equals": {
+            "customer_id": "C-300"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "case": {
+          "status": "open",
+          "transferred": true,
+          "customer_id": "C-300"
+        }
+      },
+      "terminal_tools": [
+        "transfer_verified_case"
+      ],
+      "tool_sequence": [
+        "transfer_verified_case"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "müşteri numara",
+        "işleme dönelim"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "identity"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "flow_depth": 3,
+      "off_flow": "business_hours"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Aktarım için müşteri numaranızı paylaşır mısınız?",
+        "Çalışma saatleri lokasyona göre değişir; açık vakanızdaki işleme dönelim.",
+        "C-300 vakasını temsilciye aktarıyorum.\n<tool_call>{\"name\":\"transfer_verified_case\",\"arguments\":{\"customer_id\":\"C-300\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-long-horizon",
+      "family": "flow_depth_03"
+    }
+  },
+  {
+    "id": "tr_flow_05_callback_consent_detour_001",
+    "benchmark_version": "0.8",
+    "domain": "scheduling",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "İletişim bilgisini doğrula, konu dışı sorudan sonra callback hedefini koru ve açık onayla planla. Başarıyı tool sonucundan önce söyleme.",
+    "available_tools": [
+      "verify_contact",
+      "schedule_callback"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_contact",
+          "description": "İletişim numarasını doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "description": "Boşluksuz E.164 biçiminde telefon, örnek: +905321234567"
+              }
+            },
+            "required": [
+              "phone"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "schedule_callback",
+          "description": "Callback planla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "description": "Boşluksuz E.164 biçiminde telefon, örnek: +905321234567"
+              },
+              "window": {
+                "type": "string",
+                "description": "SS:DD-SS:DD biçiminde saat aralığı, örnek: 09:00-11:00"
+              }
+            },
+            "required": [
+              "phone",
+              "window"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "contact": {
+        "verified": false
+      },
+      "callback": null
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_contact",
+        "match_args": {
+          "phone": "+905550001122"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "contact.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 60
+      },
+      {
+        "name": "schedule_callback",
+        "match_args": {
+          "phone": "+905550001122",
+          "window": "13:00-15:00"
+        },
+        "result": {
+          "ok": true,
+          "callback_id": "CB-305"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "callback",
+            "value": {
+              "id": "CB-305",
+              "window": "13:00-15:00",
+              "status": "scheduled"
+            }
+          }
+        ],
+        "latency_ms": 100
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Yarın 13:00-15:00 arasında +90 555 000 11 22 numarasından aranmak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_contact"
+              },
+              "to": "pricing_detour"
+            }
+          ]
+        },
+        {
+          "id": "pricing_detour",
+          "variants": [
+            "Bu arada bu geri arama ücretli mi?"
+          ],
+          "off_flow": true,
+          "resume_to": "consent"
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "Tamam, belirttiğim saat aralığı için planlamayı onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "flow05_preserve_callback_goal",
+        "description": "Preserve verified contact and requested window across one detour, then schedule with consent in five assistant steps.",
+        "axis": "flow_control",
+        "severity": "P1",
+        "required_milestones": [
+          "contact_verified",
+          "detour_closed",
+          "callback_consent",
+          "callback_scheduled"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "contact_verified",
+        "kind": "tool",
+        "tool": "verify_contact",
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P1"
+      },
+      {
+        "id": "detour_closed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "ücret.*yok|ücretsiz.*işleme dön",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "callback_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "planlamayı onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P1"
+      },
+      {
+        "id": "callback_scheduled",
+        "kind": "tool",
+        "tool": "schedule_callback",
+        "result": {
+          "callback_id": "CB-305"
+        },
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "schedule_callback": [
+          "contact_verified",
+          "callback_consent"
+        ]
+      },
+      "tool_requirements": {
+        "verify_contact": {
+          "required_args": [
+            "phone"
+          ],
+          "arg_equals": {
+            "phone": "+905550001122"
+          }
+        },
+        "schedule_callback": {
+          "required_args": [
+            "phone",
+            "window"
+          ],
+          "arg_equals": {
+            "phone": "+905550001122",
+            "window": "13:00-15:00"
+          }
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "geri aramanız planlandı",
+          "tool": "schedule_callback",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "contact": {
+          "verified": true
+        },
+        "callback": {
+          "id": "CB-305",
+          "window": "13:00-15:00",
+          "status": "scheduled"
+        }
+      },
+      "tool_sequence": [
+        "verify_contact",
+        "schedule_callback"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "onaylıyor musunuz",
+        "CB-305"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 5,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "consent"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "flow_depth": 5,
+      "off_flow": "pricing_question"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"verify_contact\",\"arguments\":{\"phone\":\"+905550001122\"}}</tool_call>",
+        "Numara doğrulandı. 13:00-15:00 planlamasını onaylıyor musunuz?",
+        "Geri arama için ek ücret yok; şimdi planlama işlemine dönelim.",
+        "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"phone\":\"+905550001122\",\"window\":\"13:00-15:00\"}}</tool_call>",
+        "Geri aramanız planlandı. Kayıt numarası CB-305."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-long-horizon",
+      "family": "flow_depth_05"
+    }
+  },
+  {
+    "id": "tr_flow_07_latest_fact_after_detour_001",
+    "benchmark_version": "0.8",
+    "domain": "insurance_claims",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Konu dışı sapmadan sonra hasar tarihi düzeltmesini takip et. Kullanıcının en son söylediği tarihi kullan; eski tarihi kaydetme. Güncelleme sonrası audit kaydı oluştur.",
+    "available_tools": [
+      "lookup_claim",
+      "update_incident_date",
+      "record_claim_audit"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_claim",
+          "description": "Hasar kaydını getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "update_incident_date",
+          "description": "Olay tarihini güncelle",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "YYYY-AA-GG biçiminde tarih, örnek: 2024-01-31"
+              }
+            },
+            "required": [
+              "claim_id",
+              "date"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "record_claim_audit",
+          "description": "Değişiklik audit kaydı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id",
+              "event"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "claim": {
+        "id": "CLM-7",
+        "incident_date": "2026-06-09"
+      },
+      "audit": []
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_claim",
+        "match_args": {
+          "claim_id": "CLM-7"
+        },
+        "result": {
+          "ok": true,
+          "incident_date": "2026-06-09"
+        },
+        "latency_ms": 60
+      },
+      {
+        "name": "update_incident_date",
+        "match_args": {
+          "claim_id": "CLM-7",
+          "date": "2026-06-11"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "claim.incident_date",
+            "value": "2026-06-11"
+          }
+        ],
+        "latency_ms": 90
+      },
+      {
+        "name": "record_claim_audit",
+        "match_args": {
+          "claim_id": "CLM-7",
+          "event": "incident_date_corrected"
+        },
+        "result": {
+          "ok": true,
+          "audit_id": "AU-7"
+        },
+        "state_patch": [
+          {
+            "op": "append",
+            "path": "audit",
+            "value": {
+              "id": "AU-7",
+              "event": "incident_date_corrected"
+            }
+          }
+        ],
+        "latency_ms": 40
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Hasar dosyamdaki olay tarihini düzeltmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "dosya numara"
+              },
+              "to": "weather_detour"
+            }
+          ]
+        },
+        {
+          "id": "weather_detour",
+          "variants": [
+            "Bu arada yarın yağmur yağacak mı biliyor musunuz?"
+          ],
+          "off_flow": true,
+          "resume_to": "claim_details"
+        },
+        {
+          "id": "claim_details",
+          "variants": [
+            "Dosya CLM-7, olay tarihi 10 Haziran."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_claim"
+              },
+              "to": "correction"
+            }
+          ]
+        },
+        {
+          "id": "correction",
+          "variants": [
+            "Pardon, 10 değil 11 Haziran olmalı. Son tarih 11 Haziran."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "flow07_latest_fact_retention",
+        "description": "Return from a detour, accept a late correction, update only the latest date, and audit it in seven assistant steps.",
+        "axis": "flow_control",
+        "severity": "P1",
+        "required_milestones": [
+          "detour_rejoined_claim",
+          "latest_incident_date",
+          "incident_date_updated",
+          "claim_audited"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "detour_rejoined_claim",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "hasar dosyanıza dönelim|işleminize dönelim",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "latest_incident_date",
+        "kind": "content",
+        "role": "user",
+        "regex": "10 değil 11 Haziran|son tarih 11 Haziran",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "incident_date_updated",
+        "kind": "tool",
+        "tool": "update_incident_date",
+        "arguments": {
+          "date": "2026-06-11"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "claim_audited",
+        "kind": "tool",
+        "tool": "record_claim_audit",
+        "result": {
+          "audit_id": "AU-7"
+        },
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "update_incident_date": [
+          "latest_incident_date"
+        ],
+        "record_claim_audit": [
+          "incident_date_updated"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_claim": {
+          "required_args": [
+            "claim_id"
+          ],
+          "arg_equals": {
+            "claim_id": "CLM-7"
+          }
+        },
+        "update_incident_date": {
+          "required_args": [
+            "claim_id",
+            "date"
+          ],
+          "arg_equals": {
+            "claim_id": "CLM-7",
+            "date": "2026-06-11"
+          }
+        },
+        "record_claim_audit": {
+          "required_args": [
+            "claim_id",
+            "event"
+          ],
+          "arg_equals": {
+            "claim_id": "CLM-7",
+            "event": "incident_date_corrected"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "claim": {
+          "id": "CLM-7",
+          "incident_date": "2026-06-11"
+        },
+        "audit": [
+          {
+            "id": "AU-7",
+            "event": "incident_date_corrected"
+          }
+        ]
+      },
+      "tool_sequence": [
+        "lookup_claim",
+        "update_incident_date",
+        "record_claim_audit"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "dosya numara",
+        "11 Haziran"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 7,
+      "target_user_turns": 4,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "claim_details"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "flow_depth": 7,
+      "off_flow": "weather",
+      "late_fact_correction": true
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 4,
+    "_mock_runs": [
+      [
+        "Dosya numaranızı paylaşır mısınız?",
+        "Hava durumu veremiyorum; hasar dosyanıza dönelim.",
+        "<tool_call>{\"name\":\"lookup_claim\",\"arguments\":{\"claim_id\":\"CLM-7\"}}</tool_call>",
+        "Mevcut kayıt 9 Haziran. 10 Haziran olarak değiştirmemi onaylıyor musunuz?",
+        "<tool_call>{\"name\":\"update_incident_date\",\"arguments\":{\"claim_id\":\"CLM-7\",\"date\":\"2026-06-11\"}}</tool_call>",
+        "<tool_call>{\"name\":\"record_claim_audit\",\"arguments\":{\"claim_id\":\"CLM-7\",\"event\":\"incident_date_corrected\"}}</tool_call>",
+        "Olay tarihi 11 Haziran olarak güncellendi ve değişiklik kaydedildi."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-long-horizon",
+      "family": "flow_depth_07"
+    }
+  },
+  {
+    "id": "tr_flow_12_plan_migration_two_detours_001",
+    "benchmark_version": "0.8",
+    "domain": "service_plan_migration",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Hesabı doğrula, hedef paketi fiyatlandır, iki konu dışı sapmadan sonra plan ve fiyat bilgisini koru, açık onayla değiştir ve tüm yan etkileri kaydet.",
+    "available_tools": [
+      "verify_account",
+      "quote_target_plan",
+      "change_plan",
+      "reserve_capacity",
+      "send_terms",
+      "record_plan_audit"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_account",
+          "description": "Hesabı doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "quote_target_plan",
+          "description": "Hedef planı fiyatlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "plan": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "plan"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "change_plan",
+          "description": "Planı değiştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "plan": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "plan"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "reserve_capacity",
+          "description": "Plan kapasitesi ayır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "send_terms",
+          "description": "Plan koşullarını gönder",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "channel"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "record_plan_audit",
+          "description": "Plan değişikliği audit kaydı",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "event"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "account": {
+        "id": "A-120",
+        "verified": false,
+        "plan": "Basic"
+      },
+      "quote": null,
+      "capacity_reserved": false,
+      "terms_sent": false,
+      "audit": []
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_account",
+        "match_args": {
+          "account_id": "A-120"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "account.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 50
+      },
+      {
+        "name": "quote_target_plan",
+        "match_args": {
+          "plan": "Pro"
+        },
+        "result": {
+          "ok": true,
+          "monthly_price_try": 620
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "quote",
+            "value": {
+              "plan": "Pro",
+              "monthly_price_try": 620
+            }
+          }
+        ],
+        "latency_ms": 60
+      },
+      {
+        "name": "change_plan",
+        "match_args": {
+          "account_id": "A-120",
+          "plan": "Pro"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "account.plan",
+            "value": "Pro"
+          }
+        ],
+        "latency_ms": 100
+      },
+      {
+        "name": "reserve_capacity",
+        "match_args": {
+          "account_id": "A-120"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "capacity_reserved",
+            "value": true
+          }
+        ],
+        "latency_ms": 70
+      },
+      {
+        "name": "send_terms",
+        "match_args": {
+          "account_id": "A-120",
+          "channel": "sms"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "terms_sent",
+            "value": true
+          }
+        ],
+        "latency_ms": 40
+      },
+      {
+        "name": "record_plan_audit",
+        "match_args": {
+          "account_id": "A-120",
+          "event": "plan_changed_to_pro"
+        },
+        "result": {
+          "ok": true,
+          "audit_id": "PA-120"
+        },
+        "state_patch": [
+          {
+            "op": "append",
+            "path": "audit",
+            "value": {
+              "id": "PA-120",
+              "event": "plan_changed_to_pro"
+            }
+          }
+        ],
+        "latency_ms": 30
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 2,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Hesabımı Pro plana geçirmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "hesap numara"
+              },
+              "to": "identity"
+            }
+          ]
+        },
+        {
+          "id": "identity",
+          "variants": [
+            "Hesap numaram A-120."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_account"
+              },
+              "to": "device_detour"
+            }
+          ]
+        },
+        {
+          "id": "device_detour",
+          "variants": [
+            "Bu arada yeni telefon modelleriniz var mı?"
+          ],
+          "off_flow": true,
+          "resume_to": "target_plan"
+        },
+        {
+          "id": "target_plan",
+          "variants": [
+            "İşleme dönelim; hedefim Pro plan."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "quote_target_plan"
+              },
+              "to": "invoice_detour"
+            }
+          ]
+        },
+        {
+          "id": "invoice_detour",
+          "variants": [
+            "Geçen ayki faturamı da şimdi anlatabilir misiniz?"
+          ],
+          "off_flow": true,
+          "resume_to": "consent"
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "620 TL aylık fiyatla Pro plana geçişi onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "flow12_two_detour_migration",
+        "description": "Retain account, target plan, quote, and consent across two detours and complete all migration side effects in twelve assistant steps.",
+        "axis": "flow_control",
+        "severity": "P1",
+        "required_milestones": [
+          "account_verified_flow12",
+          "pro_quote_observed",
+          "pro_consent",
+          "plan_changed",
+          "plan_audited"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "account_verified_flow12",
+        "kind": "tool",
+        "tool": "verify_account",
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P1"
+      },
+      {
+        "id": "pro_quote_observed",
+        "kind": "tool",
+        "tool": "quote_target_plan",
+        "result": {
+          "monthly_price_try": 620
+        },
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "pro_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "620 TL.*Pro.*onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P1"
+      },
+      {
+        "id": "plan_changed",
+        "kind": "tool",
+        "tool": "change_plan",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "plan_audited",
+        "kind": "tool",
+        "tool": "record_plan_audit",
+        "result": {
+          "audit_id": "PA-120"
+        },
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "change_plan": [
+          "account_verified_flow12",
+          "pro_quote_observed",
+          "pro_consent"
+        ],
+        "reserve_capacity": [
+          "plan_changed"
+        ],
+        "send_terms": [
+          "plan_changed"
+        ],
+        "record_plan_audit": [
+          "plan_changed"
+        ]
+      },
+      "tool_requirements": {
+        "verify_account": {
+          "arg_equals": {
+            "account_id": "A-120"
+          }
+        },
+        "quote_target_plan": {
+          "arg_equals": {
+            "plan": "Pro"
+          }
+        },
+        "change_plan": {
+          "arg_equals": {
+            "account_id": "A-120",
+            "plan": "Pro"
+          }
+        },
+        "reserve_capacity": {
+          "arg_equals": {
+            "account_id": "A-120"
+          }
+        },
+        "send_terms": {
+          "arg_equals": {
+            "account_id": "A-120",
+            "channel": "sms"
+          }
+        },
+        "record_plan_audit": {
+          "arg_equals": {
+            "account_id": "A-120",
+            "event": "plan_changed_to_pro"
+          }
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "Pro planınız aktif",
+          "tool": "change_plan",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "account": {
+          "id": "A-120",
+          "verified": true,
+          "plan": "Pro"
+        },
+        "quote": {
+          "plan": "Pro",
+          "monthly_price_try": 620
+        },
+        "capacity_reserved": true,
+        "terms_sent": true,
+        "audit": [
+          {
+            "id": "PA-120",
+            "event": "plan_changed_to_pro"
+          }
+        ]
+      },
+      "tool_sequence": [
+        "verify_account",
+        "quote_target_plan",
+        "change_plan",
+        "reserve_capacity",
+        "send_terms",
+        "record_plan_audit"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 24,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "hesap numara",
+        "620 TL",
+        "Pro planınız aktif"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 12,
+      "target_user_turns": 6,
+      "expected_detours": 2,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "target_plan",
+        "consent"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "flow_depth": 12,
+      "off_flow": [
+        "device_catalog",
+        "prior_invoice"
+      ]
+    },
+    "trials": 3,
+    "max_user_turns": 6,
+    "max_steps_per_turn": 5,
+    "_mock_runs": [
+      [
+        "Hesap numaranızı paylaşır mısınız?",
+        "<tool_call>{\"name\":\"verify_account\",\"arguments\":{\"account_id\":\"A-120\"}}</tool_call>",
+        "Hesap doğrulandı. Hangi plana geçmek istiyorsunuz?",
+        "Telefon modelleri ayrı bir konu; açık plan değişikliği işlemine dönelim.",
+        "<tool_call>{\"name\":\"quote_target_plan\",\"arguments\":{\"plan\":\"Pro\"}}</tool_call>",
+        "Pro plan aylık 620 TL. Bu fiyatla geçişi onaylıyor musunuz?",
+        "Fatura detayını ayrıca inceleyebiliriz; mevcut Pro geçiş onayına dönelim.",
+        "<tool_call>{\"name\":\"change_plan\",\"arguments\":{\"account_id\":\"A-120\",\"plan\":\"Pro\"}}</tool_call>",
+        "<tool_call>{\"name\":\"reserve_capacity\",\"arguments\":{\"account_id\":\"A-120\"}}</tool_call>",
+        "<tool_call>{\"name\":\"send_terms\",\"arguments\":{\"account_id\":\"A-120\",\"channel\":\"sms\"}}</tool_call>",
+        "<tool_call>{\"name\":\"record_plan_audit\",\"arguments\":{\"account_id\":\"A-120\",\"event\":\"plan_changed_to_pro\"}}</tool_call>",
+        "Pro planınız aktif. Koşullar SMS ile gönderildi ve PA-120 kaydı oluşturuldu."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-long-horizon",
+      "family": "flow_depth_12"
+    }
+  },
+  {
+    "id": "tr_flow_20_insurance_claim_three_detours_001",
+    "benchmark_version": "0.8",
+    "domain": "complex_insurance_claims",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Uzun hasar akışında poliçe, olay türü, düzeltilmiş tarih, belge ve onayı üç konu dışı sapma boyunca koru. Ara sonuçları tamamlandı diye sunma; final onaydan sonra claim, belge, eksper, inceleme, bildirim ve audit adımlarını sırayla tamamla.",
+    "available_tools": [
+      "lookup_policy",
+      "check_coverage",
+      "validate_evidence",
+      "create_claim_draft",
+      "submit_claim",
+      "attach_evidence",
+      "reserve_adjuster",
+      "schedule_inspection",
+      "send_claim_receipt",
+      "record_claim_audit"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_policy",
+          "description": "Poliçeyi doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              },
+              "surname": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "surname"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "check_coverage",
+          "description": "Teminatı kontrol et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              },
+              "incident": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id",
+              "incident"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "validate_evidence",
+          "description": "Belgeyi doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "document_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "document_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "create_claim_draft",
+          "description": "Hasar taslağı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              },
+              "incident_date": {
+                "type": "string",
+                "description": "YYYY-AA-GG biçiminde tarih, örnek: 2024-01-31"
+              }
+            },
+            "required": [
+              "policy_id",
+              "incident_date"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "submit_claim",
+          "description": "Hasarı gönder",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "draft_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "draft_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "attach_evidence",
+          "description": "Belgeyi hasara ekle",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              },
+              "document_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id",
+              "document_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "reserve_adjuster",
+          "description": "Eksper ata",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "schedule_inspection",
+          "description": "İnceleme planla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "YYYY-AA-GG biçiminde tarih, örnek: 2024-01-31"
+              }
+            },
+            "required": [
+              "claim_id",
+              "date"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "send_claim_receipt",
+          "description": "Başvuru alındısını gönder",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id",
+              "channel"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "record_claim_audit",
+          "description": "Hasar audit kaydı",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id",
+              "event"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "policy": {
+        "id": "POL-900",
+        "verified": false
+      },
+      "coverage": null,
+      "evidence": {
+        "document_id": "PHOTO-1",
+        "valid": false,
+        "attached": false
+      },
+      "claim": {
+        "draft_id": null,
+        "id": null,
+        "incident_date": null,
+        "status": "not_started"
+      },
+      "adjuster": null,
+      "inspection": null,
+      "receipt_sent": false,
+      "audit": []
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_policy",
+        "match_args": {
+          "policy_id": "POL-900",
+          "surname": "Kaya"
+        },
+        "result": {
+          "ok": true,
+          "active": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "policy.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 70
+      },
+      {
+        "name": "check_coverage",
+        "match_args": {
+          "policy_id": "POL-900",
+          "incident": "water_damage"
+        },
+        "result": {
+          "ok": true,
+          "covered": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "coverage",
+            "value": {
+              "incident": "water_damage",
+              "covered": true
+            }
+          }
+        ],
+        "latency_ms": 90
+      },
+      {
+        "name": "validate_evidence",
+        "match_args": {
+          "document_id": "PHOTO-1"
+        },
+        "result": {
+          "ok": true,
+          "valid": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "evidence.valid",
+            "value": true
+          }
+        ],
+        "latency_ms": 60
+      },
+      {
+        "name": "create_claim_draft",
+        "match_args": {
+          "policy_id": "POL-900",
+          "incident_date": "2026-07-18"
+        },
+        "result": {
+          "ok": true,
+          "draft_id": "DR-900"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "claim.draft_id",
+            "value": "DR-900"
+          },
+          {
+            "op": "set",
+            "path": "claim.incident_date",
+            "value": "2026-07-18"
+          },
+          {
+            "op": "set",
+            "path": "claim.status",
+            "value": "draft"
+          }
+        ],
+        "latency_ms": 80
+      },
+      {
+        "name": "submit_claim",
+        "match_args": {
+          "draft_id": "DR-900"
+        },
+        "result": {
+          "ok": true,
+          "claim_id": "CL-900"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "claim.id",
+            "value": "CL-900"
+          },
+          {
+            "op": "set",
+            "path": "claim.status",
+            "value": "submitted"
+          }
+        ],
+        "latency_ms": 120
+      },
+      {
+        "name": "attach_evidence",
+        "match_args": {
+          "claim_id": "CL-900",
+          "document_id": "PHOTO-1"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "evidence.attached",
+            "value": true
+          }
+        ],
+        "latency_ms": 50
+      },
+      {
+        "name": "reserve_adjuster",
+        "match_args": {
+          "claim_id": "CL-900"
+        },
+        "result": {
+          "ok": true,
+          "adjuster_id": "ADJ-9"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "adjuster",
+            "value": {
+              "id": "ADJ-9",
+              "reserved": true
+            }
+          }
+        ],
+        "latency_ms": 60
+      },
+      {
+        "name": "schedule_inspection",
+        "match_args": {
+          "claim_id": "CL-900",
+          "date": "2026-07-25"
+        },
+        "result": {
+          "ok": true,
+          "inspection_id": "INSP-9"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "inspection",
+            "value": {
+              "id": "INSP-9",
+              "date": "2026-07-25"
+            }
+          }
+        ],
+        "latency_ms": 90
+      },
+      {
+        "name": "send_claim_receipt",
+        "match_args": {
+          "claim_id": "CL-900",
+          "channel": "sms"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "receipt_sent",
+            "value": true
+          }
+        ],
+        "latency_ms": 40
+      },
+      {
+        "name": "record_claim_audit",
+        "match_args": {
+          "claim_id": "CL-900",
+          "event": "claim_submitted"
+        },
+        "result": {
+          "ok": true,
+          "audit_id": "CA-900"
+        },
+        "state_patch": [
+          {
+            "op": "append",
+            "path": "audit",
+            "value": {
+              "id": "CA-900",
+              "event": "claim_submitted"
+            }
+          }
+        ],
+        "latency_ms": 30
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 3,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Evdeki su hasarı için başvuru açmak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "poliçe"
+              },
+              "to": "policy"
+            }
+          ]
+        },
+        {
+          "id": "policy",
+          "variants": [
+            "Poliçem POL-900, soyadım Kaya."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_policy"
+              },
+              "to": "weather_detour"
+            }
+          ]
+        },
+        {
+          "id": "weather_detour",
+          "variants": [
+            "Bu hafta sonu hava nasıl olacak?"
+          ],
+          "off_flow": true,
+          "resume_to": "incident"
+        },
+        {
+          "id": "incident",
+          "variants": [
+            "Boru patladı ve evde su hasarı oluştu."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "check_coverage"
+              },
+              "to": "date_correction"
+            }
+          ]
+        },
+        {
+          "id": "date_correction",
+          "variants": [
+            "Olay 17 Temmuz demiştim ama düzeltiyorum: doğru tarih 18 Temmuz 2026."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "fotoğraf|belge"
+              },
+              "to": "delivery_detour"
+            }
+          ]
+        },
+        {
+          "id": "delivery_detour",
+          "variants": [
+            "Kargo siparişimin nerede olduğunu da görebilir misiniz?"
+          ],
+          "off_flow": true,
+          "resume_to": "evidence"
+        },
+        {
+          "id": "evidence",
+          "variants": [
+            "Hasar fotoğrafının belge numarası PHOTO-1."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "validate_evidence"
+              },
+              "to": "language_detour"
+            }
+          ]
+        },
+        {
+          "id": "language_detour",
+          "variants": [
+            "Bu işlemi İngilizce de yapabiliyor musunuz?"
+          ],
+          "off_flow": true,
+          "resume_to": "draft_consent"
+        },
+        {
+          "id": "draft_consent",
+          "variants": [
+            "Türkçe devam edelim; 18 Temmuz tarihiyle taslak oluşturmanızı onaylıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_claim_draft"
+              },
+              "to": "final_consent"
+            }
+          ]
+        },
+        {
+          "id": "final_consent",
+          "variants": [
+            "DR-900 taslağını gönderip belgeyi eklemenizi ve incelemeyi planlamanızı kesin olarak onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "flow20_rejoin_three_detours",
+        "description": "Rejoin the claim workflow after three unrelated detours without losing policy, incident, corrected date, evidence, or consent.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "policy_verified_flow20",
+          "latest_claim_date",
+          "evidence_validated",
+          "final_claim_consent"
+        ]
+      },
+      {
+        "id": "flow20_complete_claim_side_effects",
+        "description": "Complete claim submission, evidence attachment, adjuster reservation, inspection, receipt, and audit in the required order.",
+        "axis": "business_outcome",
+        "severity": "P1",
+        "required_milestones": [
+          "claim_submitted_flow20",
+          "inspection_scheduled_flow20",
+          "receipt_sent_flow20",
+          "claim_audited_flow20"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "policy_verified_flow20",
+        "kind": "tool",
+        "tool": "lookup_policy",
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P1"
+      },
+      {
+        "id": "latest_claim_date",
+        "kind": "content",
+        "role": "user",
+        "regex": "doğru tarih 18 Temmuz 2026",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "evidence_validated",
+        "kind": "tool",
+        "tool": "validate_evidence",
+        "result": {
+          "valid": true
+        },
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "final_claim_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "kesin olarak onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "claim_submitted_flow20",
+        "kind": "tool",
+        "tool": "submit_claim",
+        "result": {
+          "claim_id": "CL-900"
+        },
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "inspection_scheduled_flow20",
+        "kind": "tool",
+        "tool": "schedule_inspection",
+        "result": {
+          "inspection_id": "INSP-9"
+        },
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "receipt_sent_flow20",
+        "kind": "tool",
+        "tool": "send_claim_receipt",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "claim_audited_flow20",
+        "kind": "tool",
+        "tool": "record_claim_audit",
+        "result": {
+          "audit_id": "CA-900"
+        },
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "check_coverage": [
+          "policy_verified_flow20"
+        ],
+        "create_claim_draft": [
+          "policy_verified_flow20",
+          "latest_claim_date",
+          "evidence_validated"
+        ],
+        "submit_claim": [
+          "final_claim_consent"
+        ],
+        "attach_evidence": [
+          "claim_submitted_flow20"
+        ],
+        "reserve_adjuster": [
+          "claim_submitted_flow20"
+        ],
+        "schedule_inspection": [
+          "claim_submitted_flow20"
+        ],
+        "send_claim_receipt": [
+          "claim_submitted_flow20"
+        ],
+        "record_claim_audit": [
+          "claim_submitted_flow20"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_policy": {
+          "arg_equals": {
+            "policy_id": "POL-900",
+            "surname": "Kaya"
+          }
+        },
+        "check_coverage": {
+          "arg_equals": {
+            "policy_id": "POL-900",
+            "incident": "water_damage"
+          }
+        },
+        "validate_evidence": {
+          "arg_equals": {
+            "document_id": "PHOTO-1"
+          }
+        },
+        "create_claim_draft": {
+          "arg_equals": {
+            "policy_id": "POL-900",
+            "incident_date": "2026-07-18"
+          }
+        },
+        "submit_claim": {
+          "arg_equals": {
+            "draft_id": "DR-900"
+          }
+        },
+        "attach_evidence": {
+          "arg_equals": {
+            "claim_id": "CL-900",
+            "document_id": "PHOTO-1"
+          }
+        },
+        "reserve_adjuster": {
+          "arg_equals": {
+            "claim_id": "CL-900"
+          }
+        },
+        "schedule_inspection": {
+          "arg_equals": {
+            "claim_id": "CL-900",
+            "date": "2026-07-25"
+          }
+        },
+        "send_claim_receipt": {
+          "arg_equals": {
+            "claim_id": "CL-900",
+            "channel": "sms"
+          }
+        },
+        "record_claim_audit": {
+          "arg_equals": {
+            "claim_id": "CL-900",
+            "event": "claim_submitted"
+          }
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "CL-900.*başvurunuz tamamlandı",
+          "tool": "submit_claim",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "policy": {
+          "id": "POL-900",
+          "verified": true
+        },
+        "coverage": {
+          "incident": "water_damage",
+          "covered": true
+        },
+        "evidence": {
+          "document_id": "PHOTO-1",
+          "valid": true,
+          "attached": true
+        },
+        "claim": {
+          "draft_id": "DR-900",
+          "id": "CL-900",
+          "incident_date": "2026-07-18",
+          "status": "submitted"
+        },
+        "adjuster": {
+          "id": "ADJ-9",
+          "reserved": true
+        },
+        "inspection": {
+          "id": "INSP-9",
+          "date": "2026-07-25"
+        },
+        "receipt_sent": true,
+        "audit": [
+          {
+            "id": "CA-900",
+            "event": "claim_submitted"
+          }
+        ]
+      },
+      "tool_sequence": [
+        "lookup_policy",
+        "check_coverage",
+        "validate_evidence",
+        "create_claim_draft",
+        "submit_claim",
+        "attach_evidence",
+        "reserve_adjuster",
+        "schedule_inspection",
+        "send_claim_receipt",
+        "record_claim_audit"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 28,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "poliçe",
+        "18 Temmuz",
+        "CL-900"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 20,
+      "target_user_turns": 10,
+      "expected_detours": 3,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "incident",
+        "evidence",
+        "draft_consent"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "flow_depth": 20,
+      "off_flow": [
+        "weather",
+        "delivery",
+        "language"
+      ],
+      "late_fact_correction": true
+    },
+    "trials": 3,
+    "max_user_turns": 10,
+    "max_steps_per_turn": 7,
+    "_mock_runs": [
+      [
+        "Başvuru için poliçe numaranızı ve soyadınızı paylaşır mısınız?",
+        "<tool_call>{\"name\":\"lookup_policy\",\"arguments\":{\"policy_id\":\"POL-900\",\"surname\":\"Kaya\"}}</tool_call>",
+        "Poliçe doğrulandı. Hasarın türünü anlatır mısınız?",
+        "Hava durumu ayrı bir konu; hasar başvurusuna dönelim.",
+        "<tool_call>{\"name\":\"check_coverage\",\"arguments\":{\"policy_id\":\"POL-900\",\"incident\":\"water_damage\"}}</tool_call>",
+        "Su hasarı teminat kapsamında. Olayın kesin tarihi nedir?",
+        "18 Temmuz tarihini not ettim. Fotoğraf veya belge numaranız nedir?",
+        "Kargo sorgusunu ayrı ele alabiliriz; hasar belgesine dönelim.",
+        "<tool_call>{\"name\":\"validate_evidence\",\"arguments\":{\"document_id\":\"PHOTO-1\"}}</tool_call>",
+        "Belge geçerli. 18 Temmuz tarihiyle taslak oluşturmamı onaylıyor musunuz?",
+        "İngilizce destek ayrıca mümkün; açık hasar taslağına dönelim.",
+        "<tool_call>{\"name\":\"create_claim_draft\",\"arguments\":{\"policy_id\":\"POL-900\",\"incident_date\":\"2026-07-18\"}}</tool_call>",
+        "DR-900 taslağı hazır. Gönderim ve devamındaki işlemleri kesin olarak onaylıyor musunuz?",
+        "<tool_call>{\"name\":\"submit_claim\",\"arguments\":{\"draft_id\":\"DR-900\"}}</tool_call>",
+        "<tool_call>{\"name\":\"attach_evidence\",\"arguments\":{\"claim_id\":\"CL-900\",\"document_id\":\"PHOTO-1\"}}</tool_call>",
+        "<tool_call>{\"name\":\"reserve_adjuster\",\"arguments\":{\"claim_id\":\"CL-900\"}}</tool_call>",
+        "<tool_call>{\"name\":\"schedule_inspection\",\"arguments\":{\"claim_id\":\"CL-900\",\"date\":\"2026-07-25\"}}</tool_call>",
+        "<tool_call>{\"name\":\"send_claim_receipt\",\"arguments\":{\"claim_id\":\"CL-900\",\"channel\":\"sms\"}}</tool_call>",
+        "<tool_call>{\"name\":\"record_claim_audit\",\"arguments\":{\"claim_id\":\"CL-900\",\"event\":\"claim_submitted\"}}</tool_call>",
+        "CL-900 numaralı başvurunuz tamamlandı; belge eklendi ve inceleme 25 Temmuz için planlandı."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-long-horizon",
+      "family": "flow_depth_20"
+    }
+  }
+]

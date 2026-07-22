@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use CEB in research or evaluation, please cite this software."
+title: "Conversation Execution Benchmark"
+type: software
+version: 0.8.0
+date-released: 2026-07-22
+authors:
+  - name: "SiriusAitech Brain Team"
+url: "https://github.com/sirius-tedarik/Conversation-Execution-Benchmark"
+repository-code: "https://github.com/sirius-tedarik/Conversation-Execution-Benchmark"
+license: Apache-2.0
+keywords:
+  - conversational agents
+  - voice agents
+  - benchmark
+  - tool calling
+  - evaluation

@@ -1,0 +1,2373 @@
+[
+  {
+    "id": "tr_callcenter_hold_resume_checkpoint_001",
+    "benchmark_version": "0.8",
+    "domain": "account_services_hold",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Adres değişikliğinde hesabı doğrula, kullanıcı bekleme istediğinde görüşmeyi sonlandırma ve dönüşte doğrulanmış bilgileri yeniden istemeden kaldığın adımdan devam et. Açık onaydan önce adresi değiştirme.",
+    "available_tools": [
+      "verify_account",
+      "update_address"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_account",
+          "description": "Hesabı doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "postal_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "postal_code"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "update_address",
+          "description": "Adresi değiştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "address"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "account": {
+        "id": "AC-90",
+        "verified": false,
+        "address": "Eski Mah. No: 4"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_account",
+        "match_args": {
+          "account_id": "AC-90",
+          "postal_code": "34000"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "account.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 70
+      },
+      {
+        "name": "update_address",
+        "match_args": {
+          "account_id": "AC-90",
+          "address": "Yeni Cad. No: 12"
+        },
+        "result": {
+          "ok": true,
+          "change_id": "ADR-90"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "account.address",
+            "value": "Yeni Cad. No: 12"
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Hesabımdaki adresi değiştirmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "hesap.*posta kod"
+              },
+              "to": "identity"
+            }
+          ]
+        },
+        {
+          "id": "identity",
+          "variants": [
+            "Hesap AC-90, mevcut posta kodum 34000."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_account"
+              },
+              "to": "hold_detour"
+            }
+          ]
+        },
+        {
+          "id": "hold_detour",
+          "variants": [
+            "Bir saniye hatta bekler misiniz? Kapıya bakıp hemen döneceğim."
+          ],
+          "off_flow": true,
+          "resume_to": "new_address"
+        },
+        {
+          "id": "new_address",
+          "variants": [
+            "Döndüm. Yeni adres Yeni Cad. No: 12."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Yeni Cad.*onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "Yeni Cad. No: 12 olarak değiştirilmesini onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "resume_after_hold_without_reverification",
+        "description": "Preserve the verified checkpoint across a user-requested hold and update only after address consent.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "account_verified",
+          "hold_acknowledged",
+          "address_consent",
+          "address_updated"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "account_verified",
+        "kind": "tool",
+        "tool": "verify_account",
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "hold_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "bekliyorum|hatta kalıyorum|döndüğünüzde",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "address_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "değiştirilmesini onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "address_updated",
+        "kind": "tool",
+        "tool": "update_address",
+        "arguments": {
+          "address": "Yeni Cad. No: 12"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "update_address": [
+          "account_verified",
+          "address_consent"
+        ]
+      },
+      "tool_requirements": {
+        "verify_account": {
+          "arg_equals": {
+            "account_id": "AC-90",
+            "postal_code": "34000"
+          }
+        },
+        "update_address": {
+          "arg_equals": {
+            "account_id": "AC-90",
+            "address": "Yeni Cad. No: 12"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "account": {
+          "verified": true,
+          "address": "Yeni Cad. No: 12"
+        }
+      },
+      "terminal_tools": [
+        "update_address"
+      ],
+      "tool_sequence": [
+        "verify_account",
+        "update_address"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "hesap.*posta kod",
+        "bekliyorum|hatta kalıyorum",
+        "Yeni Cad.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 6,
+      "target_user_turns": 5,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "reask_regex": "hesap numaranızı.*tekrar|posta kodunuzu.*tekrar",
+      "required_resume_nodes": [
+        "new_address"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "hold_and_resume",
+      "off_flow": "temporary_hold",
+      "checkpoint": "verified_account"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "Doğrulama için hesap numaranız ve mevcut posta kodunuz nedir?",
+        "<tool_call>{\"name\":\"verify_account\",\"arguments\":{\"account_id\":\"AC-90\",\"postal_code\":\"34000\"}}</tool_call>",
+        "Hesap doğrulandı. Yeni adresinizi alabilir miyim?",
+        "Elbette, hatta kalıyorum; döndüğünüzde yeni adres adımından devam ederiz.",
+        "Yeni adresi Yeni Cad. No: 12 olarak değiştirmemi onaylıyor musunuz?",
+        "Onayınızla adresi değiştiriyorum.\n<tool_call>{\"name\":\"update_address\",\"arguments\":{\"account_id\":\"AC-90\",\"address\":\"Yeni Cad. No: 12\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "hold_resume_checkpoint"
+    }
+  },
+  {
+    "id": "tr_callcenter_multi_intent_queue_001",
+    "benchmark_version": "0.8",
+    "domain": "billing_multi_intent",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Birincil fatura itirazını koru. Kullanıcının paket sorusunu yanıtladıktan sonra itirazın kaldığı gerekçe adımına dön; fatura numarasını yeniden isteme ve onaysız itiraz açma.",
+    "available_tools": [
+      "lookup_plan",
+      "open_bill_dispute"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_plan",
+          "description": "Tarife bilgisini getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "open_bill_dispute",
+          "description": "Fatura itirazı aç",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "invoice_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "amount_try": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "invoice_id",
+              "reason",
+              "amount_try"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "account": {
+        "id": "BA-8",
+        "plan": "Plus 20 GB"
+      },
+      "dispute": {
+        "status": "not_opened"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_plan",
+        "match_args": {
+          "account_id": "BA-8"
+        },
+        "result": {
+          "ok": true,
+          "plan": "Plus 20 GB"
+        },
+        "latency_ms": 60
+      },
+      {
+        "name": "open_bill_dispute",
+        "match_args": {
+          "invoice_id": "INV-8",
+          "reason": "duplicate_fee",
+          "amount_try": 420
+        },
+        "result": {
+          "ok": true,
+          "case_id": "DSP-8"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "dispute",
+            "value": {
+              "status": "open",
+              "case_id": "DSP-8",
+              "invoice_id": "INV-8"
+            }
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "INV-8 faturamdaki 420 TL ücrete itiraz etmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "itiraz.*neden|ücret.*neden"
+              },
+              "to": "plan_detour"
+            }
+          ]
+        },
+        {
+          "id": "plan_detour",
+          "variants": [
+            "Gerekçeyi söyleyeceğim; önce BA-8 hesabımda kaç GB var?"
+          ],
+          "off_flow": true,
+          "resume_to": "reason"
+        },
+        {
+          "id": "reason",
+          "variants": [
+            "Tamam, itiraz nedeni aynı ücretin iki kez yansıtılması."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "420 TL.*onay"
+              },
+              "to": "consent"
+            }
+          ]
+        },
+        {
+          "id": "consent",
+          "variants": [
+            "INV-8 için 420 TL mükerrer ücret itirazını açmanızı onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "queue_secondary_intent_and_resume_primary",
+        "description": "Answer the secondary plan question and resume the bill-dispute checkpoint without losing known facts.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "plan_answered",
+          "reason_received",
+          "dispute_consent",
+          "dispute_opened"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "plan_answered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "Plus 20 GB",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "reason_received",
+        "kind": "content",
+        "role": "user",
+        "regex": "iki kez|mükerrer",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "dispute_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "itirazını açmanızı onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "dispute_opened",
+        "kind": "tool",
+        "tool": "open_bill_dispute",
+        "result": {
+          "case_id": "DSP-8"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "open_bill_dispute": [
+          "reason_received",
+          "dispute_consent"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_plan": {
+          "arg_equals": {
+            "account_id": "BA-8"
+          }
+        },
+        "open_bill_dispute": {
+          "arg_equals": {
+            "invoice_id": "INV-8",
+            "reason": "duplicate_fee",
+            "amount_try": 420
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "dispute": {
+          "status": "open",
+          "case_id": "DSP-8",
+          "invoice_id": "INV-8"
+        }
+      },
+      "terminal_tools": [
+        "open_bill_dispute"
+      ],
+      "tool_sequence": [
+        "lookup_plan",
+        "open_bill_dispute"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 24,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "itiraz.*neden|ücret.*neden",
+        "Plus 20 GB",
+        "420 TL.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 5,
+      "target_user_turns": 4,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "reask_regex": "fatura numara.*tekrar|INV-8.*tekrar",
+      "required_resume_nodes": [
+        "reason"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "multi_intent_queue",
+      "off_flow": "secondary_plan_question",
+      "primary_intent": "bill_dispute"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "420 TL itirazının nedenini paylaşır mısınız?",
+        "<tool_call>{\"name\":\"lookup_plan\",\"arguments\":{\"account_id\":\"BA-8\"}}</tool_call>",
+        "Paketiniz Plus 20 GB. Şimdi fatura itirazına dönelim: ücretin neden hatalı olduğunu belirtir misiniz?",
+        "INV-8 için 420 TL mükerrer ücret itirazını açmamı onaylıyor musunuz?",
+        "Onayınızla itirazı açıyorum.\n<tool_call>{\"name\":\"open_bill_dispute\",\"arguments\":{\"invoice_id\":\"INV-8\",\"reason\":\"duplicate_fee\",\"amount_try\":420}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "multi_intent_queue"
+    }
+  },
+  {
+    "id": "tr_callcenter_transfer_context_retention_001",
+    "benchmark_version": "0.8",
+    "domain": "technical_support_transfer",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Aktarım sırasında doğrulama ve sorun özetini bağlama kaydet. Aktarım sonrası kullanıcıdan aynı hesap ve arıza bilgisini yeniden isteme; taşınan bağlamla teknik kayıt aç.",
+    "available_tools": [
+      "verify_customer",
+      "load_transfer_context",
+      "open_technical_ticket"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_customer",
+          "description": "Müşteriyi doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "load_transfer_context",
+          "description": "Aktarım bağlamını kaydet",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "issue"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "open_technical_ticket",
+          "description": "Teknik kayıt aç",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string"
+              },
+              "context_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "issue",
+              "context_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "customer": {
+        "id": "TS-71",
+        "verified": false
+      },
+      "transfer": {
+        "context_id": null
+      },
+      "ticket": {
+        "status": "not_opened"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_customer",
+        "match_args": {
+          "account_id": "TS-71"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "customer.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 60
+      },
+      {
+        "name": "load_transfer_context",
+        "match_args": {
+          "account_id": "TS-71",
+          "issue": "router_red_light"
+        },
+        "result": {
+          "ok": true,
+          "context_id": "CTX-71"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "transfer.context_id",
+            "value": "CTX-71"
+          }
+        ],
+        "latency_ms": 70
+      },
+      {
+        "name": "open_technical_ticket",
+        "match_args": {
+          "account_id": "TS-71",
+          "issue": "router_red_light",
+          "context_id": "CTX-71"
+        },
+        "result": {
+          "ok": true,
+          "ticket_id": "TT-71"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "ticket",
+            "value": {
+              "status": "open",
+              "id": "TT-71"
+            }
+          }
+        ],
+        "latency_ms": 90,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Modemimde kırmızı ışık yanıyor ve internet yok."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "hesap numara"
+              },
+              "to": "identity"
+            }
+          ]
+        },
+        {
+          "id": "identity",
+          "variants": [
+            "Hesap numaram TS-71; sorun modem kırmızı ışığı."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "load_transfer_context"
+              },
+              "to": "transfer_detour"
+            }
+          ]
+        },
+        {
+          "id": "transfer_detour",
+          "variants": [
+            "Teknik ekibe aktarıldım; hesap ve sorunu baştan anlatmak istemiyorum."
+          ],
+          "off_flow": true,
+          "resume_to": "resume_issue"
+        },
+        {
+          "id": "resume_issue",
+          "variants": [
+            "Evet, kırmızı ışık hâlâ yanıyor; mevcut bilgilerle kaydı açın."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "retain_context_across_transfer",
+        "description": "Carry verified identity and issue context across transfer without forcing the caller to repeat them.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "customer_verified",
+          "context_loaded",
+          "no_repeat_ack",
+          "ticket_opened"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "customer_verified",
+        "kind": "tool",
+        "tool": "verify_customer",
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "context_loaded",
+        "kind": "tool",
+        "tool": "load_transfer_context",
+        "result": {
+          "context_id": "CTX-71"
+        },
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "no_repeat_ack",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "tekrar anlatmanıza gerek yok|bilgileriniz bende|bağlam.*taşındı",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "ticket_opened",
+        "kind": "tool",
+        "tool": "open_technical_ticket",
+        "result": {
+          "ticket_id": "TT-71"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "load_transfer_context": [
+          "customer_verified"
+        ],
+        "open_technical_ticket": [
+          "context_loaded",
+          "no_repeat_ack"
+        ]
+      },
+      "tool_requirements": {
+        "verify_customer": {
+          "arg_equals": {
+            "account_id": "TS-71"
+          }
+        },
+        "load_transfer_context": {
+          "arg_equals": {
+            "account_id": "TS-71",
+            "issue": "router_red_light"
+          }
+        },
+        "open_technical_ticket": {
+          "arg_equals": {
+            "account_id": "TS-71",
+            "issue": "router_red_light",
+            "context_id": "CTX-71"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "customer": {
+          "verified": true
+        },
+        "transfer": {
+          "context_id": "CTX-71"
+        },
+        "ticket": {
+          "status": "open",
+          "id": "TT-71"
+        }
+      },
+      "terminal_tools": [
+        "open_technical_ticket"
+      ],
+      "tool_sequence": [
+        "verify_customer",
+        "load_transfer_context",
+        "open_technical_ticket"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 24,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "hesap numara",
+        "tekrar anlatmanıza gerek yok|bilgileriniz bende"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 6,
+      "target_user_turns": 4,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "reask_regex": "hesap numaranız nedir|sorunu baştan|sorununuz neydi",
+      "required_resume_nodes": [
+        "resume_issue"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "transfer_context_retention",
+      "off_flow": "queue_transfer",
+      "checkpoint": "verified_issue_context"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 4,
+    "_mock_runs": [
+      [
+        "Teknik destek için hesap numaranızı alabilir miyim?",
+        "<tool_call>{\"name\":\"verify_customer\",\"arguments\":{\"account_id\":\"TS-71\"}}</tool_call>",
+        "<tool_call>{\"name\":\"load_transfer_context\",\"arguments\":{\"account_id\":\"TS-71\",\"issue\":\"router_red_light\"}}</tool_call>",
+        "Doğrulama ve sorun özeti teknik ekip bağlamına taşındı.",
+        "Bilgileriniz bende; tekrar anlatmanıza gerek yok. Mevcut durumla devam edebiliriz.",
+        "Mevcut bağlamla teknik kaydı açıyorum.\n<tool_call>{\"name\":\"open_technical_ticket\",\"arguments\":{\"account_id\":\"TS-71\",\"issue\":\"router_red_light\",\"context_id\":\"CTX-71\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "transfer_context_retention"
+    }
+  },
+  {
+    "id": "tr_callcenter_correction_during_confirmation_001",
+    "benchmark_version": "0.8",
+    "domain": "utility_payment_plan",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Ödeme planı onayında kullanıcı tutarı düzeltirse eski tutarı geçersiz say. Son tutarı yeniden açıkça onaylat ve araca yalnızca güncel tutarı gönder.",
+    "available_tools": [
+      "lookup_balance",
+      "create_payment_plan"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_balance",
+          "description": "Borç bakiyesini getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "create_payment_plan",
+          "description": "Ödeme planı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "monthly_amount_try": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "account_id",
+              "monthly_amount_try"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "account": {
+        "id": "UT-2",
+        "balance_try": 3600
+      },
+      "plan": {
+        "status": "not_created",
+        "monthly_amount_try": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_balance",
+        "match_args": {
+          "account_id": "UT-2"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 3600
+        },
+        "latency_ms": 60
+      },
+      {
+        "name": "create_payment_plan",
+        "match_args": {
+          "account_id": "UT-2",
+          "monthly_amount_try": 900
+        },
+        "result": {
+          "ok": true,
+          "plan_id": "PP-2"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "plan",
+            "value": {
+              "status": "active",
+              "monthly_amount_try": 900,
+              "id": "PP-2"
+            }
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "UT-2 hesabım için aylık 1200 TL ödeme planı istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_balance"
+              },
+              "to": "correction_detour"
+            }
+          ]
+        },
+        {
+          "id": "correction_detour",
+          "variants": [
+            "Onaylamadan düzelteyim: 1200 değil, aylık 900 TL olsun."
+          ],
+          "off_flow": true,
+          "resume_to": "corrected_consent"
+        },
+        {
+          "id": "corrected_consent",
+          "variants": [
+            "Aylık 900 TL ödeme planını onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "apply_latest_amount_at_confirmation",
+        "description": "Replace the stale amount with the caller's correction and create only the newly confirmed payment plan.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "balance_checked",
+          "amount_corrected",
+          "corrected_amount_confirmed",
+          "plan_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "balance_checked",
+        "kind": "tool",
+        "tool": "lookup_balance",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "amount_corrected",
+        "kind": "content",
+        "role": "user",
+        "regex": "1200 değil.*900 TL",
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "corrected_amount_confirmed",
+        "kind": "content",
+        "role": "user",
+        "regex": "900 TL.*onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "plan_created",
+        "kind": "tool",
+        "tool": "create_payment_plan",
+        "arguments": {
+          "monthly_amount_try": 900
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "create_payment_plan": [
+          "amount_corrected",
+          "corrected_amount_confirmed"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_balance": {
+          "arg_equals": {
+            "account_id": "UT-2"
+          }
+        },
+        "create_payment_plan": {
+          "arg_equals": {
+            "account_id": "UT-2",
+            "monthly_amount_try": 900
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "plan": {
+          "status": "active",
+          "monthly_amount_try": 900,
+          "id": "PP-2"
+        }
+      },
+      "terminal_tools": [
+        "create_payment_plan"
+      ],
+      "tool_sequence": [
+        "lookup_balance",
+        "create_payment_plan"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "1200 TL.*onay",
+        "900 TL.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "corrected_consent"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "correction_during_confirmation",
+      "off_flow": "amount_correction",
+      "stale_amount_try": 1200,
+      "latest_amount_try": 900
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"lookup_balance\",\"arguments\":{\"account_id\":\"UT-2\"}}</tool_call>",
+        "3600 TL bakiye için aylık 1200 TL planı onaylıyor musunuz?",
+        "Düzeltmenizi aldım. Aylık 900 TL ödeme planını onaylıyor musunuz?",
+        "Onayınızla 900 TL planı oluşturuyorum.\n<tool_call>{\"name\":\"create_payment_plan\",\"arguments\":{\"account_id\":\"UT-2\",\"monthly_amount_try\":900}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "correction_during_confirmation"
+    }
+  },
+  {
+    "id": "tr_callcenter_supervisor_request_retracted_001",
+    "benchmark_version": "0.8",
+    "domain": "complaints_escalation",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Şikâyeti incele. Kullanıcı yönetici talebini geri çekerse aktarım yapma; son çözüm tercihini uygula ve ücret iadesi kredisi için açık onay kullan.",
+    "available_tools": [
+      "lookup_fee",
+      "transfer_supervisor",
+      "apply_service_credit"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_fee",
+          "description": "Ücreti incele",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "fee_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "fee_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "transfer_supervisor",
+          "description": "Yöneticiye aktar",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "apply_service_credit",
+          "description": "Hizmet kredisi uygula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "amount_try": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "account_id",
+              "amount_try"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "fee": {
+        "id": "F-19",
+        "amount_try": 120,
+        "valid": false
+      },
+      "supervisor": {
+        "transferred": false
+      },
+      "credit": {
+        "status": "not_applied"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_fee",
+        "match_args": {
+          "account_id": "CP-19",
+          "fee_id": "F-19"
+        },
+        "result": {
+          "ok": true,
+          "valid": false,
+          "credit_amount_try": 120
+        },
+        "latency_ms": 70
+      },
+      {
+        "name": "transfer_supervisor",
+        "match_args": {
+          "account_id": "CP-19"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "supervisor.transferred",
+            "value": true
+          }
+        ],
+        "latency_ms": 80,
+        "terminal": true
+      },
+      {
+        "name": "apply_service_credit",
+        "match_args": {
+          "account_id": "CP-19",
+          "amount_try": 120
+        },
+        "result": {
+          "ok": true,
+          "credit_id": "CR-19"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "credit",
+            "value": {
+              "status": "applied",
+              "amount_try": 120,
+              "id": "CR-19"
+            }
+          }
+        ],
+        "latency_ms": 90,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "CP-19 hesabımdaki F-19 kodlu 120 TL yanlış ücret için arıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_fee"
+              },
+              "to": "supervisor_detour"
+            }
+          ]
+        },
+        {
+          "id": "supervisor_detour",
+          "variants": [
+            "Buna çok sinirlendim, bir yöneticiyle görüşmek istiyorum."
+          ],
+          "off_flow": true,
+          "resume_to": "resolution_choice"
+        },
+        {
+          "id": "resolution_choice",
+          "variants": [
+            "Yönetici aktarımından vazgeçtim. 120 TL krediyi uygulamanızı onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "honor_retracted_escalation_and_latest_resolution",
+        "description": "Do not transfer after the caller retracts escalation; apply only the explicitly approved service credit.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "fee_invalid",
+          "supervisor_request_ack",
+          "transfer_retracted",
+          "credit_applied"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "fee_invalid",
+        "kind": "tool",
+        "tool": "lookup_fee",
+        "result": {
+          "valid": false
+        },
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "supervisor_request_ack",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "yönetici.*aktar|talebinizi anlıyorum",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "transfer_retracted",
+        "kind": "content",
+        "role": "user",
+        "regex": "aktarımından vazgeçtim",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "credit_applied",
+        "kind": "tool",
+        "tool": "apply_service_credit",
+        "result": {
+          "credit_id": "CR-19"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "transfer_supervisor"
+      ],
+      "tool_prerequisites": {
+        "apply_service_credit": [
+          "fee_invalid",
+          "transfer_retracted"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_fee": {
+          "arg_equals": {
+            "account_id": "CP-19",
+            "fee_id": "F-19"
+          }
+        },
+        "apply_service_credit": {
+          "arg_equals": {
+            "account_id": "CP-19",
+            "amount_try": 120
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "supervisor": {
+          "transferred": false
+        },
+        "credit": {
+          "status": "applied",
+          "amount_try": 120,
+          "id": "CR-19"
+        }
+      },
+      "terminal_tools": [
+        "apply_service_credit"
+      ],
+      "tool_sequence": [
+        "lookup_fee",
+        "apply_service_credit"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 23,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "yönetici.*aktar|talebinizi anlıyorum"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "resolution_choice"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "supervisor_request_retracted",
+      "off_flow": "escalation_request",
+      "latest_intent": "service_credit"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"lookup_fee\",\"arguments\":{\"account_id\":\"CP-19\",\"fee_id\":\"F-19\"}}</tool_call>",
+        "Ücret geçersiz görünüyor; 120 TL kredi çözümü sunabilirim.",
+        "Yöneticiye aktarım talebinizi anlıyorum. Aktarımı mı, burada 120 TL krediyle devam etmeyi mi istersiniz?",
+        "Son tercihinizle aktarım yapmadan 120 TL krediyi uyguluyorum.\n<tool_call>{\"name\":\"apply_service_credit\",\"arguments\":{\"account_id\":\"CP-19\",\"amount_try\":120}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "supervisor_request_retracted"
+    }
+  },
+  {
+    "id": "tr_callcenter_silence_ambiguity_recovery_001",
+    "benchmark_version": "0.8",
+    "domain": "card_delivery_tracking",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sessizlik veya anlaşılmayan ses sonrası kimlik bilgisi tahmin etme. Kısa ve tek bir netleştirme sorusu sor; yalnızca açıkça verilen kart son dört hanesiyle teslimatı sorgula.",
+    "available_tools": [
+      "lookup_card_delivery"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_card_delivery",
+          "description": "Kart teslimatını sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "card_last4": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "card_last4"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "lookup": {
+        "card_last4": null,
+        "status": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_card_delivery",
+        "match_args": {
+          "card_last4": "7788"
+        },
+        "result": {
+          "ok": true,
+          "status": "courier",
+          "eta": "2026-07-24"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "lookup",
+            "value": {
+              "card_last4": "7788",
+              "status": "courier",
+              "eta": "2026-07-24"
+            }
+          }
+        ],
+        "latency_ms": 70,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "Yeni kartımın teslimat durumunu öğrenmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "son dört"
+              },
+              "to": "silence_detour"
+            }
+          ]
+        },
+        {
+          "id": "silence_detour",
+          "variants": [
+            "[uzun sessizlik] ... şey..."
+          ],
+          "off_flow": true,
+          "resume_to": "clarified"
+        },
+        {
+          "id": "clarified",
+          "variants": [
+            "Kartımın son dört hanesi 7788."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "recover_from_silence_without_guessing",
+        "description": "Handle silence with a bounded clarification and query only the explicitly supplied card digits.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "last4_requested",
+          "silence_clarified",
+          "last4_received",
+          "delivery_looked_up"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "last4_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "son dört",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "silence_clarified",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "duyamadım|anlayamadım|son dört haneyi",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "last4_received",
+        "kind": "content",
+        "role": "user",
+        "regex": "son dört hanesi 7788",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "delivery_looked_up",
+        "kind": "tool",
+        "tool": "lookup_card_delivery",
+        "arguments": {
+          "card_last4": "7788"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "lookup_card_delivery": [
+          "last4_received"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_card_delivery": {
+          "arg_equals": {
+            "card_last4": "7788"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "lookup": {
+          "card_last4": "7788",
+          "status": "courier",
+          "eta": "2026-07-24"
+        }
+      },
+      "terminal_tools": [
+        "lookup_card_delivery"
+      ],
+      "tool_sequence": [
+        "lookup_card_delivery"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 18,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "son dört",
+        "duyamadım|anlayamadım"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 3,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "clarified"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "silence_ambiguity_recovery",
+      "off_flow": "long_silence",
+      "asr_confidence": "unobserved"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Güvenli sorgu için kartınızın son dört hanesini söyler misiniz?",
+        "Sizi anlayamadım; yalnızca kartın son dört hanesini söyler misiniz?",
+        "7788 ile teslimatı sorguluyorum.\n<tool_call>{\"name\":\"lookup_card_delivery\",\"arguments\":{\"card_last4\":\"7788\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "silence_ambiguity_recovery"
+    }
+  },
+  {
+    "id": "tr_callcenter_channel_switch_without_consent_confusion_001",
+    "benchmark_version": "0.8",
+    "domain": "appointment_notifications",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Randevu hatırlatma aramasında bildirim kanalı isteğini işlem onayı sayma. SMS tercihini kaydet, sonra randevu değişikliği için ayrı ve açık onay al.",
+    "available_tools": [
+      "lookup_appointment",
+      "set_notification_channel",
+      "reschedule_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_appointment",
+          "description": "Randevuyu getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "appointment_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "appointment_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "set_notification_channel",
+          "description": "Bildirim kanalını ayarla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "appointment_id": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "appointment_id",
+              "channel"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "reschedule_appointment",
+          "description": "Randevuyu değiştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "appointment_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "YYYY-AA-GG biçiminde tarih, örnek: 2024-01-31"
+              }
+            },
+            "required": [
+              "appointment_id",
+              "date"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "id": "AP-8",
+        "date": "2026-08-10",
+        "notification_channel": "voice",
+        "status": "scheduled"
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_appointment",
+        "match_args": {
+          "appointment_id": "AP-8"
+        },
+        "result": {
+          "ok": true,
+          "available": true
+        },
+        "latency_ms": 60
+      },
+      {
+        "name": "set_notification_channel",
+        "match_args": {
+          "appointment_id": "AP-8",
+          "channel": "sms"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.notification_channel",
+            "value": "sms"
+          }
+        ],
+        "latency_ms": 60
+      },
+      {
+        "name": "reschedule_appointment",
+        "match_args": {
+          "appointment_id": "AP-8",
+          "date": "2026-08-20"
+        },
+        "result": {
+          "ok": true,
+          "confirmation": "APT-820"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.date",
+            "value": "2026-08-20"
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "AP-8 randevu hatırlatmanız için teşekkürler; tarihi 20 Ağustos'a taşımak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_appointment"
+              },
+              "to": "channel_detour"
+            }
+          ]
+        },
+        {
+          "id": "channel_detour",
+          "variants": [
+            "Bu arada bundan sonraki onayları SMS ile gönderin."
+          ],
+          "off_flow": true,
+          "resume_to": "reschedule_consent"
+        },
+        {
+          "id": "reschedule_consent",
+          "variants": [
+            "AP-8 randevusunun 20 Ağustos'a alınmasını ayrıca onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "separate_channel_preference_from_action_consent",
+        "description": "Apply the SMS preference but obtain a separate explicit consent before rescheduling the appointment.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "appointment_checked",
+          "sms_requested",
+          "channel_set",
+          "separate_consent_requested",
+          "reschedule_consent",
+          "appointment_rescheduled"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "appointment_checked",
+        "kind": "tool",
+        "tool": "lookup_appointment",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "sms_requested",
+        "kind": "content",
+        "role": "user",
+        "regex": "SMS ile gönderin",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "channel_set",
+        "kind": "tool",
+        "tool": "set_notification_channel",
+        "arguments": {
+          "channel": "sms"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "separate_consent_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "ayrıca.*onay|randevu.*ayrı.*onay",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "reschedule_consent",
+        "kind": "content",
+        "role": "user",
+        "regex": "ayrıca onaylıyorum",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_rescheduled",
+        "kind": "tool",
+        "tool": "reschedule_appointment",
+        "arguments": {
+          "date": "2026-08-20"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "set_notification_channel": [
+          "sms_requested"
+        ],
+        "reschedule_appointment": [
+          "separate_consent_requested",
+          "reschedule_consent"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_appointment": {
+          "arg_equals": {
+            "appointment_id": "AP-8"
+          }
+        },
+        "set_notification_channel": {
+          "arg_equals": {
+            "appointment_id": "AP-8",
+            "channel": "sms"
+          }
+        },
+        "reschedule_appointment": {
+          "arg_equals": {
+            "appointment_id": "AP-8",
+            "date": "2026-08-20"
+          }
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "date": "2026-08-20",
+          "notification_channel": "sms",
+          "status": "scheduled"
+        }
+      },
+      "terminal_tools": [
+        "reschedule_appointment"
+      ],
+      "tool_sequence": [
+        "lookup_appointment",
+        "set_notification_channel",
+        "reschedule_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 24,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "ayrıca.*onay|randevu.*ayrı.*onay"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 5,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "reschedule_consent"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "channel_switch_midflow",
+      "off_flow": "sms_preference",
+      "consent_separation": true
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 4,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"lookup_appointment\",\"arguments\":{\"appointment_id\":\"AP-8\"}}</tool_call>",
+        "20 Ağustos uygun; değişiklik için onayınızı birazdan ayrıca alacağım.",
+        "<tool_call>{\"name\":\"set_notification_channel\",\"arguments\":{\"appointment_id\":\"AP-8\",\"channel\":\"sms\"}}</tool_call>",
+        "Bildirim kanalı SMS oldu. Randevuyu 20 Ağustos'a taşımayı ayrıca onaylıyor musunuz?",
+        "Ayrı onayınızla randevuyu değiştiriyorum.\n<tool_call>{\"name\":\"reschedule_appointment\",\"arguments\":{\"appointment_id\":\"AP-8\",\"date\":\"2026-08-20\"}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "channel_switch_consent_separation"
+    }
+  },
+  {
+    "id": "tr_callcenter_emotional_escalation_true_intent_001",
+    "benchmark_version": "0.8",
+    "domain": "outage_support_intent",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Duygusal veya koşullu iptal ifadesini kesin iptal talebi sayma. Kullanıcının güncel gerçek amacını netleştir; hizmeti iptal etmeden kesinti bilgisini araçla doğrula ve yalnızca doğrulanmış tahmini paylaş.",
+    "available_tools": [
+      "lookup_outage",
+      "cancel_service"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_outage",
+          "description": "Kesintiyi sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "district": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id",
+              "district"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "cancel_service",
+          "description": "Hizmeti iptal et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "service": {
+        "account_id": "OUT-5",
+        "status": "active"
+      },
+      "outage": {
+        "eta": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_outage",
+        "match_args": {
+          "account_id": "OUT-5",
+          "district": "Kadikoy"
+        },
+        "result": {
+          "ok": true,
+          "status": "known",
+          "eta": "18:30"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "outage.eta",
+            "value": "18:30"
+          }
+        ],
+        "latency_ms": 80
+      },
+      {
+        "name": "cancel_service",
+        "match_args": {
+          "account_id": "OUT-5"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "service.status",
+            "value": "cancelled"
+          }
+        ],
+        "latency_ms": 90,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "request",
+      "max_detours": 1,
+      "nodes": [
+        {
+          "id": "request",
+          "variants": [
+            "İnternet yine kesildi; böyle giderse iptal edeceğim."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "iptal.*istiyor musunuz|amacınız"
+              },
+              "to": "emotion_detour"
+            }
+          ]
+        },
+        {
+          "id": "emotion_detour",
+          "variants": [
+            "Çok sinirliyim ama şu anda iptal istemiyorum; sadece ne zaman düzeleceğini öğrenmek istiyorum."
+          ],
+          "off_flow": true,
+          "resume_to": "outage_details"
+        },
+        {
+          "id": "outage_details",
+          "variants": [
+            "Hesap OUT-5, ilçe Kadıköy."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "separate_emotion_from_executable_intent",
+        "description": "Treat conditional cancellation as emotion, preserve the active service, and answer the caller's actual outage question.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "intent_clarified",
+          "no_cancel_intent",
+          "outage_checked",
+          "eta_grounded"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "intent_clarified",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iptal.*istiyor musunuz|amacınız",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "no_cancel_intent",
+        "kind": "content",
+        "role": "user",
+        "regex": "iptal istemiyorum.*ne zaman",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "outage_checked",
+        "kind": "tool",
+        "tool": "lookup_outage",
+        "result": {
+          "eta": "18:30"
+        },
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "eta_grounded",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "18:30",
+        "axis": "business_outcome",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "cancel_service"
+      ],
+      "tool_prerequisites": {
+        "lookup_outage": [
+          "no_cancel_intent"
+        ]
+      },
+      "tool_requirements": {
+        "lookup_outage": {
+          "arg_equals": {
+            "account_id": "OUT-5",
+            "district": "Kadikoy"
+          }
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "18:30",
+          "tool": "lookup_outage",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "service": {
+          "status": "active"
+        },
+        "outage": {
+          "eta": "18:30"
+        }
+      },
+      "tool_sequence": [
+        "lookup_outage"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 22,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "iptal.*istiyor musunuz|amacınız",
+        "18:30"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 1,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "outage_details"
+      ]
+    },
+    "runtime": {
+      "max_model_latency_ms": 1000,
+      "max_logical_tool_latency_ms": 500,
+      "max_unbridged_tool_wait_ms": 500
+    },
+    "perturbations": {
+      "user_behavior": "emotional_escalation_true_intent",
+      "off_flow": "conditional_cancellation",
+      "latest_intent": "outage_eta"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 3,
+    "_mock_runs": [
+      [
+        "Sizi anlıyorum. Şu anda iptal mi istiyorsunuz, yoksa amacınız kesintinin süresini öğrenmek mi?",
+        "İptal işlemi yapmıyorum. Kesintiyi kontrol etmek için hesap ve ilçe bilgisini alabilir miyim?",
+        "<tool_call>{\"name\":\"lookup_outage\",\"arguments\":{\"account_id\":\"OUT-5\",\"district\":\"Kadikoy\"}}</tool_call>",
+        "Doğrulanan tahmini çözüm saati 18:30; hizmetiniz aktif kalıyor."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-callcenter-offflow",
+      "family": "emotional_escalation_true_intent"
+    }
+  }
+]
