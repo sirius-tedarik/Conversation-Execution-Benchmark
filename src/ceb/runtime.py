@@ -78,21 +78,37 @@ def compute_runtime_metrics(trajectory: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def runtime_checks(trajectory: dict[str, Any], requirements: dict[str, Any]) -> list[dict[str, Any]]:
+def runtime_checks(
+    trajectory: dict[str, Any], requirements: dict[str, Any], advisory_metrics: frozenset[str] = frozenset()
+) -> list[dict[str, Any]]:
+    """`advisory_metrics` names metrics measured, reported, but never gated — meant for
+    `max_model_latency_ms` against a real (non-local) endpoint, where the number mixes
+    genuine model think-time with ordinary network round-trip and says nothing about
+    conversational correctness. Everything else (tool latency, barge-in stop time, dead
+    air) comes from the scenario's own mock timings or audio-event fixtures and stays a
+    real gate regardless."""
     metrics, checks = compute_runtime_metrics(trajectory), []
     for metric, threshold in requirements.items():
         if not metric.startswith("max_"):
             continue
         value = metrics.get(metric)
+        advisory = metric in advisory_metrics
+        threshold_f = float(threshold)
+        if value is None:
+            detail = f"not observed; threshold={threshold}"
+        elif advisory:
+            detail = f"{value:.1f}ms (advisory, not gated; threshold={threshold_f:.1f}ms)"
+        else:
+            detail = f"{value:.1f}ms <= {threshold_f:.1f}ms"
         checks.append(
             {
                 "axis": "runtime",
                 "name": metric,
-                "passed": None if value is None else value <= float(threshold),
+                "passed": None if (value is None or advisory) else value <= threshold_f,
                 "severity": "P1",
-                "detail": f"not observed; threshold={threshold}" if value is None else f"{value:.1f}ms <= {float(threshold):.1f}ms",
+                "detail": detail,
                 "value": value,
-                "threshold": float(threshold),
+                "threshold": threshold_f,
             }
         )
     return checks

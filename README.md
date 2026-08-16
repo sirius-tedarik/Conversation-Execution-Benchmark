@@ -33,8 +33,8 @@ CEB evaluates the **whole execution trajectory**.
 
 | | Public pilot `v0.8` |
 |---|---|
-| Scenarios | 83 executable Turkish cases |
-| Domains | 82 operational and safety domains |
+| Scenarios | 160 executable Turkish cases |
+| Domains | 159 operational and safety domains |
 | Direction | Inbound and outbound |
 | Trials | 3 per scenario by default |
 | Evaluation axes | 7, reported separately |
@@ -69,6 +69,8 @@ release_gate=PASS
 
 This command exercises the real user controller, model-turn parser, tools, state transitions, injected faults, milestones, oracles, reliability aggregation, and release gate using deterministic reference outputs.
 
+`--out` always writes two files: the JSON report and a sibling `.html` report (`reports/reference.html` here) — a self-contained, dependency-free page with the summary stats, per-axis scores, and a scenario table (failing first, with the specific checks that failed) that opens directly from disk in any browser.
+
 ### 3. Evaluate a model
 
 ```bash
@@ -80,6 +82,8 @@ ceb \
   --trials 3 \
   --out reports/your-model.json
 ```
+
+Every run writes a report — `reports/<model>-<UTC timestamp>.json` plus a self-contained HTML page beside it — without needing `--out`; pass `--out` to choose the path or `--no-report` to score without writing files. The HTML page carries every trial's checks and full conversation, filters by status/group/axis, and exports the visible scenarios with their transcripts as one CSV.
 
 The endpoint must expose `/v1/chat/completions`. Native tool calls are normalized into CEB's provider-neutral trajectory format. Use `ceb --help` for all options.
 
@@ -161,6 +165,8 @@ For `k` trials per scenario:
 
 `Pass^k` is the production-oriented reliability measure. Release thresholds are versioned in [`benchmark.json`](benchmark.json).
 
+`benchmark.json`'s gate (`p0_failures: 0`, `pass_pow_k: 1.0`, every axis at 90–100) is calibrated for the deterministic mock self-test, not a live model — it exists to catch harness regressions, so a real model will not clear it. For evaluating an actual model against a ship/no-ship bar, use [`benchmark.release.json`](benchmark.release.json) instead: `ceb --manifest benchmark.release.json ...`. Its thresholds are calibrated from measured live sweeps against `callingai-qwen35-9b-v2` (89.8% Pass@1, 88.8% Pass^k on the full 143-case suite) — adjust them for your own release bar as evidence accumulates.
+
 ### Reference harness result
 
 The deterministic fixtures are expected to pass every declared check. Their purpose is regression detection, not model comparison.
@@ -201,7 +207,7 @@ The deterministic fixtures are expected to pass every declared check. Their purp
 | `tr_flow_12_plan_migration_two_detours_001` | Service-plan migration | 12-step stateful execution with two detour/rejoin cycles |
 | `tr_flow_20_insurance_claim_three_detours_001` | Complex insurance claims | 20-step execution with three detours, corrections, consent, and ten tools |
 
-The public packs live in [`cases/`](cases). `pilot_v0_8.json` contains the original execution cases, `safety_v0_8.json` adds five safety families, `diversity_v0_8.json` broadens operational coverage, `long_horizon_flow_v0_8.json` targets exact flow depth, `behavior_stress_v0_8.json` adds orthogonal user strategies, `callcenter_offflow_v0_8.json` targets checkpoint recovery, `end_call_boundaries_v0_8.json` tests premature and correctly timed call termination, `production_critical_behaviors_v0_8.json` turns dataset/runtime contracts into isolated executable regressions, `outbound_compliance_v0_8.json` covers do-not-call, pre-collection disclosure, intent inversion, and calling-hours duties on outbound calls, `input_robustness_v0_8.json` covers speech-to-text noise, barge-in, chunked spoken-digit assembly, fixed-length code validation, relative-date disambiguation, mid-call language switching, background crosstalk, and DTMF keypad entry, `nested_flow_v0_8.json` covers detours nested inside detours and the end-call barge-in race, `consistency_v0_8.json` targets self-consistency across turns, `turkish_language_v0_8.json` targets Turkish-specific comprehension and normalization, and `channel_discipline_v0_8.json` targets voice-channel conduct. See the [`scenario diversity taxonomy`](docs/SCENARIO_TAXONOMY.md) for the full matrix and enforced coverage floor. Private packs should use the same published schema but omit `_mock_runs` and hidden-test answers.
+The public packs live in [`cases/`](cases). `pilot_v0_8.json` contains the original execution cases, `safety_v0_8.json` adds five safety families, `diversity_v0_8.json` broadens operational coverage, `long_horizon_flow_v0_8.json` targets exact flow depth, `behavior_stress_v0_8.json` adds orthogonal user strategies, `callcenter_offflow_v0_8.json` targets checkpoint recovery, `end_call_boundaries_v0_8.json` tests premature and correctly timed call termination, `production_critical_behaviors_v0_8.json` turns dataset/runtime contracts into isolated executable regressions, `outbound_compliance_v0_8.json` covers do-not-call, pre-collection disclosure, intent inversion, and calling-hours duties on outbound calls, `input_robustness_v0_8.json` covers speech-to-text noise, barge-in, chunked spoken-digit assembly, fixed-length code validation, relative-date disambiguation, mid-call language switching, background crosstalk, and DTMF keypad entry, `nested_flow_v0_8.json` covers detours nested inside detours and the end-call barge-in race, `consistency_v0_8.json` targets self-consistency across turns, `turkish_language_v0_8.json` targets Turkish-specific comprehension and normalization, `channel_discipline_v0_8.json` targets voice-channel conduct, `parallel_traps_v0_8.json` runs unrelated trap families simultaneously in one call, `call_conduct_v0_8.json` derives conversational-conduct cases from real production calls, `consistency_deep_v0_8.json` holds several invariants at once across detours, `consistency_hard_v0_8.json` targets consistency with the model's own statements across seven sectors, and `behavior_gaps_v0_8.json` closes inverted-risk coverage: over-refusal of a permitted action, unrequested extra mutations, PII over-collection, zero-row tool results, a refused handoff, a stale prompt figure contradicted by a live tool result, a past-date booking request, a claimed internal-staff authority, repeated pre-execution reversals, and a partially failed multi-action request. See the [`scenario diversity taxonomy`](docs/SCENARIO_TAXONOMY.md) for the full matrix and enforced coverage floor. Private packs should use the same published schema but omit `_mock_runs` and hidden-test answers.
 
 ### Production-critical behavior pack
 

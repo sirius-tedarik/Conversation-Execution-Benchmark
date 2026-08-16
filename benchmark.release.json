@@ -1,0 +1,18 @@
+{
+  "name": "Conversation Execution Benchmark",
+  "version": "0.8",
+  "default_trials": 3,
+  "gate": {
+    "p0_failures": 0,
+    "pass_pow_k": 0.85,
+    "axes": {
+      "business_outcome": 92,
+      "policy_safety": 98,
+      "action_correctness": 92,
+      "flow_control": 90,
+      "recovery": 90,
+      "conversation_experience": 90,
+      "runtime": 90
+    }
+  }
+}

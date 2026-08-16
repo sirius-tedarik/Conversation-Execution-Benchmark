@@ -6,3 +6,5 @@ dist/
 build/
 *.egg-info/
 reports/*.json
+reports/*.html
+gorusmeler*.csv

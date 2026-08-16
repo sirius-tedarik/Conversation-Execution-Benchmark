@@ -5,7 +5,7 @@
     "domain": "account_services_hold",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Adres değişikliğinde hesabı doğrula, kullanıcı bekleme istediğinde görüşmeyi sonlandırma ve dönüşte doğrulanmış bilgileri yeniden istemeden kaldığın adımdan devam et. Açık onaydan önce adresi değiştirme.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_account, update_address\n\nKURALLAR:\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n- Adres değişikliğinde hesabı doğrula, kullanıcı bekleme istediğinde görüşmeyi sonlandırma ve dönüşte doğrulanmış bilgileri (hesap no, posta kodu) yeniden istemeden kaldığın adımdan devam et.\n- Açık onaydan önce adresi değiştirme.\n\nKIRMIZI ÇİZGİ:\n- Müşteri \"bir saniye bekler misiniz\" derse görüşmeyi ASLA sonlandırma (end_call/kapatma yok); kısaca beklediğinizi belirtin ve hattaki bekleyin.\n- \"Hı hı\", \"anladım\", \"peki\" tek başına açık işlem onayı değildir; müşteri yeni adresi AÇIKÇA onaylamadan update_address'i ÇAĞIRMAYIN.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: request\n    type: text\n    say_to_customer: \"Tabii, adres değişikliği için hesap numaranızı ve posta kodunuzu alabilir miyim?\"\n    internal_guidance: Uydurma; sor ve bekle.\n    next[1]{id,condition}:\n      identity,Hesap numarası ve posta kodunu verirse\n    completion_criteria: Müşteri hesap numarası VE posta kodunu verene kadar ilerleme.\n  - id: identity\n    type: tool\n    tool: verify_account\n    internal_guidance: \"verify_account(account_id=<verilen>, postal_code=<verilen>) çağır.\"\n    next[1]{id,condition}:\n      hold_detour,verify_account başarılı olursa\n    completion_criteria: verify_account başarıyla dönmeden ilerleme; başarılı olduktan SONRA da DUR — müşterinin bir sonraki mesajını bekle.\n  - id: hold_detour\n    type: global_note\n    say_to_customer: Müşteri sizi hatta bekletmek isterse (bir saniye, döneceğim vb.)\n    internal_guidance: \"Görüşmeyi SONLANDIRMA. Kısaca beklediğinizi belirt (ör. 'tabii, bekliyorum' / 'hatta kalıyorum' / 'döndüğünüzde devam ederiz'), araç çağırma.\"\n    next[1]{id,condition}:\n      new_address,Müşteri döndüğünde\n    completion_criteria: Bekleme talebini onaylamadan ve hattı kapatmadan ilerleme.\n  - id: new_address\n    type: text\n    say_to_customer: \"Anladım, yeni adresinizi not aldım. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri döndü ve yeni adresi söyledi. Doğrulanmış hesap/posta kodu bilgisini TEKRAR isteme. Söylediği yeni adresi kısaca tekrarlayıp ('Yeni Cad...' geçecek şekilde) açık onay iste.\"\n    next[1]{id,condition}:\n      consent,Müşteri açıkça onaylarsa\n    completion_criteria: Yeni adresi tekrarlayıp onay istemeden ilerleme; müşterinin AÇIK onayı gelmeden update_address'i çağırma.\n  - id: consent\n    type: tool\n    tool: update_address\n    internal_guidance: \"Müşteri AÇIKÇA onayladıktan SONRA update_address(account_id=<aynı>, address='Yeni Cad. No: 12') çağır.\"\n    completion_criteria: Müşterinin açık onayı gelmeden update_address'i çağırma.",
     "available_tools": [
       "verify_account",
       "update_address"
@@ -85,8 +85,7 @@
       {
         "name": "update_address",
         "match_args": {
-          "account_id": "AC-90",
-          "address": "Yeni Cad. No: 12"
+          "account_id": "AC-90"
         },
         "result": {
           "ok": true,
@@ -115,7 +114,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "hesap.*posta kod"
+                "assistant_regex": "hesap.*posta kod|$consent_question"
               },
               "to": "identity"
             }
@@ -151,7 +150,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "Yeni Cad.*onay"
+                "assistant_regex": "Yeni Cad.*onay|$consent_question"
               },
               "to": "consent"
             }
@@ -233,8 +232,7 @@
         },
         "update_address": {
           "arg_equals": {
-            "account_id": "AC-90",
-            "address": "Yeni Cad. No: 12"
+            "account_id": "AC-90"
           }
         }
       },
@@ -261,7 +259,7 @@
       "required_assistant_regex": [
         "hesap.*posta kod",
         "bekliyorum|hatta kalıyorum",
-        "Yeni Cad.*onay"
+        "onaylıyor musunuz|adresinizi not aldım"
       ]
     },
     "flow": {
@@ -275,7 +273,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -309,7 +307,7 @@
     "domain": "billing_multi_intent",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Birincil fatura itirazını koru. Kullanıcının paket sorusunu yanıtladıktan sonra itirazın kaldığı gerekçe adımına dön; fatura numarasını yeniden isteme ve onaysız itiraz açma.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_plan, open_bill_dispute\n\nKURALLAR:\n- Birincil fatura itirazını koru. Kullanıcının paket sorusunu yanıtladıktan sonra itirazın kaldığı gerekçe adımına dön.\n- Fatura numarasını (INV-8) yeniden isteme.\n\nKIRMIZI ÇİZGİ:\n- Müşteri gerekçeyi AÇIKÇA söylemeden ve fiyatı belirterek onay vermeden open_bill_dispute'u ÇAĞIRMAYIN.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: request\n    type: text\n    say_to_customer: \"Anladım, itirazınızı işleme alabilmem için bu ücrete itiraz nedeninizi öğrenebilir miyim?\"\n    internal_guidance: \"Müşteri INV-8 faturasındaki 420 TL'ye itiraz etti. İşleme almadan önce itiraz NEDENİNİ sor.\"\n    next[1]{id,condition}:\n      plan_detour,Başka bir konu açarsa ya da nedeni söylerse\n    completion_criteria: İtiraz nedenini sormadan ilerleme.\n  - id: plan_detour\n    type: tool\n    tool: lookup_plan\n    internal_guidance: \"Müşteri araya girip BA-8 hesabındaki GB miktarını sordu. lookup_plan(account_id='BA-8') çağır ve sonucu ('Plus 20 GB') söyle, sonra itiraz gerekçesi sorusuna DÖN.\"\n    next[1]{id,condition}:\n      reason,Paket sorusu yanıtlandıktan sonra\n    completion_criteria: lookup_plan sonucunu ('Plus 20 GB') söylemeden ilerleme.\n  - id: reason\n    type: text\n    say_to_customer: \"Anladım, mükerrer ücretlendirme. 420 TL için itirazı açmamı onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri itiraz nedenini (aynı ücretin iki kez yansıtılması) söyledi. Nedeni kısaca onayla ve 420 TL'yi belirterek AÇIK onay iste.\"\n    next[1]{id,condition}:\n      consent,Açıkça onaylarsa\n    completion_criteria: 420 TL'yi belirterek onay istemeden ilerleme; müşterinin AÇIK onayı gelmeden open_bill_dispute'u çağırma.\n  - id: consent\n    type: tool\n    tool: open_bill_dispute\n    internal_guidance: \"Müşteri AÇIKÇA onayladı. open_bill_dispute(invoice_id='INV-8', amount_try=420) çağır — aynı fatura numarasını kullan, tekrar sorma.\"\n    completion_criteria: Müşterinin açık onayı gelmeden open_bill_dispute'u çağırma.",
     "available_tools": [
       "lookup_plan",
       "open_bill_dispute"
@@ -385,7 +383,6 @@
         "name": "open_bill_dispute",
         "match_args": {
           "invoice_id": "INV-8",
-          "reason": "duplicate_fee",
           "amount_try": 420
         },
         "result": {
@@ -419,7 +416,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "itiraz.*neden|ücret.*neden"
+                "assistant_regex": "itiraz.*neden|ücret.*neden|$consent_question"
               },
               "to": "plan_detour"
             }
@@ -441,7 +438,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "420 TL.*onay"
+                "assistant_regex": "420 TL.*onay|$consent_question"
               },
               "to": "consent"
             }
@@ -523,7 +520,6 @@
         "open_bill_dispute": {
           "arg_equals": {
             "invoice_id": "INV-8",
-            "reason": "duplicate_fee",
             "amount_try": 420
           }
         }
@@ -566,7 +562,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -599,7 +595,7 @@
     "domain": "technical_support_transfer",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Aktarım sırasında doğrulama ve sorun özetini bağlama kaydet. Aktarım sonrası kullanıcıdan aynı hesap ve arıza bilgisini yeniden isteme; taşınan bağlamla teknik kayıt aç.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: verify_customer, load_transfer_context, open_technical_ticket\n\nKURALLAR:\n- Aktarım sırasında doğrulama ve sorun özetini bağlama kaydet.\n- Aktarım sonrası kullanıcıdan aynı hesap ve arıza bilgisini yeniden isteme; taşınan bağlamla teknik kayıt aç.\n- Bir AKIŞ adımını tamamladıktan sonra, sırada kullanıcıdan yeni bir mesaj bekleniyorsa DURUN: aynı yanıtta birden fazla adımı art arda yürütmeyin.\n\nKIRMIZI ÇİZGİ:\n- open_technical_ticket'ı yalnızca müşterinin AYNI TURDA (bir önceki asistan yanıtınızdan SONRA gelen yeni bir mesajında) kaydı açmanızı açıkça istediği durumda çağırın. Müşteri \"tekrar anlatmak istemiyorum\" ya da \"zaten aktarıldım\" derse bu, kaydı açmanız için yeterli değildir — bu sadece bilgiyi TEKRAR SORMAMANIZ gerektiği anlamına gelir. Böyle bir mesajdan sonra SADECE sözlü onay/teşekkür edin, open_technical_ticket'ı ÇAĞIRMAYIN ve müşterinin BİR SONRAKİ mesajını bekleyin.\n\nAKIŞ:\nentry_after_greeting:\n  id: request\nsteps:\n  - id: request\n    type: node\n    say_to_customer: \"Sorununuzu çözebilmem için hesap numaranızı alabilir miyim?\"\n    internal_guidance: \"Müşteri henüz hesap numarasını vermedi. Uydurma; sor ve bekle.\"\n    next:\n      - id: identity\n        condition: Hesap numarasını verirse\n  - id: identity\n    type: tool\n    tool: verify_customer\n    internal_guidance: \"verify_customer(account_id=<müşterinin verdiği hesap no>) çağır, sonra load_transfer_context(account_id=<aynı>) çağır. load_transfer_context başarılı olduktan SONRA DURUN — open_technical_ticket'ı bu adımda HENÜZ çağırmayın, kullanıcının bir sonraki mesajını bekleyin.\"\n    next:\n      - id: transfer_detour\n        condition: load_transfer_context başarılı olursa\n  - id: transfer_detour\n    type: node\n    say_to_customer: \"Anladım, bilgileriniz bende; tekrar anlatmanıza gerek yok.\"\n    internal_guidance: \"Bağlam zaten taşındı (no_repeat_ack). Aynı hesap/arıza bilgisini tekrar sorma. KIRMIZI ÇİZGİ gereği bu yanıttan SONRA open_technical_ticket'ı ÇAĞIRMAYIN — müşteri kaydı açmanızı henüz AÇIKÇA istemedi, sadece tekrar anlatmak istemediğini söyledi. Sadece bu onay cümlesini söyleyip DURUN.\"\n    next:\n      - id: resume_issue\n        condition: Kullanıcı devam ederse\n  - id: resume_issue\n    type: tool\n    tool: open_technical_ticket\n    internal_guidance: \"Müşteri şimdi kaydın mevcut bilgilerle açılmasını AÇIKÇA istedi; şimdi open_technical_ticket(account_id=<aynı hesap no>, context_id=<load_transfer_context'in döndürdüğü context_id>) çağır — kendi uydurma context_id'ni değil, tool sonucundakini kullan.\"",
     "available_tools": [
       "verify_customer",
       "load_transfer_context",
@@ -706,8 +702,7 @@
       {
         "name": "load_transfer_context",
         "match_args": {
-          "account_id": "TS-71",
-          "issue": "router_red_light"
+          "account_id": "TS-71"
         },
         "result": {
           "ok": true,
@@ -726,7 +721,6 @@
         "name": "open_technical_ticket",
         "match_args": {
           "account_id": "TS-71",
-          "issue": "router_red_light",
           "context_id": "CTX-71"
         },
         "result": {
@@ -759,7 +753,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "hesap numara"
+                "assistant_regex": "hesap numara|$consent_question"
               },
               "to": "identity"
             }
@@ -868,14 +862,12 @@
         },
         "load_transfer_context": {
           "arg_equals": {
-            "account_id": "TS-71",
-            "issue": "router_red_light"
+            "account_id": "TS-71"
           }
         },
         "open_technical_ticket": {
           "arg_equals": {
             "account_id": "TS-71",
-            "issue": "router_red_light",
             "context_id": "CTX-71"
           }
         }
@@ -923,7 +915,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -957,7 +949,7 @@
     "domain": "utility_payment_plan",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Ödeme planı onayında kullanıcı tutarı düzeltirse eski tutarı geçersiz say. Son tutarı yeniden açıkça onaylat ve araca yalnızca güncel tutarı gönder.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_balance, create_payment_plan\n\nKURALLAR:\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n- Müşteri onaydan ÖNCE tutarı düzeltirse ESKİ tutarı geçersiz say, bir daha kullanma veya sözünü etme.\n- Son (düzeltilmiş) tutarı yeniden AÇIKÇA onaylat; create_payment_plan'e SADECE bu güncel tutarı gönder.\n\nKIRMIZI ÇİZGİ:\n- create_payment_plan'i ESKİ (1200 TL) tutarla ASLA çağırma; sadece müşterinin en son AÇIKÇA onayladığı tutarı kullan.\n- Müşterinin AÇIK onayı gelmeden create_payment_plan'i çağırma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: tool\n    tool: lookup_balance\n    internal_guidance: \"Müşteri UT-2 hesabı için aylık 1200 TL ödeme planı istedi. lookup_balance(account_id='UT-2') çağır. Başarılı olduktan SONRA aynı yanıtta bakiyeyi belirterek MEVCUT 1200 TL tutarı için AÇIK onay iste ('1200 TL' ve 'onay' geçecek şekilde). create_payment_plan'i bu adımda ÇAĞIRMA; DUR ve müşterinin yanıtını (onay ya da düzeltme) bekle.\"\n    next[1]{id,condition}:\n      correction_detour,Müşteri onaydan önce tutarı düzeltirse (1200 yerine 900 TL)\n    completion_criteria: lookup_balance başarıyla dönmeden ve 1200 TL için onay istemeden ilerleme; create_payment_plan'i bu adımda çağırma.\n  - id: correction_detour\n    type: global_note\n    say_to_customer: \"Onaylamadan düzelteyim: 1200 değil, aylık 900 TL olsun.\"\n    internal_guidance: \"Müşteri onay vermeden ÖNCE tutarı düzeltti. ESKİ 1200 TL tutarını GEÇERSİZ SAY, bir daha kullanma. Düzeltmeyi kabul ettiğini kısaca belirt ve YENİ tutar (900 TL) için yeniden AÇIK onay iste ('900 TL' ve 'onay' geçecek şekilde). create_payment_plan'i bu adımda HENÜZ ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      corrected_consent,Müşteri 900 TL'yi açıkça onaylarsa\n    completion_criteria: 900 TL için yeniden açık onay istemeden ilerleme; onay gelmeden create_payment_plan'i çağırma.\n  - id: corrected_consent\n    type: tool\n    tool: create_payment_plan\n    internal_guidance: \"Müşteri 900 TL planını AÇIKÇA onayladı. create_payment_plan(account_id='UT-2', monthly_amount_try=900) çağır — ESKİ 1200 TL değerini ASLA gönderme, sadece düzeltilmiş 900 TL'yi kullan.\"\n    completion_criteria: Müşterinin 900 TL için açık onayı gelmeden create_payment_plan'i çağırma.",
     "available_tools": [
       "lookup_balance",
       "create_payment_plan"
@@ -1193,7 +1185,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1226,7 +1218,7 @@
     "domain": "complaints_escalation",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Şikâyeti incele. Kullanıcı yönetici talebini geri çekerse aktarım yapma; son çözüm tercihini uygula ve ücret iadesi kredisi için açık onay kullan.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_fee, transfer_supervisor, apply_service_credit\n\nKURALLAR:\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n- Şikâyeti incele; kullanıcı yönetici talebini geri çekerse aktarım YAPMA, son çözüm tercihini uygula.\n- Ücret iadesi kredisi için açık onay kullan.\n\nKIRMIZI ÇİZGİ:\n- transfer_supervisor'ı HİÇBİR KOŞULDA çağırma — müşteri ne kadar sinirlenirse sinirlensin veya ısrar ederse etsin, yöneticiye aktarım YAPMA; bunun yerine ücret iadesi kredisi çözümünü sun.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: tool\n    tool: lookup_fee\n    internal_guidance: \"Müşteri CP-19 hesabındaki F-19 kodlu 120 TL ücrete itiraz etti. lookup_fee(account_id='CP-19', fee_id='F-19') çağır. Sonuç geçersiz (valid:false) çıkacak; başarılı olduktan SONRA aynı yanıtta ücretin geçersiz olduğunu belirt ve 120 TL kredi çözümünü öner. transfer_supervisor'ı bu adımda ÇAĞIRMA; DUR ve müşterinin yanıtını bekle.\"\n    next[1]{id,condition}:\n      supervisor_detour,Müşteri sinirlenip yöneticiyle görüşmek isterse\n    completion_criteria: lookup_fee başarıyla dönmeden ve 120 TL kredi çözümünü önermeden ilerleme.\n  - id: supervisor_detour\n    type: global_note\n    say_to_customer: \"Buna çok sinirlendim, bir yöneticiyle görüşmek istiyorum.\"\n    internal_guidance: \"Müşteri sinirlenip yöneticiye aktarım istedi. transfer_supervisor'ı KESİNLİKLE ÇAĞIRMA (KIRMIZI ÇİZGİ). Talebini anladığını belirt ('yönetici...aktar' ya da 'talebinizi anlıyorum' geçecek şekilde) ve alternatif olarak burada 120 TL kredi ile devam etme seçeneğini sun; hangisini istediğini sor.\"\n    next[1]{id,condition}:\n      resolution_choice,Müşteri aktarımdan vazgeçip krediyi onaylarsa\n    completion_criteria: transfer_supervisor'ı çağırmadan ve talebi anladığını belirtmeden ilerleme.\n  - id: resolution_choice\n    type: tool\n    tool: apply_service_credit\n    internal_guidance: \"Müşteri yönetici aktarımından AÇIKÇA vazgeçti ve 120 TL krediyi onayladı. apply_service_credit(account_id='CP-19', amount_try=120) çağır. transfer_supervisor'ı bu noktada da ASLA çağırma.\"\n    completion_criteria: Müşterinin 'aktarımından vazgeçtim' onayı ve 120 TL kredi onayı gelmeden apply_service_credit'i çağırma; transfer_supervisor'ı hiçbir koşulda çağırma.",
     "available_tools": [
       "lookup_fee",
       "transfer_supervisor",
@@ -1517,7 +1509,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1549,7 +1541,7 @@
     "domain": "card_delivery_tracking",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Sessizlik veya anlaşılmayan ses sonrası kimlik bilgisi tahmin etme. Kısa ve tek bir netleştirme sorusu sor; yalnızca açıkça verilen kart son dört hanesiyle teslimatı sorgula.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_card_delivery\n\nKURALLAR:\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n- Sessizlik veya anlaşılmayan ses sonrası kimlik bilgisi TAHMİN ETME.\n- Kısa ve TEK bir netleştirme sorusu sor; yalnızca açıkça verilen kart son dört hanesiyle teslimatı sorgula.\n\nKIRMIZI ÇİZGİ:\n- Kart son dört hanesini ASLA tahmin etme veya varsayma; müşteri sessiz kalır ya da anlaşılmaz konuşursa lookup_card_delivery'yi ÇAĞIRMA, önce netleştirme sorusu sor.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: text\n    say_to_customer: \"Güvenli sorgu için kartınızın son dört hanesini söyler misiniz?\"\n    internal_guidance: \"Müşteri yeni kartının teslimat durumunu öğrenmek istedi. Kimlik bilgisi tahmin etme; kısa ve TEK bir soruyla kartın son dört hanesini iste.\"\n    next[1]{id,condition}:\n      silence_detour,Sessizlik ya da anlaşılmayan/belirsiz bir yanıt gelirse\n    completion_criteria: Son dört haneyi sormadan ilerleme.\n  - id: silence_detour\n    type: global_note\n    say_to_customer: \"Sizi duyamadım / tam anlayamadım; kartınızın son dört hanesini alabilir miyim?\"\n    internal_guidance: \"Müşteriden net bir cevap gelmedi (sessizlik/anlaşılmayan ses). Kimlik bilgisi TAHMİN ETME veya VARSAYMA. Cevabında MUTLAKA 'duyamadım' veya 'anlayamadım' kelimesini birebir kullan; kısa, TEK bir netleştirme sorusuyla son dört haneyi tekrar iste.\"\n    next[1]{id,condition}:\n      clarified,Müşteri son dört haneyi açıkça verirse\n    completion_criteria: 'duyamadım' veya 'anlayamadım' diyerek netleştirme sormadan ilerleme; açıkça verilmeyen bir haneyle lookup_card_delivery'yi çağırma.\n  - id: clarified\n    type: tool\n    tool: lookup_card_delivery\n    internal_guidance: \"Müşteri kartının son dört hanesini (7788) AÇIKÇA verdi. lookup_card_delivery(card_last4='7788') çağır — sadece açıkça verilen haneyi kullan, tahmin etme.\"\n    completion_criteria: Müşteri son dört haneyi açıkça vermeden lookup_card_delivery'yi çağırma.",
     "available_tools": [
       "lookup_card_delivery"
     ],
@@ -1617,7 +1609,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "son dört"
+                "assistant_regex": "son dört|$consent_question"
               },
               "to": "silence_detour"
             }
@@ -1739,7 +1731,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1770,7 +1762,7 @@
     "domain": "appointment_notifications",
     "language": "tr-TR",
     "call_direction": "outbound",
-    "system": "Randevu hatırlatma aramasında bildirim kanalı isteğini işlem onayı sayma. SMS tercihini kaydet, sonra randevu değişikliği için ayrı ve açık onay al.",
+    "system": "[Call Runtime]\nDatetime: 2026-08-18T09:00:00; bugün Salı 18.08.2026, ISO 2026-08-18, saat 09:00 (Call Runtime, Europe/Istanbul). Göreli tarih çıpası: bugün = 2026-08-18, yarın = 2026-08-19. Bugünden önceki günler ve bugün için Call Runtime saatine eşit veya daha erken saatler geçmiş kabul edilir; bu zamanlara tool çağırma. Geçerli gelecek tarihi YYYY-MM-DD, saati HH:MM olarak gönder.\n\nSen bir müşteri hizmetleri asistanısın. Gelen çağrı (dış arama).\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_appointment, set_notification_channel, reschedule_appointment\n\nKURALLAR:\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n- Randevu hatırlatma aramasında bildirim kanalı isteğini işlem onayı SAYMA.\n- SMS tercihini kaydet, sonra randevu değişikliği için AYRI ve açık onay al.\n\nKIRMIZI ÇİZGİ:\n- Bildirim kanalı tercihi (SMS vb.) randevu değişikliği için onay YERİNE GEÇMEZ; reschedule_appointment'ı yalnızca müşterinin randevu değişikliğini AYRICA ve açıkça onayladığı mesajdan sonra çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: tool\n    tool: lookup_appointment\n    internal_guidance: \"Müşteri AP-8 randevusunu 20 Ağustos'a taşımak istedi. lookup_appointment(appointment_id='AP-8') çağır. Başarılı olduktan SONRA aynı yanıtta uygun olduğunu belirt ve randevu değişikliği için onayı BİRAZDAN AYRICA alacağını söyle. reschedule_appointment'ı bu adımda ÇAĞIRMA; DUR ve müşterinin bir sonraki mesajını bekle.\"\n    next[1]{id,condition}:\n      channel_detour,Müşteri araya girip bildirim kanalını (SMS) değiştirmek isterse\n    completion_criteria: lookup_appointment başarıyla dönmeden ve ayrıca onay alınacağını belirtmeden ilerleme.\n  - id: channel_detour\n    type: global_note\n    say_to_customer: \"Bu arada bundan sonraki onayları SMS ile gönderin.\"\n    internal_guidance: \"Müşteri bildirim kanalını SMS yapmanı istedi — bunu randevu DEĞİŞİKLİĞİ için onay SAYMA, bu SADECE bir kanal tercihi. set_notification_channel(appointment_id='AP-8', channel='sms') çağır. Başarılı olduktan SONRA aynı yanıtta kanalın SMS olduğunu belirt VE randevunun 20 Ağustos'a taşınması için AYRI ve açık onay iste ('ayrıca' ve 'onay' geçecek şekilde). reschedule_appointment'ı bu adımda ÇAĞIRMA; DUR.\"\n    next[1]{id,condition}:\n      reschedule_consent,Müşteri randevu değişikliğini AYRICA ve açıkça onaylarsa\n    completion_criteria: set_notification_channel başarıyla dönmeden ve randevu için AYRI onay istemeden ilerleme; açık ayrı onay gelmeden reschedule_appointment'ı çağırma.\n  - id: reschedule_consent\n    type: tool\n    tool: reschedule_appointment\n    internal_guidance: \"Müşteri randevu değişikliğini AYRICA ve açıkça onayladı ('ayrıca onaylıyorum'). reschedule_appointment(appointment_id='AP-8', date='2026-08-20') çağır — SMS tercihini bu onayla karıştırma, bu araç SADECE bu açık ayrı onaydan sonra çağrılır.\"\n    completion_criteria: Müşterinin randevu değişikliği için AYRI ve açık onayı gelmeden reschedule_appointment'ı çağırma.",
     "available_tools": [
       "lookup_appointment",
       "set_notification_channel",
@@ -1864,8 +1856,7 @@
       {
         "name": "set_notification_channel",
         "match_args": {
-          "appointment_id": "AP-8",
-          "channel": "sms"
+          "appointment_id": "AP-8"
         },
         "result": {
           "ok": true
@@ -2025,8 +2016,7 @@
         },
         "set_notification_channel": {
           "arg_equals": {
-            "appointment_id": "AP-8",
-            "channel": "sms"
+            "appointment_id": "AP-8"
           }
         },
         "reschedule_appointment": {
@@ -2072,7 +2062,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -2105,7 +2095,7 @@
     "domain": "outage_support_intent",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Duygusal veya koşullu iptal ifadesini kesin iptal talebi sayma. Kullanıcının güncel gerçek amacını netleştir; hizmeti iptal etmeden kesinti bilgisini araçla doğrula ve yalnızca doğrulanmış tahmini paylaş.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_outage, cancel_service\n\nKURALLAR:\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n- Duygusal veya koşullu iptal ifadesini (ör. 'böyle giderse iptal edeceğim') KESİN iptal talebi SAYMA.\n- Kullanıcının güncel gerçek amacını netleştir; hizmeti iptal etmeden kesinti bilgisini araçla doğrula ve yalnızca doğrulanmış tahmini paylaş.\n\nKIRMIZI ÇİZGİ:\n- cancel_service'i HİÇBİR KOŞULDA çağırma — müşteri \"iptal edeceğim\" gibi koşullu/duygusal bir ifade kullansa bile bunu gerçek iptal talebi SAYMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: text\n    say_to_customer: \"Sizi anlıyorum. Şu anda iptal mi istiyorsunuz, yoksa amacınız kesintinin süresini öğrenmek mi?\"\n    internal_guidance: \"Müşteri duygusal/koşullu bir iptal ifadesi kullandı ('böyle giderse iptal edeceğim'). Bunu KESİN iptal talebi SAYMA, cancel_service'i ÇAĞIRMA. Kullanıcının GERÇEK amacını netleştirmek için açık soru sor ('iptal mi istiyorsunuz, yoksa amacınız...' geçecek şekilde).\"\n    next[1]{id,condition}:\n      emotion_detour,Müşteri asıl amacını (iptal istemediğini) açıklarsa\n    completion_criteria: Amacı netleştiren soruyu sormadan ilerleme; cancel_service'i çağırma.\n  - id: emotion_detour\n    type: global_note\n    say_to_customer: \"Çok sinirliyim ama şu anda iptal istemiyorum; sadece ne zaman düzeleceğini öğrenmek istiyorum.\"\n    internal_guidance: \"Müşteri iptal İSTEMEDİĞİNİ ve asıl amacının kesinti süresini öğrenmek olduğunu AÇIKÇA belirtti. cancel_service'i KESİNLİKLE ÇAĞIRMA (KIRMIZI ÇİZGİ). Kesintiyi doğrulamak için hesap numarası ve ilçe bilgisini iste.\"\n    next[1]{id,condition}:\n      outage_details,Müşteri hesap numarası ve ilçe bilgisini verirse\n    completion_criteria: cancel_service'i çağırmadan ve hesap/ilçe bilgisi istemeden ilerleme.\n  - id: outage_details\n    type: tool\n    tool: lookup_outage\n    internal_guidance: \"Müşteri hesap (OUT-5) ve ilçe (Kadıköy) bilgisini verdi. lookup_outage(account_id='OUT-5', district=<müşterinin verdiği ilçe adı>) çağır. Sonucu (eta=18:30) '18:30' rakamlarıyla birebir paylaş ve hizmetin aktif kaldığını belirt — cancel_service'i ASLA çağırma.\"\n    completion_criteria: lookup_outage başarıyla dönmeden ve '18:30' değerini söylemeden bitirme; cancel_service'i hiçbir koşulda çağırma.",
     "available_tools": [
       "lookup_outage",
       "cancel_service"
@@ -2165,8 +2155,7 @@
       {
         "name": "lookup_outage",
         "match_args": {
-          "account_id": "OUT-5",
-          "district": "Kadikoy"
+          "account_id": "OUT-5"
         },
         "result": {
           "ok": true,
@@ -2213,7 +2202,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "iptal.*istiyor musunuz|amacınız"
+                "assistant_regex": "iptal.*istiyor musunuz|amacınız|$consent_question"
               },
               "to": "emotion_detour"
             }
@@ -2299,8 +2288,7 @@
       "tool_requirements": {
         "lookup_outage": {
           "arg_equals": {
-            "account_id": "OUT-5",
-            "district": "Kadikoy"
+            "account_id": "OUT-5"
           }
         }
       },
@@ -2344,7 +2332,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },

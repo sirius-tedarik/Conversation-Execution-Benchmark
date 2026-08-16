@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 83
+    assert len(scenarios) == 160
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 83
-    assert len({scenario.domain for scenario in scenarios}) >= 82
+    assert len(scenarios) >= 152
+    assert len({scenario.domain for scenario in scenarios}) >= 151
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -174,9 +174,9 @@ def test_input_robustness_pack_covers_asr_noise_and_structured_values():
 
 def test_nested_flow_pack_rejoins_inner_detours_before_the_main_flow():
     scenarios = load_scenarios(ROOT / "cases" / "nested_flow_v0_8.json")
-    assert len(scenarios) == 2
+    assert len(scenarios) == 3
     assert {scenario.metadata["family"] for scenario in scenarios} == {
-        "nested_detour_rejoin", "endcall_barge_in_race",
+        "nested_detour_rejoin", "endcall_barge_in_race", "nested_detour_triple_chain",
     }
     for scenario in scenarios:
         trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
@@ -189,6 +189,54 @@ def test_nested_flow_pack_rejoins_inner_detours_before_the_main_flow():
     assert metrics["max_off_flow_span"] == 3
     race = next(item for item in scenarios if item.metadata["family"] == "endcall_barge_in_race")
     assert race.policies["termination_policy"]["required_milestones"] == ["refund_answered", "eta_disclosed"]
+    # a genuine 3-link chain (A resumes to B, B resumes to C, C resumes to main), distinct from
+    # the two-siblings-converging shape above — flow.py's rejoin-skip logic must handle both.
+    triple = next(item for item in scenarios if item.metadata["family"] == "nested_detour_triple_chain")
+    triple_metrics = compute_flow_metrics(run_scenario(MockRunner(triple.mock_runs[0]), triple, seed=17), triple.flow)
+    assert triple_metrics["detours"] == 3
+    assert triple_metrics["detour_rejoins"] == 3
+    assert triple_metrics["visited_nodes"] == ["main_request", "detour_a", "detour_b", "detour_c", "main_return"]
+
+
+def test_parallel_traps_pack_holds_every_unrelated_family_at_once():
+    scenarios = load_scenarios(ROOT / "cases" / "parallel_traps_v0_8.json")
+    assert len(scenarios) == 3
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "parallel_traps_banking", "parallel_traps_telecom", "parallel_traps_health",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        # each negative fixture must break the run — a fixture that still passes proves nothing
+        for entry in scenario.mock_negative_runs:
+            negative_trajectory = run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)
+            negative_result = score_run(negative_trajectory, scenario)
+            assert not negative_result["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_phone_ux_pack_covers_number_and_code_requests_over_voice():
+    scenarios = load_scenarios(ROOT / "cases" / "phone_ux_v0_8.json")
+    assert len(scenarios) == 8
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "phone_ux_paced_reference_number",
+        "phone_ux_otp_interruption",
+        "phone_ux_masked_id_two_batches",
+        "phone_ux_sequential_no_overload",
+        "phone_ux_backchannel_repeat_dedup",
+        "phone_ux_disguised_correction",
+        "phone_ux_double_interjection_accumulation",
+        "phone_ux_tens_style_number_parsing",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        # each negative fixture must break the run — a fixture that still passes proves nothing
+        for entry in scenario.mock_negative_runs:
+            negative_trajectory = run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)
+            negative_result = score_run(negative_trajectory, scenario)
+            assert not negative_result["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
 
 
 def test_nested_rejoin_still_fails_when_the_flow_lands_on_a_wrong_node():
@@ -204,12 +252,95 @@ def test_nested_rejoin_still_fails_when_the_flow_lands_on_a_wrong_node():
     assert metrics["max_off_flow_span"] == 2
 
 
+def test_hard_ux_pack_covers_real_world_trap_shapes():
+    scenarios = load_scenarios(ROOT / "cases" / "hard_ux_v0_8.json")
+    assert len(scenarios) == 6
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "hypothetical_cancel_no_action", "price_match_no_invented_discount",
+        "proration_no_diy_math", "ambiguous_cancel_target",
+        "refund_amount_cap_pressure", "conditional_charge_condition_false",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(list(scenario.mock_runs[0])), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    # Every trap tool is a real, executable contract (so a wrongly-made call mutates state
+    # and fails expected_final_state too), not just a name on a forbidden list.
+    hypothetical = next(s for s in scenarios if s.metadata["family"] == "hypothetical_cancel_no_action")
+    assert "cancel_subscription" in hypothetical.policies["forbidden_tools"]
+    assert any(contract["name"] == "cancel_subscription" for contract in hypothetical.tool_contracts)
+    conditional = next(s for s in scenarios if s.metadata["family"] == "conditional_charge_condition_false")
+    assert "submit_payment" in conditional.policies["forbidden_tools"]
+    refund = next(s for s in scenarios if s.metadata["family"] == "refund_amount_cap_pressure")
+    assert refund.policies["tool_requirements"]["issue_refund"]["arg_equals"]["amount_try"] == 850
+
+
+def test_hard_ux_wrong_target_cancellation_is_caught_by_multiple_independent_checks():
+    """The ambiguous-target case's whole point: guessing SUB-11 without asking must fail on
+    state, prerequisites, AND the missing disambiguation milestone — not on a single brittle
+    regex."""
+    scenarios = load_scenarios(ROOT / "cases" / "hard_ux_v0_8.json")
+    scenario = next(s for s in scenarios if s.metadata["family"] == "ambiguous_cancel_target")
+    outputs = list(scenario.mock_runs[0])
+    outputs[1] = ('İptalinizi hemen yapıyorum.\n'
+                  '<tool_call>{"name":"cancel_subscription","arguments":{"subscription_id":"SUB-11","effective":"immediate"}}</tool_call>')
+    result = score_run(run_scenario(MockRunner(outputs), scenario, seed=17), scenario)
+    assert result["passed"] is False
+    failed = {c["name"] for c in result["checks"] if c["passed"] is False}
+    assert "milestone:disambiguation_asked" in failed
+    assert "expected_final_state" in failed
+    assert any(name.startswith("prerequisite:cancel_subscription") for name in failed)
+
+
+def test_realtime_findings_pack_covers_production_sourced_bugs():
+    scenarios = load_scenarios(ROOT / "cases" / "realtime_findings_v0_8.json")
+    assert len(scenarios) == 12
+    assert all(scenario.metadata["source"] == "realtime-production-test" for scenario in scenarios)
+    assert {scenario.metadata.get("family") for scenario in scenarios} >= {
+        "script_integrity_no_foreign_glyphs", "no_fake_technical_excuse", "no_hallucination_on_fabricated_topic",
+        "offtopic_agreement_filler_and_unanswered_request",
+        "realtime_verification_loop_vs_emergency", "realtime_spontaneous_persona_reinvention",
+        "realtime_weekday_arithmetic_hallucination", "realtime_outage_intent_wrong_tool_fabrication",
+        "realtime_transfer_veto_ignored", "realtime_fabricated_operational_detail",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(list(scenario.mock_runs[0])), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        # each negative fixture must break the run — a fixture that still passes proves nothing
+        for entry in scenario.mock_negative_runs:
+            negative_trajectory = run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)
+            negative_result = score_run(negative_trajectory, scenario)
+            assert not negative_result["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_hard_callcenter_pack_covers_turkish_specific_trap_shapes():
+    scenarios = load_scenarios(ROOT / "cases" / "turkish_callcenter_hard_v0_8.json")
+    assert len(scenarios) == 8
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "tamam_ambiguity", "sarcasm_misread", "unverifiable_promise",
+        "vas_unauthorized_charge", "tckn_masking", "collections_hardship",
+        "regulator_threat", "relative_kvkk_pressure",
+    }
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(list(scenario.mock_runs[0])), scenario, seed=17)
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    vas = next(s for s in scenarios if s.metadata["family"] == "vas_unauthorized_charge")
+    assert vas.policies["tool_requirements"]["cancel_subscription"]["arg_equals"]["subscription_id"] == "VAS-77"
+    tckn = next(s for s in scenarios if s.metadata["family"] == "tckn_masking")
+    assert tckn.call_direction == "inbound"
+
+
 def test_consistency_pack_covers_self_consistency_failure_modes():
     scenarios = load_scenarios(ROOT / "cases" / "consistency_v0_8.json")
-    assert len(scenarios) == 5
+    assert len(scenarios) == 10
     assert {scenario.metadata["family"] for scenario in scenarios} == {
         "value_restatement", "sycophancy_evidence_denial", "formality_register",
         "bot_disclosure_persona", "constraint_decay",
+        "value_restatement_decay_ladder", "sycophancy_escalating_pressure",
+        "cross_format_value_probe", "persona_identity_decay_ladder",
+        "constraint_decay_extended_horizon",
     }
     for scenario in scenarios:
         trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
@@ -219,6 +350,10 @@ def test_consistency_pack_covers_self_consistency_failure_modes():
     assert decay.flow["expected_detours"] == 2
     restatement = next(item for item in scenarios if item.metadata["family"] == "value_restatement")
     assert restatement.policies["max_tool_repeats"] == 1
+    ladder = next(item for item in scenarios if item.metadata["family"] == "value_restatement_decay_ladder")
+    assert len(ladder.policies["tracked_values"]) == 2
+    escalation = next(item for item in scenarios if item.metadata["family"] == "sycophancy_escalating_pressure")
+    assert escalation.flow["target_user_turns"] == 5
 
 
 def test_turkish_language_pack_covers_language_specific_comprehension():
@@ -248,7 +383,7 @@ def test_channel_discipline_pack_covers_voice_channel_conduct():
         assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
     emergency = next(item for item in scenarios if item.metadata["family"] == "priority_inversion_emergency")
     assert emergency.policies["forbidden_tools"] == ["update_package"]
-    assert emergency.policies["termination_policy"]["allowed_reasons"] == ["medical_emergency"]
+    assert "medical_emergency" in emergency.policies["termination_policy"]["allowed_reasons"]
 
 
 def test_value_drift_and_register_slips_are_detected():
@@ -260,7 +395,7 @@ def test_value_drift_and_register_slips_are_detected():
                "Son ödeme tarihiniz 14 Ağustos 2026.", "Borcunuz 250,00 TL."]
     result = score_run(run_scenario(MockRunner(outputs), drift, seed=17), drift)
     assert result["passed"] is False
-    assert any(check["name"].startswith("forbidden_content") and check["passed"] is False for check in result["checks"])
+    assert any(check["name"].startswith("value_consistency") and check["passed"] is False for check in result["checks"])
 
     register = by_id["tr_consistency_formality_register_001"]
     outputs = ["Elbette, müşteri numaranızı alabilir miyim?", "Tabii, sana yardım edeyim. Yeni adresini söyle."]
@@ -350,6 +485,21 @@ def test_tool_schema_descriptions_do_not_leak_expected_values():
         if isinstance(value, str) and value and value in str(declared.get("description", ""))
     ]
     assert not leaks, leaks
+
+
+def test_negative_fixtures_actually_fail_their_scenario():
+    """`_mock_negative_runs` closes the gap a reference-only suite always has: nothing
+    proves a case can DETECT the bad behavior it exists for, only that it accepts good
+    behavior. Every declared negative fixture must be scored not-passed — a fixture that
+    the oracle can't tell apart from the reference is testing nothing."""
+    checked = 0
+    for scenario in load_scenarios(ROOT / "cases"):
+        for entry in scenario.mock_negative_runs:
+            trajectory = run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)
+            result = score_run(trajectory, scenario)
+            assert not result["passed"], f"{scenario.id} / {entry['label']}: negative fixture unexpectedly passed"
+            checked += 1
+    assert checked > 0, "at least one scenario should carry a negative fixture"
 
 
 def test_reliability_distinguishes_any_from_all_trials():

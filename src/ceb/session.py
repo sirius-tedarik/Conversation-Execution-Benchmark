@@ -20,7 +20,8 @@ def _append(timeline: list[dict[str, Any]], step: dict[str, Any]) -> dict[str, A
 
 
 def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, Any]:
-    simulator = ControlledUserSimulator(scenario.id, scenario.user_plan, seed)
+    read_only_tools = frozenset(scenario.policies.get("read_only_tools", []))
+    simulator = ControlledUserSimulator(scenario.id, scenario.user_plan, seed, read_only_tools)
     environment = StatefulEnvironment(scenario.initial_state, scenario.tool_contracts)
     messages: list[dict[str, Any]] = []
     if scenario.system:
@@ -112,7 +113,7 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, An
                 break
         else:
             execution_error = execution_error or "max_steps_per_turn exceeded"
-        if terminal_tool or simulator.advance(turn_steps) is None:
+        if terminal_tool or simulator.advance(turn_steps, timeline) is None:
             break
     else:
         max_turns_hit = True

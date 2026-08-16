@@ -73,8 +73,23 @@ def apply_patch(state: dict[str, Any], operations: list[dict[str, Any]]) -> None
             raise ToolExecutionError(f"unknown state patch operation: {op}")
 
 
-def deep_subset(expected: Any, actual: Any, path: str = "state") -> list[str]:
-    """Return mismatches; undeclared fields in actual state are allowed."""
+_TR_FOLD = str.maketrans("çÇşŞıİğĞöÖüÜ", "ccssiiggoouu")
+
+
+def _normalize_text(value: str) -> str:
+    """Fold case and Turkish diacritics so 'SMS'/'sms' and 'Kadıköy'/'Kadikoy' compare
+    equal — a model choosing a different casing or an ASCII-folded spelling for the same
+    value is not a different value, and scoring it as one hides real defects behind noise."""
+    return value.strip().casefold().translate(_TR_FOLD)
+
+
+def deep_subset(expected: Any, actual: Any, path: str = "state", normalize_strings: bool = False) -> list[str]:
+    """Return mismatches; undeclared fields in actual state are allowed.
+
+    `normalize_strings` folds case and Turkish diacritics before comparing plain string
+    leaves — intended for comparing *model-supplied arguments* (where "SMS" and "sms" are
+    the same instruction), not for state assertions, where the persisted value is exact
+    by construction and a literal mismatch is itself the signal."""
     mismatches: list[str] = []
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
@@ -84,7 +99,11 @@ def deep_subset(expected: Any, actual: Any, path: str = "state") -> list[str]:
             if key not in actual:
                 mismatches.append(f"{child}: missing")
             else:
-                mismatches.extend(deep_subset(value, actual[key], child))
+                mismatches.extend(deep_subset(value, actual[key], child, normalize_strings))
+        return mismatches
+    if normalize_strings and isinstance(expected, str) and isinstance(actual, str):
+        if _normalize_text(expected) != _normalize_text(actual):
+            mismatches.append(f"{path}: expected {expected!r}, got {actual!r}")
         return mismatches
     if expected != actual:
         mismatches.append(f"{path}: expected {expected!r}, got {actual!r}")
@@ -92,7 +111,7 @@ def deep_subset(expected: Any, actual: Any, path: str = "state") -> list[str]:
 
 
 def _args_match(expected: dict[str, Any], actual: dict[str, Any]) -> bool:
-    return all(actual.get(key) == value for key, value in expected.items())
+    return not deep_subset(expected, actual, normalize_strings=True)
 
 
 @dataclass

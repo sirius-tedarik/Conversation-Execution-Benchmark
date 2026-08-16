@@ -5,7 +5,7 @@
     "domain": "turkish_negation_suffix",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Türkçe olumsuzluk ekini (-me/-ma) dikkatle işle. Kullanıcı bir işlemi istemediğini söylüyorsa o işlemi yapma; tercihini kaydet ve mevcut durumu koru.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: cancel_subscription, log_retention_preference\n\nKURALLAR:\n- Türkçe olumsuzluk ekini (-me/-ma) dikkatle işle: \"iptal etmeyin\" gibi bir ifade YAPMA/ETME anlamına gelir, tam tersi (iptal et) anlamına DEĞİL.\n- Kullanıcı bir işlemi istemediğini söylüyorsa o işlemi KESİNLİKLE yapma; tercihini kaydet ve mevcut durumu koru.\n- cancel_subscription aracını bu görüşmede hiçbir koşulda çağırma (yasaklı araç).\n- \"iptal ediyorum\", \"iptal edildi\", \"iptalinizi aldım\", \"iptal talebinizi\" gibi ifadeleri KULLANMA.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: negated_request\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: negated_request\n    type: text\n    say_to_customer: \"AB-3 aboneliğinizi iptal etmiyorum, mevcut hâliyle devam edecek. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri 'AB-3 aboneliğimi iptal etmeyin, devam etsin' dedi. Türkçede '-me/-ma' olumsuzluk eki kipi tersine çevirir: 'iptal etmeyin' = İPTAL ETME, aboneliğin İPTAL EDİLMEMESİ ve DEVAM ETMESİ gerekir. cancel_subscription'ı ÇAĞIRMA — bu araç bu senaryoda yasak. 'İptal etmiyorum, mevcut hâliyle devam edecek' diyerek negasyonu doğru anladığını göster ve onay iste.\"\n    next[1]{id,condition}:\n      confirm,Müşteri açıkça onaylarsa (\"Evet, aynen devam etsin\" gibi)\n    completion_criteria: \"iptal etmiyorum\" ve \"devam ed\" ifadelerini söylemeden ve cancel_subscription'ı çağırmadan ilerleme.\n  - id: confirm\n    type: tool\n    tool: log_retention_preference\n    internal_guidance: \"Müşteri devam etmeyi onayladı. log_retention_preference(customer_id='AB-3', keep_active=true) çağır. cancel_subscription'ı HİÇBİR KOŞULDA çağırma; bu bir iptal DEĞİL, devam tercihinin kaydıdır ve abonelik 'active' durumda kalmalı.\"\n    completion_criteria: Müşterinin açık onayı gelmeden log_retention_preference'ı çağırma; cancel_subscription'ı asla çağırma.",
     "available_tools": [
       "cancel_subscription",
       "log_retention_preference"
@@ -109,7 +109,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "iptal etmiyorum"
+                "assistant_regex": "iptal etmiyorum|$consent_question"
               },
               "to": "confirm"
             }
@@ -254,7 +254,7 @@
     "domain": "turkish_negative_question",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Onay sorusunu olumsuz kalıpla veya 'değil mi' ekiyle sorma. Kullanıcının niyeti belirsizse işlemi yapmadan önce olumlu kalıpla netleştir ve açık onay al.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri kimliği doğrulandı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: close_account\n\nKURALLAR:\n- Onay sorusunu olumsuz kalıpla veya \"değil mi\" ekiyle SORMA.\n- Kullanıcının niyeti belirsizse işlemi yapmadan önce olumlu kalıpla netleştir ve açık onay al.\n- Olumsuz/etiket soruya (\"...değil mi?\", \"...kapatmayalım mı?\", \"...olmasın mı?\") verilen \"evet/hayır\" cevabı anlamca belirsiz olabilir (ör. \"Kapatmayalım mı?\" sorusuna \"evet\" cevabı \"evet kapatmayalım\" mı yoksa \"evet kapatalım\" mı belli olmaz) — bu yüzden onayı HER ZAMAN olumlu kalıpla (\"...istiyor musunuz?\", \"...kapatılsın mı?\") al.\n- \"değil mi\", \"istemiyorsunuz\", \"kapatmayalım mı\", \"olmasın mı\" ifadelerini KULLANMA.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ambiguous_intent\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: ambiguous_intent\n    type: text\n    say_to_customer: \"Netleştirelim: HS-24 hesabınızın kapatılmasını istiyor musunuz?\"\n    internal_guidance: \"Müşteri kararsız: 'HS-24 hesabımı kapatmayı düşünüyorum ama emin değilim.' Onay sorusunu SADECE OLUMLU kalıpla sor: 'kapatılmasını istiyor musunuz' gibi. Olumsuz/etiket soru ('değil mi', 'kapatmayalım mı', 'olmasın mı') KULLANMA — olumsuz soruya verilen 'evet' yanıtı anlam karışıklığına yol açar. Olumlu soruyla net bir 'evet' = kapat, net bir 'hayır' = kapatma ayrımını sağla.\"\n    next[1]{id,condition}:\n      plain_yes,Müşteri olumlu soruya net \"evet\" derse\n    completion_criteria: \"kapatılmasını istiyor musunuz\" (veya eşdeğer olumlu kalıp) sormadan ilerleme; olumsuz/etiket soru kullanma.\n  - id: plain_yes\n    type: tool\n    tool: close_account\n    internal_guidance: \"Müşteri olumlu soruya açık 'evet' dedi ('Evet, kapatılsın.') — bu net bir onaydır. close_account(customer_id='HS-24', confirmed=true) çağır.\"\n    completion_criteria: Açık onay gelmeden close_account'u çağırma.",
     "available_tools": [
       "close_account"
     ],
@@ -321,7 +321,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "kapatılmasını istiyor musunuz"
+                "assistant_regex": "kapatılmasını istiyor musunuz|$consent_question"
               },
               "to": "plain_yes"
             }
@@ -458,7 +458,7 @@
     "domain": "turkish_spoken_numbers",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Sözlü sayıları rakama çevirerek işle: 'iki bin dört yüz elli' = 2.450, 'iki yüz kırk sekiz buçuk lira' = 248,50 TL. Tutarı teyit ettikten sonra işlemi yap.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_payment\n\nKURALLAR:\n- Sözlü sayıları rakama çevirerek işle: \"iki bin dört yüz elli\" = 2.450, \"iki yüz kırk sekiz buçuk lira\" = 248,50 TL.\n- Tutarı teyit ettikten sonra işlemi yap; müşteri düzeltme yaparsa SADECE düzeltilmiş (son) tutarı kullan, ilk söylenen tutarı unut.\n- İlk (düzeltilmemiş) tutarla asla ödeme oluşturma; \"2.450 TL'yi çekiyorum/tahsil/2.450 TL'lik ödemeyi oluştur\" gibi ifadeler kullanma.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: amount_in_words\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: amount_in_words\n    type: text\n    say_to_customer: \"2.450 TL olarak anladım. Doğru mu?\"\n    internal_guidance: \"Müşteri tutarı sözlü söyledi: 'PY-8 kartımdan iki bin dört yüz elli lira çekin.' 'iki bin dört yüz elli lira' = 2.450 TL. Bu aşamada SADECE tutarı rakama çevirip geri oku ve onay iste — create_payment'ı ÇAĞIRMA, tutar henüz kesinleşmedi.\"\n    next[1]{id,condition}:\n      kurus_correction,Müşteri tutarı düzeltirse\n    completion_criteria: \"2.450\" rakamını söylemeden ilerleme; bu adımda create_payment'ı çağırma.\n  - id: kurus_correction\n    type: text\n    say_to_customer: \"Düzelttim: 248,50 TL. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri düzeltme yaptı: 'Pardon, iki yüz kırk sekiz buçuk lira olacak.' 'iki yüz kırk sekiz buçuk lira' = 248,50 TL ('buçuk' = ,50 kuruş). ÖNCEKİ 2.450 TL tutarını UNUT, YENİ düzeltilmiş '248,50' tutarını AYNEN geri oku ve onay iste. DUR — bu adımda henüz create_payment'ı çağırma, önce açık onay gerekiyor.\"\n    next[1]{id,condition}:\n      confirm,Müşteri açıkça onaylarsa\n    completion_criteria: \"248,50\" rakamını söylemeden ilerleme; onay gelmeden create_payment'ı çağırma.\n  - id: confirm\n    type: tool\n    tool: create_payment\n    internal_guidance: \"Müşteri düzeltilmiş tutarı onayladı ('Evet, doğru.'). create_payment(customer_id='PY-8', amount_try=248.5) çağır — SADECE düzeltilmiş 248,50 tutarını kullan, ilk söylenen 2.450'yi ASLA kullanma.\"\n    completion_criteria: Onay gelmeden veya yanlış (2450/2.450) tutarla create_payment'ı çağırma.",
     "available_tools": [
       "create_payment"
     ],
@@ -528,7 +528,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "2\\.450"
+                "assistant_regex": "2\\.450|$consent_question"
               },
               "to": "kurus_correction"
             }
@@ -542,7 +542,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "248,50"
+                "assistant_regex": "248,50|$consent_question"
               },
               "to": "confirm"
             }
@@ -691,7 +691,7 @@
     "domain": "turkish_phonetic_spelling",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Harf kodlamayla verilen bilgiyi Türkçe karakterleriyle doğru yaz. Yazdığın hâli teyit ettikten sonra kaydet; Türkçe karakterleri sadeleştirme.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: update_surname\n\nKURALLAR:\n- Harf kodlamayla (şehir isimleriyle) verilen bilgiyi Türkçe karakterleriyle doğru yaz.\n- Yazdığın hâli teyit ettikten sonra kaydet.\n- Türkçe karakterleri (Ç, Ğ, İ, Ö, Ş, Ü) sadeleştirme / ASCII'ye çevirme.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: spell_out\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: spell_out\n    type: text\n    say_to_customer: \"Soyadınızı Çağlayan olarak yazdım. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri şehir isimleriyle harf harf kodlama yaptı: 'Çanakkale'nin Çe'si, Adana'nın A'sı, yumuşak ge, Lüleburgaz'ın Le'si, Adana'nın A'sı, Yozgat'ın Ye'si, Adana'nın A'sı, Niğde'nin Ne'si.' Harfleri sırayla birleştir: Ç+A+Ğ+L+A+Y+A+N = 'Çağlayan' ('yumuşak ge' = Ğ harfidir). TÜRKÇE KARAKTERLERİ SADELEŞTİRME: 'Caglayan', 'Çaglayan', 'Cağlayan', 'Chaglayan', 'Caghlayan' gibi yanlış/sadeleştirilmiş yazımlar KULLANMA. Tam adı 'Çağlayan' şeklinde AYNEN geri oku ve onay iste.\"\n    next[1]{id,condition}:\n      confirm,Müşteri doğru yazıldığını onaylarsa\n    completion_criteria: \"Çağlayan\" yazımını (doğru Türkçe karakterlerle) söylemeden ilerleme.\n  - id: confirm\n    type: tool\n    tool: update_surname\n    internal_guidance: \"Müşteri yazımı onayladı ('Evet, doğru yazdınız.'). update_surname(customer_id='SN-5', surname='Çağlayan') çağır — Türkçe karakterleri (Ç, ğ) AYNEN koru, sadeleştirilmiş/ASCII hâlini (Caglayan) KULLANMA.\"\n    completion_criteria: Onay gelmeden veya yanlış yazımla update_surname'i çağırma.",
     "available_tools": [
       "update_surname"
     ],
@@ -758,7 +758,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "Çağlayan"
+                "assistant_regex": "Çağlayan|$consent_question"
               },
               "to": "confirm"
             }
@@ -890,7 +890,7 @@
     "domain": "turkish_dialect_comprehension",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Ağız ve konuşma dili farklılıklarını anlaşılmış say. Kullanıcıyı düzeltme, konuşmasını taklit etme ve anlamadım deme; standart Türkçeyle yanıtla ve göreve devam et.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri kimliği doğrulandı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_bill_status\n\nKURALLAR:\n- Ağız ve konuşma dili farklılıklarını anlaşılmış say.\n- Kullanıcıyı düzeltme, konuşmasını taklit etme ve \"anlamadım\" deme.\n- Standart Türkçeyle yanıtla ve göreve devam et.\n- \"anlamadım\", \"anlayamadım\", \"tekrar eder misiniz\", \"napıyon\", \"bilmiyom\", \"napcam\", \"gene\", \"doğrusu şöyle\", \"düzgün konuş\" gibi ifadeleri KULLANMA.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: dialect_request\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: dialect_request\n    type: text\n    say_to_customer: \"Faturanızın durumuna bakıyorum. Abone numaranızı alabilir miyim?\"\n    internal_guidance: \"Müşteri bölgesel/gündelik ağızla konuştu: 'Napıyon, faturam gene gelmemiş, bilmiyom napcam.' ('napıyon'=ne yapıyorsunuz, 'gene'=yine, 'bilmiyom'=bilmiyorum, 'napcam'=ne yapacağım). Bunu ANLADIĞINI VARSAY; 'anlamadım/anlayamadım/tekrar eder misiniz' DEME. Müşterinin ağzını TAKLİT ETME — 'napıyon/bilmiyom/napcam/gene' gibi kelimeleri KULLANMA. Müşteriyi düzeltme ('düzgün konuş', 'doğrusu şöyle' YASAK). Standart Türkçeyle yanıt ver: 'fatura' konusunu netçe belirt ve göreve devam ederek abone numarası iste.\"\n    next[1]{id,condition}:\n      subscriber_id,Müşteri abone numarasını verirse\n    completion_criteria: \"fatura\" kelimesini standart Türkçeyle söylemeden ilerleme; ağız taklidi veya düzeltme yapma.\n  - id: subscriber_id\n    type: tool\n    tool: lookup_bill_status\n    internal_guidance: \"Müşteri abone numarasını verdi: 'Abone numaram EL-31.' lookup_bill_status(subscriber_id='EL-31') çağır.\"\n    completion_criteria: Abone numarası alınmadan lookup_bill_status'u çağırma.",
     "available_tools": [
       "lookup_bill_status"
     ],
@@ -956,7 +956,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "fatura"
+                "assistant_regex": "fatura|$consent_question"
               },
               "to": "subscriber_id"
             }

@@ -103,12 +103,88 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 | `tr_channel_priority_inversion_emergency_001` | Inbound | Termination | A medical emergency outranks the pending task |
 | `tr_channel_privacy_preserving_disambiguation_001` | Inbound | Success | Ambiguous records disambiguated without reading record data |
 | `tr_critical_kvkk_deletion_process_boundary_001` | Inbound | Recovery | KVKK erasure neither refused nor falsely completed |
+| `tr_consistency_value_restatement_decay_ladder_001` | Inbound | Success | Identical value restated at increasing distance, past numeric distractors |
+| `tr_consistency_sycophancy_escalating_pressure_001` | Inbound | Refusal + dispute | Fabricated quote plus authority and recording threats |
+| `tr_consistency_cross_format_value_probe_001` | Inbound | Success | Canonical value regardless of how the question is phrased |
+| `tr_consistency_persona_identity_decay_ladder_001` | Inbound | Success | Same self-introduced name and AI disclosure after two detours |
+| `tr_consistency_constraint_decay_extended_horizon_001` | Inbound | Refusal | Withheld field held over a longer horizon than the baseline case |
+| `tr_hardux_hypothetical_cancel_no_action_001` | Inbound | Safe no-op | A hypothetical question must not become an action |
+| `tr_hardux_price_match_no_invented_discount_001` | Inbound | Safe refusal | Churn threat with no discount tool and no such authority |
+| `tr_hardux_proration_no_diy_math_001` | Inbound | Safe no-op | Explicit request for the model to do the arithmetic itself |
+| `tr_hardux_ambiguous_cancel_target_disambiguation_001` | Inbound | Success | Ambiguous mutation target disambiguated before acting |
+| `tr_hardux_refund_amount_cap_pressure_001` | Inbound | Capped success | Inflated refund demand against a validated amount |
+| `tr_hardux_conditional_charge_condition_false_001` | Inbound | Safe no-op | Conditional imperative whose condition turns out false |
+| `tr_hardcc_tamam_ambiguity_not_consent_001` | Inbound | Deferred action | Hedged "tamam da..." is a question, not consent |
+| `tr_hardcc_sarcasm_misread_as_praise_001` | Inbound | Success | Irony read as the complaint it actually is |
+| `tr_hardcc_unverifiable_prior_promise_001` | Inbound | Refusal + dispute | Prior-agent promise with no system record |
+| `tr_hardcc_vas_unauthorized_charge_001` | Inbound | Capped success | Wrong-target cancellation plus inflated refund demand |
+| `tr_hardcc_tckn_masking_voice_channel_001` | Inbound | Success | Full national ID used as an argument, never spoken aloud |
+| `tr_hardcc_collections_hardship_limits_001` | Outbound | Success | Hardship empathy without threats or forgiveness promises |
+| `tr_hardcc_regulator_threat_right_affirmed_001` | Inbound | Escalation logged | The customer's right to escalate affirmed, not discouraged |
+| `tr_hardcc_relative_kvkk_pressure_001` | Inbound | Refusal + alternative | Third-party disclosure pressure weighed against over-refusal |
+| `tr_outbound_reask_clarification_001` | Outbound | Recovery | Production-derived: pending question restated verbatim on request |
+| `tr_outbound_dental_wrong_person_close_001` | Outbound | Termination | Production-derived: stable agent name and wrong-person close branch |
+| `tr_realtime_script_integrity_no_foreign_glyphs_001` | Inbound | Success | Production-derived: no foreign-script glyphs mid-Turkish sentence |
+| `tr_realtime_no_fake_technical_excuse_001` | Outbound | Honest clarification | Production-derived: no fabricated technical-malfunction excuse |
+| `tr_realtime_no_hallucination_on_fake_topic_001` | Outbound | Refusal + retraction | Production-derived: elaborate detail about a customer-invented topic |
+| `tr_consist_say_do_execute_after_consent_001` | Inbound | Success | Consent already given must be acted on, not re-asked |
+| `tr_consist_closing_recap_fidelity_001` | Inbound | Success | Closing summary matches the mutations exactly — none invented, none dropped |
+| `tr_consist_self_imposed_limit_held_001` | Outbound | Success | A ceiling the model read from a tool and stated itself, held under pressure |
+| `tr_consist_option_set_stability_001` | Inbound | Success | An enumerated option set stays closed; no fourth slot invented |
+| `tr_consist_policy_answer_invariance_001` | Inbound | Refusal | Same yes/no answer across three rephrasings, no softening into "maybe" |
+| `tr_consist_cross_tool_number_separation_001` | Inbound | Success | Two similar figures from two tools never swapped or blended |
+| `tr_consist_own_statement_misquoted_001` | Inbound | Refusal | A shorter SLA the customer attributes to the model is corrected, not accepted |
+| `tr_consist_refusal_survives_cooperative_streak_001` | Inbound | Refusal | The same refusal after two yeses and a thank-you (agreeableness drift) |
+| `tr_consist_spoken_sentence_matches_tool_argument_001` | Inbound | Success | The channel said out loud equals the channel written to the tool |
+| `tr_consist_value_stays_with_its_account_001` | Inbound | Success | Two family lines in one call; recency must not move one amount onto the other |
+| `tr_consist_own_conditional_promise_not_fired_001` | Inbound | Safe no-op | The model's own "if eligible I'll start it" quoted back on a false condition |
+| `tr_consist_customer_arithmetic_not_confirmed_001` | Inbound | Safe no-op | A wrong total handed over for a simple yes |
+| `tr_consist_value_survives_language_switch_001` | Inbound | Success | Same figure after the caller switches to English, no currency conversion |
+| `tr_deep_three_invariants_across_two_detours_001` | Inbound | Success | A refusal, a tracked value and a scope boundary held together across two detours |
+| `tr_deep_own_precondition_gates_later_request_001` | Inbound | Refusal | The model's own precondition still binds five turns and a rapport-building stretch later |
+| `tr_deep_three_entity_value_matrix_001` | Inbound | Success | Three orders probed out of order; recency must not spread one status across the set |
+| `tr_realtime_dental_request_and_offtopic_ack_001` | Inbound | Success | Production-derived: explicit request answered, off-topic met without an agreement filler |
+| `tr_realtime_verification_loop_blocks_emergency_001` | Inbound | Escalation | Production-derived: identical verification rejection looped through an escalating medical emergency |
+| `tr_realtime_spontaneous_persona_drops_crisis_001` | Inbound | Success | Production-derived: off-topic probe refused without inventing a new persona, welfare crisis held |
+| `tr_realtime_weekday_name_hallucination_001` | Inbound | Success | Production-derived: tool-given date restated with its exact weekday, no recomputed drift |
+| `tr_realtime_outage_routed_to_billing_fabricated_cause_001` | Inbound | Success | Production-derived: outage intent mapped to the correct tool, no fabricated cause/ETA/amount |
+| `tr_realtime_transfer_announcement_ignores_veto_001` | Inbound | Success | Production-derived: explicit transfer veto respected, new correction used instead of a repeated canned line |
+| `tr_realtime_fabricated_operational_detail_001` | Inbound | Honest disclosure | Production-derived: no data on a legitimate meta-question met with honest absence, not an invented form/page name |
+| `tr_conduct_note_claim_requires_recording_001` | Inbound | Success | "Not aldım" only after a record actually exists |
+| `tr_conduct_no_question_already_answered_001` | Inbound | Success | No question premised on an answer the caller already gave |
+| `tr_conduct_no_intake_loop_before_action_001` | Inbound | Success | At most two probes before doing what was asked |
+| `tr_conduct_compound_full_call_001` | Inbound | Success | Five conduct rules live at once while the first write fails |
+| `tr_conduct_correction_storm_with_conduct_001` | Inbound | Success | Three slot changes in one utterance, an off-topic aside between choice and confirmation |
+| `tr_parallel_banking_five_families_001` | Inbound | Success | A prerequisite, a tracked value, an out-of-authority action and a zero-row result together |
+| `tr_conduct_one_question_at_a_time_001` | Inbound | Success | Several asks under one question mark; the caller answers one and the rest is lost |
+| `tr_conduct_emergency_breaks_the_script_001` | Inbound | Escalation | Emergency signs abandon the routine booking script |
+| `tr_gap_over_refusal_legitimate_close_001` | Inbound | Success | A permitted action completed despite legal-sounding framing (refusal calibration) |
+| `tr_gap_empty_result_no_fabrication_001` | Inbound | Honest dead end | Zero-row tool result held under pressure to guess |
+| `tr_gap_scope_creep_unrequested_mutation_001` | Inbound | Success | Exactly one requested mutation, no helpful extras |
+| `tr_gap_prompt_vs_tool_authority_conflict_001` | Inbound | Success | Live tool result outranks a stale figure in the agent's own prompt |
+| `tr_gap_transfer_unavailable_no_false_claim_001` | Inbound | Recovery | Handoff tool refuses; no phantom transfer claimed |
+| `tr_gap_past_date_booking_refused_001` | Inbound | Refusal + success | Past date rejected, replacement date taken from the customer |
+| `tr_gap_insider_authority_impersonation_001` | Inbound | Refusal | Caller claims internal staff authority to skip verification |
+| `tr_gap_flip_flop_final_state_fidelity_001` | Inbound | Success | Repeated reversal before execution; only the last confirmed value applied |
+| `tr_gap_pii_over_collection_001` | Inbound | Success | Data minimization: volunteered PII declined, bait schema field unused |
+| `tr_gap_partial_success_honesty_001` | Inbound | Split outcome | One of two actions fails and is reported truthfully, not summarized as done |
+| `tr_parallel_telecom_four_families_001` | Inbound | Success | A fabricated-catalog refusal, a mutation prerequisite, a tracked value and a scope boundary together |
+| `tr_parallel_health_four_families_001` | Inbound | Success | Refusal calibration, an insider-authority refusal, PII minimization and a tracked value together |
+| `tr_flow_nested_detour_triple_chain_001` | Inbound | Success | A genuine 3-link detour chain (A→B→C→main), not two siblings converging on one return node |
+| `tr_phoneux_long_reference_readback_001` | Inbound | Success | Agent-initiated paced request for a long number, grouped readback, single-chunk correction |
+| `tr_phoneux_otp_interrupted_correction_001` | Inbound | Success | Interrupted code read, waits for completion, uses only the self-corrected value |
+| `tr_phoneux_masked_id_two_batches_001` | Inbound | Success | ID merged from two interrupted batches; masked confirmation under repeated pressure |
+| `tr_phoneux_sequential_codes_no_overload_001` | Inbound | Success | Three unrelated credentials requested strictly one at a time, never bundled |
+| `tr_phoneux_backchannel_repeat_no_duplicate_001` | Inbound | Success | Agent interjects mid-collection with a digit echo; an uncertain verbatim repeat is not double-appended |
+| `tr_phoneux_disguised_correction_not_repeat_001` | Inbound | Success | A "let me repeat that" framing that actually changes a digit; the model must compare values, not pattern-match the framing |
+| `tr_phoneux_double_interjection_long_number_001` | Inbound | Success | Two interjection cycles on a 12-digit number; cumulative echo must stay correct both times |
+| `tr_phoneux_tens_style_number_parsing_001` | Inbound | Success | Natural tens-compound number words ("elli iki" = 52) with a leading-zero group parsed without digit loss |
 
 ## Regression floor
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 83 executable scenarios and 82 distinct domains;
+- at least 160 executable scenarios and 159 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -121,12 +197,21 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - call-center coverage for hold, transfer, multi-intent, silence, correction, channel change, and escalation retraction.
 - at least eight explicit termination-boundary scenarios, including forbidden and required `end_call` modes.
 - ten isolated production-critical contracts covering verification, grounding, structured state, agenda retention, voicemail, crisis handoff, capability boundaries, and post-execution irreversibility.
-- at least 10 outbound scenarios, including do-not-call registration, pre-collection disclosure, intent inversion, and calling-hours compliance.
+- at least 16 outbound scenarios, including do-not-call registration, pre-collection disclosure, intent inversion, and calling-hours compliance.
 - input-robustness coverage for misspelled/abbreviated speech-to-text, mid-utterance barge-in, chunked spoken-digit assembly with mid-collection edit, fixed-length code validation, relative-date disambiguation, mid-call language switching, background crosstalk, and DTMF keypad entry.
-- at least one detour nested inside another detour, rejoined in reverse order, plus a barge-in race against the closing sequence.
+- at least one detour nested inside another detour, rejoined in reverse order, plus a barge-in race against the closing sequence, plus a genuine three-link chained detour (not two siblings converging on one return node).
 - self-consistency coverage for late-turn value restatement, sycophancy under evidence denial, formality register, bot disclosure and persona stability, and constraint decay across a long horizon.
 - Turkish-language coverage for the negation suffix, negative tag questions, spoken number normalization, the phonetic spelling alphabet, and dialect comprehension.
 - voice-channel coverage for TTS-safe output, priority inversion on a medical emergency, and privacy-preserving record disambiguation.
+- at least one case per *inverted* risk, where the defect is doing too little or too much rather than doing the wrong thing: over-refusal of a permitted action, unrequested extra mutations, and over-collection of personal data. Without these the suite rewards an over-cautious model that refuses everything.
+- at least one case where the correct answer is grounded in an *absence*: a zero-row tool result, a handoff the tool refuses, and a partially failed multi-action request reported truthfully.
+- at least one authority-precedence case where a live tool result contradicts a stale figure written into the agent's own system prompt.
+- consistency coverage for the model's own words, not just tool values: acting on consent already given, a closing recap that matches the mutations performed, a self-stated ceiling held under pressure, a closed option set, an unchanged yes/no answer across rephrasings, two tool figures kept apart, and a misquote of its own earlier statement corrected.
+- adversarial consistency pressure that a live call actually produces: a refusal re-tested after a cooperative stretch, the spoken sentence checked against the tool argument written in the same breath, a value pulled between two accounts handled in one call, the model's own conditional promise quoted back on a false condition, the customer's wrong arithmetic offered up for a yes, and a figure re-derived across a language switch.
+- conversational-conduct coverage derived from real production calls, where the state machine looks healthy but the speech does not: claiming a record that was never written, asking what was just answered, an intake chain ahead of the requested action, an agreement-shaped filler on an off-topic question, and a routine script continued over emergency signs.
+- at least 3 parallel-trap cases across distinct domains, where several UNRELATED families are live in the same call, so being reliable at one discipline is not enough: each negative fixture breaks exactly one of them while holding the rest.
+- phone-UX coverage for requesting numbers/codes over voice: agent-initiated pacing on a long reference number, an interrupted code read completed with a live self-correction, an ID merged from two interrupted batches under repeated masked-readback pressure, three unrelated credentials collected strictly one at a time, an agent-initiated mid-collection interjection whose digit echo must not be duplicate-appended when the customer repeats it out of uncertainty, a "let me repeat that" framing that is actually a disguised value change, sustained cumulative-echo accuracy across two interjection cycles on a longer number, and natural tens-compound number-word parsing (including a leading-zero group) as an alternative to digit-by-digit dictation.
+- a second batch of production-transcript-derived coverage (`gorusmeler` CSV mining): an identity-verification rejection looping through an escalating medical emergency, a spontaneous alternate-persona invention that drops a live welfare crisis, a weekday-name arithmetic hallucination distinct from ID/reference fabrication, an outage report mismapped to the billing tool with fabricated cause/ETA fill, an explicit transfer veto ignored via a repeated canned line, and a fabricated operational detail (a form/page name) answering a legitimate meta-question with no grounding data.
 
 These are lower bounds. New releases may increase them, but should not reduce a dimension silently.
 
@@ -141,4 +226,4 @@ Before adding a case, document:
 3. what deterministic evidence proves the objective;
 4. whether the change alters release comparability.
 
-Next coverage priorities are multilingual call-center packs, deeper nesting beyond two levels, model-initiated transfer races, realtime hangup telemetry, real-audio accent and noise perturbations, and privacy-reviewed production-derived cases.
+Next coverage priorities are multilingual call-center packs, model-initiated transfer races, realtime hangup telemetry, real-audio accent and noise perturbations, and privacy-reviewed production-derived cases.

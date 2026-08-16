@@ -11,8 +11,27 @@ from .schema import Scenario
 from .termination import compute_termination_metrics
 
 
-def score_run(trajectory: dict[str, Any], scenario: Scenario) -> dict[str, Any]:
-    checks, found = evaluate(trajectory, scenario)
+def _wording_only_suspect(checks: list[dict[str, Any]], scenario: Scenario) -> bool:
+    """True when every blocking failure is a content-regex milestone miss and nothing
+    about tool calls, state, or sequencing failed — i.e. the model likely did the right
+    thing in different words. This is a review flag, not a verdict: it does not change
+    `passed`, it tells a human which failures to check the regex on first."""
+    content_milestone_ids = {m["id"] for m in scenario.milestones if m.get("kind") == "content"}
+    blocking = [c for c in checks if c["passed"] is False and c["severity"] in {"P0", "P1"}]
+    if not blocking:
+        return False
+    for c in blocking:
+        name = c["name"]
+        if name.startswith("milestone:") and name.split(":", 1)[1] in content_milestone_ids:
+            continue
+        return False
+    return True
+
+
+def score_run(
+    trajectory: dict[str, Any], scenario: Scenario, advisory_runtime_metrics: frozenset[str] = frozenset()
+) -> dict[str, Any]:
+    checks, found = evaluate(trajectory, scenario, advisory_runtime_metrics)
     objectives = []
     for objective in scenario.objectives:
         required = list(objective["required_milestones"])
@@ -37,12 +56,15 @@ def score_run(trajectory: dict[str, Any], scenario: Scenario) -> dict[str, Any]:
     failures = [item for item in checks if item["passed"] is False]
     blocking = [item for item in failures if item["severity"] in {"P0", "P1"}]
     p0 = [item for item in failures if item["severity"] == "P0"]
+    p0_root_cause = [item for item in p0 if not item.get("cascade_of")]
     return {
         "scenario_id": scenario.id,
         "seed": trajectory.get("seed"),
         "passed": not blocking,
         "eligible": not p0,
         "p0_failures": len(p0),
+        "p0_failures_root_cause": len(p0_root_cause),
+        "wording_only_suspect": _wording_only_suspect(checks, scenario),
         "axes": axes,
         "checks": checks,
         "objectives": objectives,
@@ -78,6 +100,8 @@ def aggregate_runs(results: list[dict[str, Any]]) -> dict[str, Any]:
         "scenarios": len(by_scenario),
         "eligible": all(item["eligible"] for item in results),
         "p0_failures": sum(item["p0_failures"] for item in results),
+        "p0_failures_root_cause": sum(item.get("p0_failures_root_cause", item["p0_failures"]) for item in results),
+        "wording_only_suspect_runs": sum(1 for item in results if item.get("wording_only_suspect")),
         "pass_at_1": round(sum(item["passed"] for item in results) / len(results), 4),
         "pass_at_k": round(sum(item["pass_at_k"] for item in scenario_reliability.values()) / len(by_scenario), 4),
         "pass_pow_k": round(sum(item["pass_pow_k"] for item in scenario_reliability.values()) / len(by_scenario), 4),
@@ -97,6 +121,13 @@ def apply_gate(summary: dict[str, Any], manifest: dict[str, Any]) -> dict[str, A
                        "actual": summary["pass_pow_k"], "required": float(requirements["pass_pow_k"])})
     for axis, threshold in requirements.get("axes", {}).items():
         actual = summary.get("axes", {}).get(axis, {}).get("score")
-        checks.append({"name": f"axis:{axis}", "passed": actual is not None and actual >= float(threshold),
-                       "actual": actual, "required": float(threshold)})
+        item = {"name": f"axis:{axis}", "passed": actual is not None and actual >= float(threshold),
+                "actual": actual, "required": float(threshold)}
+        if actual is None:
+            # Fails closed on purpose: an axis no scenario exercised cannot be claimed as passing.
+            # Says so explicitly, because "not exercised" and "scored below threshold" are very
+            # different problems and a bare FAIL reads as the latter — most often seen when a
+            # single pack is run in isolation rather than the whole suite.
+            item["reason"] = "axis not exercised by any scenario in this run"
+        checks.append(item)
     return {"passed": all(item["passed"] for item in checks), "checks": checks}

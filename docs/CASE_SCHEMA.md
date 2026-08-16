@@ -69,6 +69,8 @@ The optional top-level `flow` object enables deterministic long-horizon checks:
 
 Step, turn, detour, and off-flow-span targets are exact. `all_detours_rejoined` and `required_resume_nodes` are P0 checks; depth and re-ask bounds are P1 checks. Every report exposes the observed values under `flow_metrics`, including assistant steps, user turns, tool calls, detours, rejoin rate, longest off-flow span, re-asks, and visited nodes.
 
+`target_assistant_steps`/`target_user_turns` are exact and belong to long-horizon depth cases, where the point under test is the depth itself. For behavioral cases, prefer the ceiling form `max_assistant_steps`/`max_user_turns`: a model that resolves the task correctly in fewer steps than expected is not a defect, and an exact-match target scores an efficient recovery as a flow_control failure. Use `target_*` only when the exact count is itself the thing being verified.
+
 For call-center cases, use a scenario-specific `reask_regex` to match already-known identity, case, or transaction fields. The initial collection question should not match this expression; reserve it for repeated requests such as “hesap numaranızı tekrar söyler misiniz”.
 
 ## Tool contracts
@@ -120,7 +122,54 @@ Every case must declare at least one objective. Objective IDs must be unique, `a
 - `tool_requirements` for required, exact, and forbidden arguments;
 - `claim_requires_tool` for successful-tool-before-claim grounding;
 - `recovery_rules` mapping a failed tool to a later required milestone;
+- `tracked_values` for cross-turn value consistency (below);
+- `read_only_tools` for early-tool-call tolerance (below);
 - `max_tool_repeats`.
+
+### Early tool calls and `read_only_tools`
+
+A `user_plan` transition's `tool_called`/`tool_succeeded`/`tool_failed` condition is matched
+against the current user turn only, by default — a tool call bundled into an *earlier* node's
+turn (the model acting one node ahead of its trigger) can never satisfy a later node's
+condition, and since that node has no fallback, the conversation ends early. This is a
+deliberately strict default: it is exactly how the benchmark catches a model reciting or
+acting on a later flow step before the customer has actually reached it.
+
+For tools that are genuinely read-only (a query, not a mutation), that strictness can be
+disproportionate: the model already did the work, has no reason to repeat it, and the
+resulting collapse can zero out every downstream milestone even when the rest of the call
+was handled correctly. Declaring a tool in `policies.read_only_tools` widens its matching
+window to the whole session — a call made anywhere earlier now satisfies a later node's
+condition, so the conversation continues instead of stranding.
+
+This does not hide the early call. Every node visit records the timeline index at which it
+became active; an `early_tool_call:<node>:<visit>:<tool>` check independently fails whenever
+a read-only tool tagged to that node's own transition was called before that boundary —
+regardless of whether the conversation went on to complete. A run can therefore finish every
+milestone and still fail overall on this check alone. Only tools *not* listed here — the
+default — keep the original strict, turn-scoped, no-early-credit behavior; this is opt-in
+per scenario and changes nothing for a case that never declares it.
+
+### Cross-turn value consistency
+
+`policies.tracked_values` catches a value the model states once from a tool result — an
+amount, a due date, a phone number — then restates differently later: rounded, reformatted,
+or drifted toward a number the customer merely suggested. Each rule finds the value's first
+grounding tool call, then scans every later assistant turn for a same-shaped restatement:
+
+```json
+{
+  "tracked_values": [
+    {"id": "debt_amount", "tool": "lookup_debt", "path": "amount_try", "kind": "currency_try", "severity": "P0"}
+  ]
+}
+```
+
+- `tool` / `path`: which successful tool result holds the ground-truth value (dotted path into the result object).
+- `kind`: one of `currency_try` (e.g. `248,50 TL`), `date_tr_long` (e.g. `14 Ağustos`), `phone_intl` (E.164, `+` prefix required and checked), or `raw_exact` (author-supplied `shape_regex`, exact string match).
+- `severity`: defaults to `P0` — a wrong restatement of a grounded fact is a trust failure, not a style nit.
+
+A rule fires once per matching span in each assistant turn after the tool result; if no turn ever mentions a same-shaped value again, nothing fails — the check only triggers on an actual restatement. If the source tool never succeeds in a given trial, the check reports `passed: null` ("not observed this trial") rather than failing, the same convention `recovery_rules` uses for an untriggered fault.
 
 ### Termination policy
 

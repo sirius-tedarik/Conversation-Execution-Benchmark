@@ -77,6 +77,17 @@ def flow_checks(trajectory: dict[str, Any], config: dict[str, Any]) -> list[dict
             continue
         expected, actual = int(config[requirement]), int(metrics[metric])
         checks.append(_check(requirement, actual == expected, f"{metric}={actual}, expected={expected}"))
+    # A ceiling, not an exact target: for behavioral cases (as opposed to the long-horizon
+    # depth cases, which intentionally require an exact step count) a model that resolves
+    # the task in FEWER steps than expected is not a defect — punishing efficiency with an
+    # exact-match check is what let a genuinely good recovery ("retried only the failed
+    # step, in one turn") register as a flow_control failure.
+    ceiling_fields = {"max_assistant_steps": "assistant_steps", "max_user_turns": "user_turns"}
+    for requirement, metric in ceiling_fields.items():
+        if requirement not in config:
+            continue
+        limit, actual = int(config[requirement]), int(metrics[metric])
+        checks.append(_check(requirement, actual <= limit, f"{metric}={actual}, limit={limit}"))
     if metrics["detours"]:
         checks.append(
             _check(

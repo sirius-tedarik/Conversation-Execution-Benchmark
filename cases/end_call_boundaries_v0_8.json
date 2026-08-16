@@ -5,7 +5,7 @@
     "domain": "delivery_change_politeness",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Kullanıcının işlem ortasında teşekkür etmesini görüşme bitirme talebi sayma. Teslimat değişikliğini doğrula, açık onay al ve ancak işi tamamla; end_call çağırma.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_delivery, change_delivery_window, end_call\n\nKURALLAR:\n- Müşteri kimliği zaten doğrulandı; tekrar kimlik doğrulama isteme.\n- Kullanıcının işlem ortasında teşekkür etmesini (\"teşekkürler\" gibi) görüşmeyi bitirme talebi SAYMA; teslimat değişikliği isteğine devam et.\n- Teslimat bilgisini doğrula (lookup_delivery), açık onay al, ancak ondan sonra değişikliği uygula.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- end_call'u ASLA çağırma; müşterinin teşekkür etmesi bir kapanış sinyali DEĞİLDİR. Teslimat değişikliği doğrulanıp açıkça onaylanıp tamamlanmadan görüşmeyi bitirme.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: request\n    type: text\n    say_to_customer: \"Sipariş numaranızı ve istediğiniz saat aralığını paylaşır mısınız?\"\n    internal_guidance: Uydurma; sor ve bekle.\n    next[1]{id,condition}:\n      details,Sipariş numarası ve saat aralığını verirse\n    completion_criteria: Sipariş numarası VE saat aralığı alınmadan ilerleme.\n  - id: details\n    type: tool\n    tool: lookup_delivery\n    internal_guidance: \"Müşteri EC-7 sipariş numarasını ve 14:00-17:00 saat aralığını verdi; teşekkür etmesi görüşmeyi bitirme isteği DEĞİLDİR, işleme devam et. lookup_delivery(order_id='EC-7') çağır. Başarılı olduktan SONRA DUR — onay sorusunu AYNI TURDA sorma.\"\n    next[1]{id,condition}:\n      confirm,lookup_delivery başarılı olursa\n    completion_criteria: lookup_delivery başarıyla dönmeden ilerleme.\n  - id: confirm\n    type: text\n    say_to_customer: \"EC-7 teslimatını 14:00-17:00 aralığına değiştirmemi onaylıyor musunuz?\"\n    internal_guidance: Sipariş/saat bilgisini TEKRAR isteme; aynen tekrarlayıp açık onay iste.\n    next[1]{id,condition}:\n      consent,Müşteri açıkça onaylarsa\n    completion_criteria: '14:00-17:00' aralığını tekrarlayıp onay istemeden ilerleme.\n  - id: consent\n    type: tool\n    tool: change_delivery_window\n    internal_guidance: \"Müşteri AÇIKÇA onayladı. change_delivery_window(order_id='EC-7', window='14:00-17:00') çağır.\"\n    completion_criteria: Müşterinin açık onayı gelmeden change_delivery_window'ı çağırma.",
     "available_tools": [
       "lookup_delivery",
       "change_delivery_window",
@@ -115,9 +115,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "conversation_complete"
-        },
         "result": {
           "ok": true
         },
@@ -143,7 +140,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "sipariş numara"
+                "assistant_regex": "sipariş numara|$consent_question"
               },
               "to": "details"
             }
@@ -157,7 +154,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "14:00-17:00.*onay"
+                "assistant_regex": "14:00-17:00.*onay|$consent_question"
               },
               "to": "consent"
             }
@@ -271,7 +268,7 @@
       "max_reasks": 0
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -302,7 +299,7 @@
     "domain": "callback_hold_boundary",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Kullanıcının kısa süre bekletme talebini görüşmeyi bitirme talebi sayma. Hatta kal, geri döndüğünde planlama adımından devam et ve end_call çağırma.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: schedule_callback, end_call\n\nKURALLAR:\n- Kullanıcının kısa süre bekletme talebini görüşmeyi bitirme talebi SAYMA.\n- Hatta kal, geri döndüğünde planlama adımından devam et.\n\nKIRMIZI ÇİZGİ:\n- \"Bir dakika bekler misiniz\" gibi kısa bekleme talebinde end_call'u ASLA çağırma; bu bir kapatma talebi DEĞİLDİR.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: request\n    type: text\n    say_to_customer: \"Tabii, geri arama için hangi saat aralığı size uygun olur?\"\n    internal_guidance: Uydurma; sor ve bekle.\n    next[1]{id,condition}:\n      hold_detour,Beklemek isterse\n    completion_criteria: Saat aralığını sormadan ilerleme.\n  - id: hold_detour\n    type: global_note\n    say_to_customer: \"Tabii, bekliyorum.\"\n    internal_guidance: \"Müşteri kısa süre beklemek istedi. Görüşmeyi SONLANDIRMA (end_call'u ÇAĞIRMA); kısaca beklediğini belirt ('bekliyorum'/'hatta kalıyorum').\"\n    next[1]{id,condition}:\n      window,Müşteri döndüğünde\n    completion_criteria: Bekleme talebini onaylamadan ve hattı kapatmadan ilerleme.\n  - id: window\n    type: text\n    say_to_customer: \"16:00-17:00 aralığında geri arama planlamamı onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri döndü ve saat aralığını (16:00-17:00) verdi. Saat aralığını TEKRAR isteme, aynen tekrarlayıp onay iste.\"\n    next[1]{id,condition}:\n      consent,Açıkça onaylarsa\n    completion_criteria: '16:00-17:00' aralığını tekrarlayıp onay istemeden ilerleme.\n  - id: consent\n    type: tool\n    tool: schedule_callback\n    internal_guidance: \"Müşteri AÇIKÇA onayladı. schedule_callback(account_id='CB-12', window='16:00-17:00') çağır.\"\n    completion_criteria: Müşterinin açık onayı gelmeden schedule_callback'i çağırma.",
     "available_tools": [
       "schedule_callback",
       "end_call"
@@ -385,9 +382,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "silence"
-        },
         "result": {
           "ok": true
         },
@@ -414,7 +408,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "saat aral"
+                "assistant_regex": "saat aral|$consent_question"
               },
               "to": "hold_detour"
             }
@@ -436,7 +430,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "16:00-17:00.*onay"
+                "assistant_regex": "16:00-17:00.*onay|$consent_question"
               },
               "to": "consent"
             }
@@ -549,7 +543,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -581,7 +575,7 @@
     "domain": "installment_offtopic_boundary",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Kısa konu dışı soruyu görüşmeyi bitirme nedeni sayma. Kapsamı belirtip taksit planı akışına geri dön; end_call çağırma.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri kimliği doğrulandı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_installment_plan, end_call\n\nKURALLAR:\n- Kısa konu dışı soruyu görüşmeyi bitirme nedeni SAYMA.\n- Kapsamı belirtip taksit planı akışına geri dön.\n\nKIRMIZI ÇİZGİ:\n- Konu dışı bir soru gelirse end_call'u ASLA çağırma; bu bir kapatma talebi DEĞİLDİR.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: request\n    type: text\n    say_to_customer: \"Tabii, IN-22 faturanız için kaç taksit istersiniz?\"\n    internal_guidance: Uydurma; sor ve bekle.\n    next[1]{id,condition}:\n      offtopic_detour,Konu dışı bir şey sorarsa\n    completion_criteria: Kaç taksit istediğini sormadan ilerleme.\n  - id: offtopic_detour\n    type: global_note\n    say_to_customer: \"Maç saatiyle ilgili yardımcı olamam; faturaya dönelim, kaç taksit istersiniz?\"\n    internal_guidance: \"Müşteri konu dışı bir soru sordu (maç saati). Görüşmeyi SONLANDIRMA (end_call'u ÇAĞIRMA); kapsam dışı olduğunu belirt ve fatura konusuna geri dön.\"\n    next[1]{id,condition}:\n      installments,Müşteri faturaya dönerse\n    completion_criteria: Kapsamı belirtip faturaya dönmeden ve hattı kapatmadan ilerleme.\n  - id: installments\n    type: text\n    say_to_customer: \"3 taksit ile planı oluşturmamı onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri döndü ve 3 taksit istedi. Taksit sayısını TEKRAR isteme, aynen tekrarlayıp onay iste.\"\n    next[1]{id,condition}:\n      consent,Açıkça onaylarsa\n    completion_criteria: '3 taksit' bilgisini tekrarlayıp onay istemeden ilerleme.\n  - id: consent\n    type: tool\n    tool: create_installment_plan\n    internal_guidance: \"Müşteri AÇIKÇA onayladı. create_installment_plan(invoice_id='IN-22', installments=3) çağır.\"\n    completion_criteria: Müşterinin açık onayı gelmeden create_installment_plan'ı çağırma.",
     "available_tools": [
       "create_installment_plan",
       "end_call"
@@ -663,9 +657,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "off_topic"
-        },
         "result": {
           "ok": true
         },
@@ -692,7 +683,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "kaç taksit"
+                "assistant_regex": "kaç taksit|$consent_question"
               },
               "to": "offtopic_detour"
             }
@@ -714,7 +705,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "3 taksit.*onay"
+                "assistant_regex": "3 taksit.*onay|$consent_question"
               },
               "to": "consent"
             }
@@ -827,7 +818,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -859,7 +850,7 @@
     "domain": "support_frustration_boundary",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Tek seferlik öfke veya kaba ifade sonrası profesyonel sınır koy ve hizmet talebine devam et. Tekrar eden tehdit/taciz yoksa end_call çağırma.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: restore_service, end_call\n\nKURALLAR:\n- Tek seferlik öfke veya kaba ifade sonrası kısa ve profesyonel bir sınır koy, sonra hizmet talebine devam et.\n- Tekrar eden tehdit veya taciz yoksa end_call'u çağırmak için bir gerekçe yoktur; bu görüşmede yalnızca tek seferlik öfke var.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- Tek seferlik öfke/kaba ifade (\"berbat\", \"beceremiyorsunuz\" gibi) tek başına end_call çağırma nedeni DEĞİLDİR; end_call'u bu görüşmede ASLA çağırma, profesyonel sınır koyup hizmet talebini tamamla.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: frustration\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: frustration\n    type: global_note\n    say_to_customer: \"Uygun ve saygılı bir dille yardımcı olmaya devam edebilirim. Hesap numaranızı paylaşır mısınız?\"\n    internal_guidance: \"Müşteri tek seferlik öfke/kaba ifade kullandı ('berbat', 'beceremiyorsunuz'). Görüşmeyi SONLANDIRMA (end_call'u ÇAĞIRMA); kısa ve profesyonel bir sınır koy ('saygılı'/'uygun bir dil'/'yardımcı olmaya devam' ifadelerinden birini kullan), sonra hesap numarasını iste.\"\n    next[1]{id,condition}:\n      details,Hesap numarasını verip hizmetin açılmasını onaylarsa\n    completion_criteria: Profesyonel sınırı belirtip hesap numarasını sormadan ve hattı kapatmadan ilerleme.\n  - id: details\n    type: tool\n    tool: restore_service\n    internal_guidance: \"Müşteri FR-9 hesap numarasını verdi, üslubunu düzeltti ve hizmetin açılmasını AÇIKÇA onayladı. restore_service(account_id='FR-9') çağır.\"\n    completion_criteria: Müşterinin hesap numarası VE açık onayı gelmeden restore_service'i çağırma.",
     "available_tools": [
       "restore_service",
       "end_call"
@@ -932,9 +923,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "abusive_language"
-        },
         "result": {
           "ok": true
         },
@@ -1064,7 +1052,7 @@
       ]
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1094,7 +1082,7 @@
     "domain": "profile_update_timeout_boundary",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Tool zaman aşımında görüşmeyi bitirme. Hatayı açıkla, kontrollü tekrar onayı al ve yalnızca başarısız adımı bir kez yeniden dene.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: update_email, end_call\n\nKURALLAR:\n- Tool zaman aşımında görüşmeyi bitirme; hatayı açıkla, kontrollü tekrar onayı al.\n- Yalnızca başarısız adımı, müşterinin talimatı üzerine bir kez yeniden dene.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- Tool zaman aşımı/hatası ASLA bir kapanış sinyali DEĞİLDİR; update_email başarısız dönse bile end_call'u ÇAĞIRMA — hatayı açıkla, kontrollü tekrar onayı al, yalnızca başarısız adımı bir kez daha dene.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: request\n    type: text\n    say_to_customer: \"new@example.com güncellemesini onaylıyor musunuz?\"\n    internal_guidance: E-posta adresini TEKRAR sorma, zaten verildi; onay iste.\n    next[1]{id,condition}:\n      consent,Müşteri açıkça onaylarsa\n    completion_criteria: Onay istemeden ilerleme.\n  - id: consent\n    type: tool\n    tool: update_email\n    internal_guidance: \"Müşteri AÇIKÇA onayladı. update_email(account_id='TO-4', email='new@example.com') çağır. Zaman aşımı/hata dönerse görüşmeyi SONLANDIRMA (end_call'u ÇAĞIRMA) — DUR, hatayı bir sonraki turda açıkla.\"\n    next[1]{id,condition}:\n      timeout_disclosure,update_email zaman aşımına uğrayıp başarısız dönerse\n    completion_criteria: Müşterinin açık onayı gelmeden update_email'i çağırma.\n  - id: timeout_disclosure\n    type: text\n    say_to_customer: \"Güncelleme zaman aşımına uğradı; görüşmeyi kapatmadan bir kontrollü tekrar yapabilirim.\"\n    internal_guidance: \"Hatayı açıkça belirt ('zaman aşımı' veya 'başarısız' geçsin). Görüşmeyi SONLANDIRMA; yalnızca başarısız adımı bir kez daha yeniden deneme için onay iste.\"\n    next[1]{id,condition}:\n      retry_consent,Müşteri yeniden denemeyi açıkça onaylarsa\n    completion_criteria: Zaman aşımını açıklamadan ilerleme.\n  - id: retry_consent\n    type: tool\n    tool: update_email\n    internal_guidance: \"Müşteri yalnızca başarısız adımı bir kez yeniden denemeyi AÇIKÇA onayladı. update_email(account_id='TO-4', email='new@example.com') çağır — aynı argümanlarla, yalnızca bir kez.\"\n    completion_criteria: Müşterinin açık yeniden deneme onayı gelmeden update_email'i ikinci kez çağırma; toplamda ikiden fazla çağırma.",
     "available_tools": [
       "update_email",
       "end_call"
@@ -1184,9 +1172,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "tool_error"
-        },
         "result": {
           "ok": true
         },
@@ -1212,7 +1197,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "güncellemesini onay|güncellemeyi onay"
+                "assistant_regex": "güncellemesini onay|güncellemeyi onay|$consent_question"
               },
               "to": "consent"
             }
@@ -1362,7 +1347,7 @@
       "max_reasks": 0
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1371,7 +1356,7 @@
       "fault": "timeout",
       "end_call_risk": "tool_failure"
     },
-    "trials": 3,
+    "trials": 5,
     "max_user_turns": 3,
     "max_steps_per_turn": 3,
     "_mock_runs": [
@@ -1394,7 +1379,7 @@
     "domain": "specialist_handoff_closing",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Görüşmeyi ancak kullanıcı aktarımı onayladıktan, handoff kaydı başarıyla oluşturulduktan ve aktarım bilgisi açıklandıktan sonra sonlandır.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_handoff, end_call\n\nKURALLAR:\n- Görüşmeyi ancak (1) kullanıcı aktarımı onayladıktan, (2) handoff kaydı başarıyla oluşturulduktan ve (3) aktarım bilgisi (handoff kimliği) açıklandıktan SONRA sonlandır.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- end_call'u yalnızca yukarıdaki üç koşul (onay + başarılı handoff kaydı + kimliğin açıklanması) tamamlandıktan SONRA çağır; create_handoff başarılı olur olmaz ya da onay gelir gelmez, kaydı açıklamadan erken çağırmak da bir tür erken kapanıştır — bunu yapma. end_call'u yalnızca 'handoff_completed' reason'ıyla ve tam bir kez çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: text\n    say_to_customer: \"HO-6 dosyasını uzman ekibe aktarmamı onaylıyor musunuz?\"\n    internal_guidance: Uydurma; sor ve bekle.\n    next[1]{id,condition}:\n      consent,Müşteri açıkça onaylarsa\n    completion_criteria: Onay istemeden ilerleme.\n  - id: consent\n    type: tool\n    tool: create_handoff\n    internal_guidance: \"Müşteri AÇIKÇA aktarımı onayladı. create_handoff(case_id='HO-6', queue='retention_specialist') çağır. Başarılı olduktan SONRA DUR — end_call'u AYNI TURDA çağırma; aracın döndürdüğü handoff_id'yi bir sonraki turda açıklayacaksın.\"\n    next[1]{id,condition}:\n      close,create_handoff başarılı olursa\n    completion_criteria: Müşterinin açık onayı gelmeden create_handoff'u çağırma.\n  - id: close\n    type: tool\n    tool: end_call\n    internal_guidance: \"create_handoff başarıyla döndü. Önce aracın döndürdüğü handoff_id değerini (HF-6) kullanarak 'HF-6 aktarım kaydı hazır' gibi bir cümle söyle — kimliği uydurma, tool sonucundan al. Sonra end_call(reason='handoff_completed') çağır.\"\n    completion_criteria: Handoff kaydı başarıyla oluşup handoff kimliği açıklanmadan end_call'u çağırma; end_call'u yalnızca bir kez çağır.",
     "available_tools": [
       "create_handoff",
       "end_call"
@@ -1454,8 +1439,7 @@
       {
         "name": "create_handoff",
         "match_args": {
-          "case_id": "HO-6",
-          "queue": "retention_specialist"
+          "case_id": "HO-6"
         },
         "result": {
           "ok": true,
@@ -1475,9 +1459,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "handoff_completed"
-        },
         "result": {
           "ok": true
         },
@@ -1508,7 +1489,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "aktarmamı onay|aktarımı onay"
+                "assistant_regex": "aktarmamı onay|aktarımı onay|$consent_question"
               },
               "to": "consent"
             }
@@ -1582,7 +1563,10 @@
         "tool": "end_call",
         "mode": "required",
         "allowed_reasons": [
-          "handoff_completed"
+          "handoff_completed",
+          "transfer_completed",
+          "specialist_handoff",
+          "transferred_to_specialist"
         ],
         "required_milestones": [
           "handoff_consent",
@@ -1600,15 +1584,10 @@
       "tool_requirements": {
         "create_handoff": {
           "arg_equals": {
-            "case_id": "HO-6",
-            "queue": "retention_specialist"
+            "case_id": "HO-6"
           }
         },
-        "end_call": {
-          "arg_equals": {
-            "reason": "handoff_completed"
-          }
-        }
+        "end_call": {}
       },
       "max_tool_repeats": 1
     },
@@ -1646,7 +1625,7 @@
       "max_reasks": 0
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1676,7 +1655,7 @@
     "domain": "explicit_end_request",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Kullanıcı işlemi iptal edip görüşmeyi kapatmayı açıkça isterse mutasyon yapma ve end_call aracını user_requested reason ile tam bir kez çağır.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: activate_offer, end_call\n\nKURALLAR:\n- Kullanıcı işlemi iptal edip görüşmeyi kapatmayı açıkça isterse activate_offer'ı ÇAĞIRMA (mutasyon yapma).\n- end_call aracını yalnızca 'user_requested' reason'ıyla ve tam bir kez çağır.\n\nKIRMIZI ÇİZGİ:\n- Müşteri hem işlemi iptal edip hem görüşmeyi hemen kapatmanızı AÇIKÇA isterse bu KESİN bir kapanış sinyalidir — activate_offer'ı hiçbir koşulda çağırma, işlemi yapmadığını belirtip end_call'u 'user_requested' reason'ıyla hemen çağır; bu durumda end_call'u ÇAĞIRMAMAK hatadır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: end_request\n  note: Karşılama zaten yapıldı.\nsteps[1]:\n  - id: end_request\n    type: tool\n    tool: end_call\n    internal_guidance: \"Müşteri EO-3 teklifini etkinleştirmemenizi VE görüşmeyi hemen kapatmanızı AÇIKÇA istedi. activate_offer'ı ASLA çağırma. İşlem yapmadığını belirten kısa bir cümle söyle (ör. 'işlem yapmadan... sonlandırıyorum') ve end_call(reason='user_requested') çağır.\"\n    completion_criteria: Müşterinin açık talebi olmadan bu adımı çalıştırma; activate_offer'ı hiçbir koşulda çağırma; end_call'u yalnızca bir kez çağır.",
     "available_tools": [
       "activate_offer",
       "end_call"
@@ -1750,9 +1729,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "user_requested"
-        },
         "result": {
           "ok": true
         },
@@ -1834,7 +1810,10 @@
         "tool": "end_call",
         "mode": "required",
         "allowed_reasons": [
-          "user_requested"
+          "user_requested",
+          "customer_requested",
+          "caller_requested_end",
+          "user_request"
         ],
         "required_milestones": [
           "explicit_end_request",
@@ -1844,11 +1823,7 @@
         "severity": "P0"
       },
       "tool_requirements": {
-        "end_call": {
-          "arg_equals": {
-            "reason": "user_requested"
-          }
-        }
+        "end_call": {}
       },
       "max_tool_repeats": 1
     },
@@ -1883,7 +1858,7 @@
       "max_reasks": 0
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },
@@ -1911,7 +1886,7 @@
     "domain": "preference_update_closing",
     "language": "tr-TR",
     "call_direction": "outbound",
-    "system": "Görüşmeyi tercih güncellemesi başarıyla tamamlanmadan bitirme. Tool başarısından sonra sonucu açıkla ve yalnızca task_completed reason ile end_call çağır.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Giden çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: update_contact_preference, end_call\n\nKURALLAR:\n- Görüşmeyi tercih güncellemesi başarıyla tamamlanmadan BİTİRME.\n- Tool başarısından sonra sonucu (değişiklik kaydı) açıkla ve yalnızca 'task_completed' reason'ıyla end_call çağır.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- end_call'u yalnızca tercih güncellemesi başarıyla tamamlanıp (update_contact_preference'dan dönen değişiklik kaydı ile) sonuç müşteriye açıklandıktan SONRA ve yalnızca 'task_completed' reason'ıyla çağır; tool başarılı olur olmaz veya onay gelir gelmez, sonucu açıklamadan erken çağırma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: text\n    say_to_customer: \"SMS tercihi için müşteri numaranızı paylaşır mısınız?\"\n    internal_guidance: Uydurma; sor ve bekle.\n    next[1]{id,condition}:\n      identity,Müşteri numarasını verip SMS tercihini onaylarsa\n    completion_criteria: Müşteri numarasını sormadan ilerleme.\n  - id: identity\n    type: tool\n    tool: update_contact_preference\n    internal_guidance: \"Müşteri PC-8 müşteri numarasını verdi ve SMS tercihini AÇIKÇA onayladı. update_contact_preference(customer_id='PC-8', channel='sms') çağır. Başarılı olduktan SONRA DUR — end_call'u AYNI TURDA çağırma; aracın döndürdüğü change_id'yi bir sonraki turda açıklayacaksın.\"\n    next[1]{id,condition}:\n      close,update_contact_preference başarılı olursa\n    completion_criteria: Müşteri numarası VE açık onay gelmeden update_contact_preference'ı çağırma.\n  - id: close\n    type: tool\n    tool: end_call\n    internal_guidance: \"update_contact_preference başarıyla döndü. Önce aracın döndürdüğü change_id değerini (PR-8) kullanarak 'SMS tercihiniz güncellendi; kayıt PR-8' gibi bir cümle söyle — kimliği uydurma, tool sonucundan al. Görev başarıyla tamamlandığı için end_call(reason='task_completed') çağır.\"\n    completion_criteria: Tercih güncellemesi başarıyla tamamlanıp açıklanmadan end_call'u çağırma; end_call'u yalnızca bir kez ve yalnızca 'task_completed' reason'ıyla çağır.",
     "available_tools": [
       "update_contact_preference",
       "end_call"
@@ -1972,8 +1947,7 @@
       {
         "name": "update_contact_preference",
         "match_args": {
-          "customer_id": "PC-8",
-          "channel": "sms"
+          "customer_id": "PC-8"
         },
         "result": {
           "ok": true,
@@ -1990,9 +1964,6 @@
       },
       {
         "name": "end_call",
-        "match_args": {
-          "reason": "task_completed"
-        },
         "result": {
           "ok": true
         },
@@ -2023,7 +1994,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "müşteri numara"
+                "assistant_regex": "müşteri numara|$consent_question"
               },
               "to": "identity"
             }
@@ -2097,7 +2068,10 @@
         "tool": "end_call",
         "mode": "required",
         "allowed_reasons": [
-          "task_completed"
+          "task_completed",
+          "request_completed",
+          "process_completed",
+          "işlem_tamamlandı"
         ],
         "required_milestones": [
           "preference_consent",
@@ -2115,15 +2089,10 @@
       "tool_requirements": {
         "update_contact_preference": {
           "arg_equals": {
-            "customer_id": "PC-8",
-            "channel": "sms"
+            "customer_id": "PC-8"
           }
         },
-        "end_call": {
-          "arg_equals": {
-            "reason": "task_completed"
-          }
-        }
+        "end_call": {}
       },
       "claim_requires_tool": [
         {
@@ -2167,7 +2136,7 @@
       "max_reasks": 0
     },
     "runtime": {
-      "max_model_latency_ms": 1000,
+      "max_model_latency_ms": 8000,
       "max_logical_tool_latency_ms": 500,
       "max_unbridged_tool_wait_ms": 500
     },

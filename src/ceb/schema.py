@@ -11,6 +11,12 @@ class ScenarioValidationError(ValueError):
     """A scenario cannot be executed or scored deterministically."""
 
 
+# Named value formats the cross-turn consistency oracle (oracles.py::_value_consistency_checks)
+# knows how to canonicalize and re-detect in later assistant turns. Kept here, not in oracles.py,
+# so schema validation and the oracle share one definition instead of drifting apart.
+TRACKED_VALUE_KINDS = frozenset({"currency_try", "date_tr_long", "phone_intl", "raw_exact"})
+
+
 def _require(mapping: dict[str, Any], key: str, expected_type: type, where: str) -> Any:
     if key not in mapping:
         raise ScenarioValidationError(f"{where}.{key} is required")
@@ -73,7 +79,7 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
 
 def _validate_flow(flow: dict[str, Any], user_plan: dict[str, Any], scenario_id: str) -> None:
     non_negative = ("expected_detours", "max_reasks", "expected_off_flow_span")
-    positive = ("target_assistant_steps", "target_user_turns")
+    positive = ("target_assistant_steps", "target_user_turns", "max_assistant_steps", "max_user_turns")
     for key in positive:
         value = flow.get(key)
         if value is not None and (not isinstance(value, int) or value <= 0):
@@ -158,6 +164,7 @@ class Scenario:
     max_user_turns: int
     max_steps_per_turn: int
     mock_runs: tuple[tuple[str, ...], ...]
+    mock_negative_runs: tuple[dict[str, Any], ...]
     mock_audio_events: tuple[dict[str, Any], ...]
     metadata: dict[str, Any]
 
@@ -252,6 +259,34 @@ class Scenario:
         for tool, required in prerequisites.items():
             if tool not in tools_raw or not isinstance(required, list) or not set(required) <= set(milestone_ids):
                 raise ScenarioValidationError(f"{scenario_id}: invalid prerequisites for {tool}")
+        read_only_tools = policies.get("read_only_tools", [])
+        if not isinstance(read_only_tools, list) or not all(isinstance(item, str) for item in read_only_tools):
+            raise ScenarioValidationError(f"{scenario_id}.policies.read_only_tools must be a list[str]")
+        if not set(read_only_tools) <= set(tools_raw):
+            raise ScenarioValidationError(f"{scenario_id}.policies.read_only_tools must be declared in available_tools")
+        tracked_values = policies.get("tracked_values", [])
+        if not isinstance(tracked_values, list):
+            raise ScenarioValidationError(f"{scenario_id}.policies.tracked_values must be a list")
+        tracked_value_ids: list[str] = []
+        for index, rule in enumerate(tracked_values):
+            where = f"{scenario_id}.policies.tracked_values[{index}]"
+            if not isinstance(rule, dict):
+                raise ScenarioValidationError(f"{where}: expected object")
+            tracked_value_ids.append(_require(rule, "id", str, where))
+            tool = _require(rule, "tool", str, where)
+            if tool not in tools_raw:
+                raise ScenarioValidationError(f"{where}.tool={tool} is not in available_tools")
+            _require(rule, "path", str, where)
+            kind = _require(rule, "kind", str, where)
+            if kind not in TRACKED_VALUE_KINDS:
+                raise ScenarioValidationError(f"{where}.kind must be one of {sorted(TRACKED_VALUE_KINDS)}")
+            if kind == "raw_exact" and not isinstance(rule.get("shape_regex"), str):
+                raise ScenarioValidationError(f"{where}.shape_regex is required when kind=raw_exact")
+            if rule.get("severity", "P0") not in {"P0", "P1", "P2"}:
+                raise ScenarioValidationError(f"{where}.severity must be P0|P1|P2")
+        if len(tracked_value_ids) != len(set(tracked_value_ids)):
+            raise ScenarioValidationError(f"{scenario_id}.policies.tracked_values contains duplicate ids")
+
         termination = policies.get("termination_policy", {})
         if not isinstance(termination, dict):
             raise ScenarioValidationError(f"{scenario_id}.policies.termination_policy must be an object")
@@ -306,6 +341,17 @@ class Scenario:
             or not all(isinstance(run, list) and all(isinstance(item, str) for item in run) for run in mock_runs)
         ):
             raise ScenarioValidationError(f"{scenario_id}._mock_runs must be list[list[str]]")
+        negative_runs = raw.get("_mock_negative_runs", [])
+        if negative_runs and not isinstance(negative_runs, list):
+            raise ScenarioValidationError(f"{scenario_id}._mock_negative_runs must be a list")
+        for index, entry in enumerate(negative_runs):
+            where = f"{scenario_id}._mock_negative_runs[{index}]"
+            if not isinstance(entry, dict):
+                raise ScenarioValidationError(f"{where}: expected object")
+            _require(entry, "label", str, where)
+            outputs = _require(entry, "outputs", list, where)
+            if not all(isinstance(item, str) for item in outputs):
+                raise ScenarioValidationError(f"{where}.outputs must be list[str]")
         audio_events = raw.get("_mock_audio_events", [])
         if audio_events and (
             not isinstance(audio_events, list) or not all(isinstance(item, dict) for item in audio_events)
@@ -336,6 +382,7 @@ class Scenario:
             max_user_turns=positive_ints["max_user_turns"],
             max_steps_per_turn=positive_ints["max_steps_per_turn"],
             mock_runs=tuple(tuple(run) for run in mock_runs),
+            mock_negative_runs=tuple(negative_runs),
             mock_audio_events=tuple(audio_events),
             metadata=values["metadata"],
         )

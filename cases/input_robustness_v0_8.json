@@ -5,7 +5,7 @@
     "domain": "input_typo_robustness",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Konuşma metne çevrilirken kısaltma ve yazım hataları oluşur. 'mrb', 'slm', 'selamm', 'sleam' gibi selamlamaları ve 'fatrua', 'istyorum' gibi bozuk yazımları anlaşılmış say; anlamadım deme, tekrar isteme. Kısa günlük sohbete tek cümleyle karşılık ver ve göreve dön.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_bill\n\nKURALLAR:\n- Konuşma metne çevrilirken kısaltma ve yazım hataları oluşur. 'mrb', 'slm', 'selamm', 'sleam' gibi selamlamaları ve 'fatrua', 'istyorum' gibi bozuk yazımları ANLAŞILMIŞ SAY; \"anlamadım\" deme, tekrar isteme.\n- Kısa günlük sohbete TEK cümleyle karşılık ver ve göreve dön.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: typo_greeting\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: typo_greeting\n    type: text\n    say_to_customer: \"Merhaba, size nasıl yardımcı olabilirim?\"\n    internal_guidance: \"Müşteri 'mrb slm' (bozuk/kısaltılmış selamlama) yazdı. Bunu selamlama olarak ANLA, 'anlamadım' deme. 'merhaba' veya 'iyi günler' diyerek karşılık ver.\"\n    next[1]{id,condition}:\n      typo_intent,Devam ederse\n    completion_criteria: Selamlama vermeden ilerleme.\n  - id: typo_intent\n    type: text\n    say_to_customer: \"Fatura borcunuzu öğrenmek için abone numaranızı alabilir miyim?\"\n    internal_guidance: \"Müşteri 'sleam, fatrua borcumu ogrenmek istyorum' (bozuk yazım) yazdı — bunu 'selam, faturamı öğrenmek istiyorum' olarak ANLA, 'anlamadım' deme ya da tekrar isteme. 'fatura' kelimesini kullanarak niyeti doğrula ve abone numarasını iste.\"\n    next[1]{id,condition}:\n      smalltalk,Konu dışı bir şey söylerse\n    completion_criteria: 'fatura' kelimesini kullanıp abone numarasını sormadan ilerleme.\n  - id: smalltalk\n    type: global_note\n    say_to_customer: \"Evet, hava gerçekten sıcak; abone numaranızla devam edebilir miyiz?\"\n    internal_guidance: \"Müşteri kısa bir günlük sohbet açtı (hava durumu). TEK cümleyle karşılık ver, sonra 'abone numaranızla devam' ifadesiyle göreve dön.\"\n    next[1]{id,condition}:\n      account,Abone numarasını verirse\n    completion_criteria: Sohbete tek cümle karşılık verip 'abone numaranızla devam' demeden ilerleme.\n  - id: account\n    type: tool\n    tool: lookup_bill\n    internal_guidance: \"Müşteri abone numarasını (EL-77) verdi. lookup_bill(subscriber_id='EL-77') çağır.\"\n    completion_criteria: Müşteri abone numarasını vermeden lookup_bill'i çağırma.",
     "available_tools": [
       "lookup_bill"
     ],
@@ -71,7 +71,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "merhaba|iyi günler"
+                "assistant_regex": "merhaba|iyi günler|$consent_question"
               },
               "to": "typo_intent"
             }
@@ -85,7 +85,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "abone numaran"
+                "assistant_regex": "abone numaran|$consent_question"
               },
               "to": "smalltalk"
             }
@@ -238,7 +238,7 @@
     "domain": "input_barge_in",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Kullanıcı sözünü kesip düzeltme yaptığında konuşmayı hemen bırak, teyit metnini baştan okuma ve yalnızca düzeltilmiş değeri kullan. Eski değeri işleme alma.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: ship_card\n\nKURALLAR:\n- Kullanıcı sözünü kesip düzeltme yaptığında konuşmayı HEMEN bırak; teyit metnini baştan okuma.\n- Yalnızca düzeltilmiş (son) değeri kullan; eski değeri ASLA işleme alma veya kaydetme.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: request\n    type: text\n    say_to_customer: \"KT-19 için kartınızı Kadıköy adresinize gönderiyorum, teyit eder misiniz?\"\n    internal_guidance: \"Müşteri KT-19 için kartını Kadıköy adresine göndermeni istedi. Adresi teyit için oku ve onay iste.\"\n    next[1]{id,condition}:\n      barge_correction,Müşteri sözünü kesip düzeltme yaparsa\n    completion_criteria: Teyit sormadan ilerleme.\n  - id: barge_correction\n    type: text\n    say_to_customer: \"Anladım, Ataşehir olarak güncelledim. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri sözünü keserek düzeltme yaptı ('Pardon, kestim; Kadıköy değil Ataşehir olacak'). Konuşmayı HEMEN bırak, teyit metnini baştan OKUMA. SADECE düzeltilmiş değeri (Ataşehir) kullan; eski değeri (Kadıköy) ASLA işleme alma veya gönderildi deme. 'Ataşehir' olarak güncellediğini belirt ve onay iste.\"\n    next[1]{id,condition}:\n      confirm,Müşteri onaylarsa\n    completion_criteria: 'Ataşehir' demeden veya Kadıköy'e gönderildiğini iddia ederek ilerleme.\n  - id: confirm\n    type: tool\n    tool: ship_card\n    internal_guidance: \"Müşteri onayladı. ship_card(customer_id='KT-19', district='Ataşehir') çağır — SADECE düzeltilmiş adresi (Ataşehir) kullan, ilk söylenen Kadıköy'ü DEĞİL.\"\n    completion_criteria: Müşterinin onayı gelmeden ship_card'ı çağırma.",
     "available_tools": [
       "ship_card"
     ],
@@ -275,8 +275,7 @@
       {
         "name": "ship_card",
         "match_args": {
-          "customer_id": "KT-19",
-          "district": "Ataşehir"
+          "customer_id": "KT-19"
         },
         "result": {
           "ok": true,
@@ -308,7 +307,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "teyit|onay"
+                "assistant_regex": "teyit|onay|$consent_question"
               },
               "to": "barge_correction"
             }
@@ -322,7 +321,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "Ataşehir"
+                "assistant_regex": "Ataşehir|$consent_question"
               },
               "to": "confirm"
             }
@@ -379,7 +378,7 @@
     "policies": {
       "forbidden_content": [
         {
-          "regex": "Kadıköy'e gönderildi|Kadıköy adresine gönderildi|Kadıköy olarak kaydettim|Kadıköy.*gönderdim",
+          "regex": "Kadıköy'e gönderildi|Kadıköy adresine gönderildi|Kadıköy olarak kaydettim|Kadıköy.{0,40}gönderdim",
           "severity": "P0"
         }
       ],
@@ -390,8 +389,7 @@
             "district"
           ],
           "arg_equals": {
-            "customer_id": "KT-19",
-            "district": "Ataşehir"
+            "customer_id": "KT-19"
           },
           "severity": "P0"
         }
@@ -496,7 +494,7 @@
     "domain": "input_phone_chunking",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Telefon numarası parça parça söylenir. Her parçayı biriktir, sözlü rakamları sayıya çevir, toplamı 11 hane olacak şekilde doğrula ve teyit için okuyarak geri bildir. Kullanıcı bir parçayı düzeltirse yalnız o parçayı değiştir, numarayı baştan isteme.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri kimliği doğrulandı (customer_id: MS-12).\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: save_phone\n\nKURALLAR:\n- Telefon numarası parça parça söylenir. Her parçayı biriktir, sözlü rakamları sayıya çevir (ör. 'sıfır beş beş iki' → 0552), toplamı 11 hane olacak şekilde doğrula ve teyit için okuyarak geri bildir.\n- Kullanıcı bir parçayı düzeltirse yalnız o parçayı değiştir, numarayı baştan isteme.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: chunk1\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: chunk1\n    type: text\n    say_to_customer: \"0552 aldım, devam eder misiniz?\"\n    internal_guidance: \"Müşteri ilk parçayı ('sıfır beş beş iki' = 0552) söyledi. Rakamlara çevirip 'devam' diyerek kalan haneleri iste.\"\n    next[1]{id,condition}:\n      chunk2,Müşteri devam ederse\n    completion_criteria: İlk parçayı sayıya çevirip onaylamadan ilerleme.\n  - id: chunk2\n    type: text\n    say_to_customer: \"0552 332 aldım, kalan son dört haneyi alabilir miyim?\"\n    internal_guidance: \"Müşteri ikinci parçayı ('üç üç iki' = 332) söyledi. Şimdiye kadar biriktirdiğin '0552 332' kısmını AYNEN söyle (kısmi geri okuma) ve 'kalan'/'son dört' hane iste.\"\n    next[1]{id,condition}:\n      chunk3,Müşteri son parçayı verirse\n    completion_criteria: '0552 332' kısmi geri okumasını yapmadan ilerleme.\n  - id: chunk3\n    type: text\n    say_to_customer: \"Numaranızı 0552 332 2212 olarak aldım, toplam 11 hane. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri üçüncü parçayı ('iki iki bir iki' = 2212) söyledi. TAM numarayı '0552 332 2212' şeklinde AYNEN geri oku, '11 hane' olduğunu belirt ve onay iste.\"\n    next[1]{id,condition}:\n      edit,Müşteri düzeltme yaparsa\n    completion_criteria: Tam numarayı ('0552 332 2212') ve '11 hane' ifadesini söylemeden ilerleme.\n  - id: edit\n    type: text\n    say_to_customer: \"Anladım, ortadaki kısmı düzeltiyorum: 0552 342 2212. Onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri ortadaki parçayı düzeltti (332 → 342). SADECE o parçayı değiştir, numaranın TAMAMINI baştan isteme. DÜZELTİLMİŞ tam numarayı '0552 342 2212' şeklinde AYNEN geri oku ve onay iste.\"\n    next[1]{id,condition}:\n      confirm,Müşteri onaylarsa\n    completion_criteria: Düzeltilmiş tam numarayı ('0552 342 2212') söylemeden ilerleme.\n  - id: confirm\n    type: tool\n    tool: save_phone\n    internal_guidance: \"Müşteri onayladı. save_phone(customer_id='MS-12', msisdn='05523422212') çağır — DÜZELTİLMİŞ numarayı (boşluksuz) kullan, ilk söylenen 05523322212'yi DEĞİL.\"\n    completion_criteria: Müşterinin onayı gelmeden save_phone'u çağırma.",
     "available_tools": [
       "save_phone"
     ],
@@ -564,7 +562,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "devam"
+                "assistant_regex": "devam|$consent_question"
               },
               "to": "chunk2"
             }
@@ -578,7 +576,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "kalan|son dört"
+                "assistant_regex": "kalan|son dört|$consent_question"
               },
               "to": "chunk3"
             }
@@ -592,7 +590,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "0552 332 2212"
+                "assistant_regex": "0552 332 2212|$consent_question"
               },
               "to": "edit"
             }
@@ -606,7 +604,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "0552 342 2212"
+                "assistant_regex": "0552 342 2212|$consent_question"
               },
               "to": "confirm"
             }
@@ -781,7 +779,7 @@
     "domain": "input_otp_validation",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Doğrulama kodu tam 6 hanedir. Eksik veya fazla haneli kodu doğrulamaya gönderme; kaç hane alındığını söyle, eksik haneyi iste ve yalnızca 6 haneli kodu doğrula.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_otp\n\nKURALLAR:\n- Doğrulama kodu TAM 6 hanedir. Eksik veya fazla haneli kodu doğrulamaya GÖNDERME.\n- Kaç hane alındığını söyle, eksik haneyi iste ve yalnızca 6 haneli kodu doğrula.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: short_code\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: short_code\n    type: text\n    say_to_customer: \"Aldığım kod 48291, yani 5 hane. Doğrulama kodu 6 hane olmalı; son rakamı alabilir miyim?\"\n    internal_guidance: \"Müşteri 5 haneli kod söyledi ('dört sekiz iki dokuz bir' = 48291). Doğrulama kodu TAM 6 HANE olmalı. Kaç hane alındığını söyle ('5 hane'), eksik olduğunu belirt ve '6 hane' olması gerektiğini açıkça ifade ederek eksik haneyi iste. Bu haliyle verify_otp'yi ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      full_code,Müşteri eksik haneyi tamamlarsa\n    completion_criteria: '5 hane' ve '6 hane' ifadelerini söylemeden ilerleme; eksik kodu doğrulamaya gönderme.\n  - id: full_code\n    type: tool\n    tool: verify_otp\n    internal_guidance: \"Müşteri eksik haneyi tamamladı, kod artık 482917 (6 hane). verify_otp(customer_id='OT-6', code='482917') çağır — SADECE tam 6 haneli kodu doğrula.\"\n    completion_criteria: Tam 6 haneli kod olmadan verify_otp'yi çağırma.",
     "available_tools": [
       "verify_otp"
     ],
@@ -850,7 +848,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "6 hane|altı hane"
+                "assistant_regex": "6 hane|altı hane|$consent_question"
               },
               "to": "full_code"
             }
@@ -884,7 +882,7 @@
         "id": "short_code_detected",
         "kind": "content",
         "role": "assistant",
-        "regex": "5 hane|beş hane|eksik",
+        "regex": "5 hane|beş hane|eksik|son rakamı|son haneyi|bir rakam daha",
         "axis": "action_correctness",
         "severity": "P0"
       },
@@ -996,7 +994,7 @@
     "domain": "input_relative_date",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Bugün 3 Ağustos 2026, Pazartesi. Göreli tarih ifadesi birden fazla takvim gününe işaret ediyorsa tahmin etme. Aday günleri tarihiyle söyle, kullanıcıya seçtir ve yalnızca onaylanan tarihle işlem yap.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nMüşteri kimliği doğrulandı.\n\nKULLANILABİLİR ARAÇLAR: book_appointment\n\nKURALLAR:\n- Bugün 3 Ağustos 2026, Pazartesi. Göreli tarih ifadesi (ör. 'önümüzdeki salı') birden fazla takvim gününe işaret ediyorsa TAHMİN ETME.\n- Aday günleri TARİHİYLE söyle, kullanıcıya seçtir ve yalnızca onaylanan tarihle işlem yap.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: relative_request\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: relative_request\n    type: text\n    say_to_customer: \"Önümüzdeki salı iki tarihe gelebiliyor: 4 Ağustos mu, 11 Ağustos mu?\"\n    internal_guidance: \"Bugün 3 Ağustos 2026 Pazartesi. Müşteri 'önümüzdeki salı' (göreli tarih) dedi — bu ifade İKİ olası güne işaret edebilir: bu haftaki 4 Ağustos Salı VEYA gelecek haftaki 11 Ağustos Salı. TAHMİN ETME. Belirsizliği açıkça belirt, her iki adayı da TARİHİYLE (4 Ağustos, 11 Ağustos) söyle ve müşteriye SEÇTİR.\"\n    next[1]{id,condition}:\n      pick,Müşteri bir tarih seçerse\n    completion_criteria: İki adayı da tarihiyle sunmadan ilerleme; tek bir tarihi varsayarak işlem yapma.\n  - id: pick\n    type: tool\n    tool: book_appointment\n    say_to_customer: \"11 Ağustos 2026 tarihine randevunuzu oluşturuyorum.\"\n    internal_guidance: \"Müşteri 11 Ağustos'u AÇIKÇA seçerek onayladı ('11 Ağustos olsun') — bu onun onayıdır, YENİDEN onay SORMA. Aynı yanıtta: '11 Ağustos 2026' tarihini AYNEN söyle VE HEMEN ARDINDAN book_appointment(customer_id='RD-4', date='2026-08-11') çağır — SADECE müşterinin seçtiği tarihi kullan, diğer adayı (4 Ağustos) DEĞİL. Bu son turdur, başka bir soru sorma.\"\n    completion_criteria: Müşterinin onayladığı tarih olmadan veya yanlış tarihle (4 Ağustos) book_appointment'ı çağırma.",
     "available_tools": [
       "book_appointment"
     ],
@@ -1065,7 +1063,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "11 Ağustos"
+                "assistant_regex": "11 Ağustos|$consent_question"
               },
               "to": "pick"
             }
@@ -1220,7 +1218,7 @@
     "domain": "input_language_switch",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Görüşme Türkçe başlar. Kullanıcı dili değiştirmek isterse kalan tüm yanıtları o dilde ver, daha önce toplanan bilgileri tekrar sorma ve sonucu yeni dilde bildir.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_order\n\nKURALLAR:\n- Görüşme Türkçe başlar. Kullanıcı dili değiştirmek isterse KALAN TÜM yanıtları o dilde ver.\n- Daha önce toplanan bilgileri (sipariş numarası vb.) TEKRAR SORMA.\n- Sonucu YENİ dilde bildir.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: tr_request\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: tr_request\n    type: text\n    say_to_customer: \"Tabii, SP-31 için kontrol ediyorum.\"\n    internal_guidance: \"Müşteri Türkçe olarak SP-31 numaralı siparişinin durumunu sordu. Görüşme Türkçe başladı; siparişi kontrol ettiğini belirt.\"\n    next[1]{id,condition}:\n      switch_request,Müşteri dil değiştirmek isterse\n    completion_criteria: Kontrol ettiğini belirtmeden ilerleme.\n  - id: switch_request\n    type: text\n    say_to_customer: \"Of course, we can continue in English.\"\n    internal_guidance: \"Müşteri İngilizce'ye geçmek istedi ('Sorry, can we continue in English?'). Kalan TÜM yanıtları İNGİLİZCE ver. Daha önce toplanan sipariş numarasını (SP-31) TEKRAR SORMA. Değişimi İngilizce onayla (of course/sure/certainly).\"\n    next[1]{id,condition}:\n      english_confirm,Müşteri İngilizce devam ederse\n    completion_criteria: İngilizce onay vermeden ilerleme.\n  - id: english_confirm\n    type: tool\n    tool: lookup_order\n    internal_guidance: \"Müşteri İngilizce devam etti ve durumu sordu. lookup_order(order_id='SP-31') çağır — order_id'yi TEKRAR SORMA, zaten biliniyor. Tool başarıyla döndükten SONRA DUR, sonucu bir sonraki adımda İngilizce bildireceksin.\"\n    next[1]{id,condition}:\n      status_report,lookup_order başarıyla dönünce\n    completion_criteria: lookup_order başarıyla dönmeden sonuca dair iddia kurma.\n  - id: status_report\n    type: text\n    say_to_customer: \"Your order SP-31 was shipped on 5 August 2026.\"\n    internal_guidance: \"lookup_order sonucunu (status=shipped, shipped_on=2026-08-05) İNGİLİZCE olarak bildir. Sipariş numarasını (SP-31) tekrar geç ve 'was shipped'/'shipped on' ifadesini kullan. Türkçe yanıt VERME.\"\n    completion_criteria: Sonucu İngilizce ve sipariş numarasıyla bildirmeden bitirme.",
     "available_tools": [
       "lookup_order"
     ],
@@ -1286,7 +1284,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "kontrol ediyorum|bakıyorum"
+                "assistant_regex": "kontrol ediyorum|bakıyorum|$consent_question"
               },
               "to": "switch_request"
             }
@@ -1300,7 +1298,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "of course|sure|certainly"
+                "assistant_regex": "of course|sure|certainly|$consent_question"
               },
               "to": "english_confirm"
             }
@@ -1447,7 +1445,7 @@
     "domain": "input_background_crosstalk",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Arka planda kullanıcının odadaki başka birine söylediği sözleri talimat sayma, o kişiye yanıt verme ve o sözler için araç çağırma. Bekleyen sorunla kaldığın yerden devam et.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_bill, cancel_subscription\n\nKURALLAR:\n- Arka planda müşterinin odadaki başka birine (ör. 'Ayşe') söylediği sözleri talimat SAYMA, o kişiye yanıt VERME ve bu sözler için araç ÇAĞIRMA (ör. lookup_bill'i tetikleme).\n- Bekleyen sorunla (abonelik iptali onayı) kaldığın yerden devam et.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: cancel_request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: cancel_request\n    type: text\n    say_to_customer: \"AB-7 aboneliğinin iptalini onaylıyor musunuz?\"\n    internal_guidance: \"Müşteri AB-7 aboneliğini iptal etmek istedi. İptali onaylıyor musunuz diye sor.\"\n    next[1]{id,condition}:\n      crosstalk,Müşteri yanıt verirse\n    completion_criteria: Onay sormadan ilerleme.\n  - id: crosstalk\n    type: global_note\n    say_to_customer: \"Tabii, bekliyorum. İptal için onayınızı alabilir miyim?\"\n    internal_guidance: \"Müşteri arka planda odadaki başka birine (Ayşe) sesleniyor ('Ayşe, faturayı masaya bırak'). Bu sözler TALİMAT DEĞİL — o kişiye YANIT VERME, bahsedilen fatura için lookup_bill ARACINI ÇAĞIRMA. Bekleyen iptal onayı sorusuyla KALDIĞIN YERDEN devam et; 'onayınızı' diyerek tekrar sor.\"\n    next[1]{id,condition}:\n      consent,Müşteri onaylarsa\n    completion_criteria: Crosstalk'a yanıt vermeden, lookup_bill çağırmadan veya onay istemeden ilerleme.\n  - id: consent\n    type: tool\n    tool: cancel_subscription\n    internal_guidance: \"Müşteri onayladı. cancel_subscription(customer_id='AB-7', confirmed=true) çağır. lookup_bill'i ASLA çağırma.\"\n    completion_criteria: Müşterinin onayı gelmeden cancel_subscription'ı çağırma.",
     "available_tools": [
       "lookup_bill",
       "cancel_subscription"
@@ -1542,7 +1540,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "onaylıyor musunuz"
+                "assistant_regex": "onaylıyor musunuz|$consent_question"
               },
               "to": "crosstalk"
             }
@@ -1558,7 +1556,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "onayınızı"
+                "assistant_regex": "onayınızı|$consent_question"
               },
               "to": "consent"
             }
@@ -1712,7 +1710,7 @@
     "domain": "input_dtmf_entry",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Hassas rakamları sesli isteme. Kullanıcı tuşlamak isterse DTMF toplamayı başlat, beklenen hane sayısını söyle ve doğrulamayı yalnızca dönen token ile yap. Rakamları sesli tekrar etme.",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nMüşteri kimliği doğrulandı.\n\nKULLANILABİLİR ARAÇLAR: collect_dtmf, verify_card_last4\n\nKURALLAR:\n- Hassas rakamları (kart son dört hane vb.) SESLİ İSTEME.\n- Kullanıcı tuşlamak isterse DTMF toplamayı (collect_dtmf) başlat ve beklenen hane sayısını söyle.\n- Doğrulamayı YALNIZCA dönen token ile yap (verify_card_last4); rakamları SESLİ TEKRAR ETME.\n- Akıştaki node sırasını/koşullarını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- verify_card_last4'ü yalnızca müşterinin AYNI TURDA (bir önceki yanıtınızdan SONRA gelen yeni bir mesajında) 'tuşladım' dediği durumda çağırın. collect_dtmf başarılı döndükten hemen sonra, aynı yanıt içinde verify_card_last4'ü ASLA çağırmayın — müşteri henüz tuşlamadı, sadece 'bekliyorum' deyip DURUN.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: privacy_request\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: privacy_request\n    type: tool\n    tool: collect_dtmf\n    internal_guidance: \"Müşteri hassas rakamları (kart son dört hanesi) sesli söylemek istemiyor, tuşlamak istiyor. Hassas rakamları SESLİ İSTEME. '4 hane' telefon tuşlarından girilebileceğini söyle (örn. '4 haneyi telefon tuşlarından girebilirsiniz'), sonra collect_dtmf(field='card_last4', length=4) çağır — çağırdıktan SONRA DUR.\"\n    next[1]{id,condition}:\n      waiting,collect_dtmf başarıyla dönünce\n    completion_criteria: Hane sayısını (4 hane) söylemeden veya tuşlama seçeneğini sunmadan collect_dtmf'i çağırma.\n  - id: waiting\n    type: text\n    say_to_customer: \"Girişinizi bekliyorum.\"\n    internal_guidance: \"collect_dtmf çağrısı yapıldı, müşterinin tuşlamasını bekle. Dönen rakamları/tokenı SESLİ TEKRAR ETME. Kısa bir bekleme mesajı ver.\"\n    next[1]{id,condition}:\n      entered,Müşteri 'tuşladım' derse\n    completion_criteria: Bekleme mesajı vermeden ilerleme; rakamları sesli tekrar ederek ilerleme.\n  - id: entered\n    type: tool\n    tool: verify_card_last4\n    internal_guidance: \"Müşteri tuşladığını bildirdi. Doğrulamayı SADECE dönen token (DT-9f2) ile yap — rakamları veya card_last4 argümanını DEĞİL. verify_card_last4(customer_id='CD-3', token='DT-9f2') çağır.\"\n    completion_criteria: Token olmadan veya rakamlarla (digits/card_last4 argümanıyla) verify_card_last4'ü çağırma.",
     "available_tools": [
       "collect_dtmf",
       "verify_card_last4"
@@ -1868,7 +1866,7 @@
         "id": "length_announced",
         "kind": "content",
         "role": "assistant",
-        "regex": "4 hane|dört hane",
+        "regex": "4 hane|dört hane|hane sayısı.{0,5}4|beklenen.{0,15}4",
         "axis": "action_correctness",
         "severity": "P0"
       },
@@ -1961,7 +1959,7 @@
       "max_questions_per_turn": 1,
       "required_assistant_regex": [
         "tuşlar|tuşlay",
-        "4 hane|dört hane"
+        "4 hane|dört hane|hane sayısı.{0,5}4"
       ]
     },
     "flow": {

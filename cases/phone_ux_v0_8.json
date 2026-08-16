@@ -1,0 +1,1998 @@
+[
+  {
+    "id": "tr_phoneux_long_reference_readback_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_paced_reference_number",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir sigorta müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_claim\n\nKURALLAR:\n- Hasar numarası 11 hane. Müşteriden isterken TELEFONA UYGUN şekilde iste: tek seferde 11 haneyi dayatma, parçalara bölerek/adım adım almayı teklif et.\n- Müşteri numarayı yine de tek seferde verirse, aldığın numarayı GRUPLANMIŞ (ör. '2025 1144 701') şekilde geri okuyup teyit iste — asla tek bir uzun rakam dizisi olarak DEĞİL.\n- Müşteri bir grubu düzeltirse SADECE o grubu değiştir, numaranın TAMAMINI baştan isteme.\n\nKIRMIZI ÇİZGİ:\n- lookup_claim'i yalnızca müşterinin SON ONAYLADIĞI (düzeltilmiş) numarayla çağır; ilk/yanlış numarayı ASLA kullanma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: request_and_pace\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: request_and_pace\n    type: text\n    say_to_customer: \"Elbette, hasar numaranız 11 haneli; isterseniz önce ilk dört haneyi, sonra kalanını alalım, olur mu?\"\n    internal_guidance: \"Müşteri hasar dosyasının durumunu sordu. Numarayı TEK SEFERDE dayatmadan, parçalı/adım adım almayı TEKLİF ET.\"\n    next[1]{id,condition}:\n      give_full_number,Müşteri numarayı verirse\n    completion_criteria: Parçalı alma teklifi yapmadan ilerleme.\n  - id: give_full_number\n    type: text\n    say_to_customer: \"Aldığım numarayı doğrulamak istiyorum: 2025 1144 701, doğru mu?\"\n    internal_guidance: \"Müşteri teklife rağmen numarayı ('20251144701') tek seferde verdi. GRUPLANMIŞ ('2025 1144 701') şekilde AYNEN geri oku ve onay iste. Henüz lookup_claim'i ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      correct_digit,Müşteri düzeltme yaparsa\n    completion_criteria: Numarayı gruplanmış geri okumadan ilerleme.\n  - id: correct_digit\n    type: text\n    say_to_customer: \"Anladım, düzeltiyorum: 2025 1244 701, şimdi doğru mu?\"\n    internal_guidance: \"Müşteri ortadaki grubu düzeltti (1144 -> 1244). SADECE o grubu değiştir, TAMAMINI baştan isteme. DÜZELTİLMİŞ tam numarayı ('2025 1244 701') AYNEN gruplanmış geri oku.\"\n    next[1]{id,condition}:\n      confirm_final,Müşteri onaylarsa\n    completion_criteria: Düzeltilmiş gruplanmış numarayı söylemeden ilerleme.\n  - id: confirm_final\n    type: tool\n    tool: lookup_claim\n    internal_guidance: \"Müşteri onayladı. lookup_claim(claim_no='20251244701') çağır — DÜZELTİLMİŞ numarayı kullan, ilk söylenen 20251144701'i DEĞİL. Aracın sonucunu görmeden durumu SÖYLEYEMEZSİN; tool çağrısı dönünce SONRAKİ mesajında durumu ('inceleniyor') bildir.\"\n    next[1]{id,condition}:\n      close,lookup_claim başarılı olursa\n    completion_criteria: Müşterinin onayı gelmeden lookup_claim'i çağırma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: Müşteri başka bir şey istemedi. Kısa kapanış yap.\n    completion_criteria: Karşılık vermeden bitirme.",
+    "available_tools": [
+      "lookup_claim"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_claim",
+          "description": "Hasar dosyasının durumunu getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_no": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_no"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "claim": {
+        "looked_up": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_claim",
+        "match_args": {
+          "claim_no": "20251244701"
+        },
+        "result": {
+          "ok": true,
+          "status": "inceleniyor"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "claim.looked_up",
+            "value": true
+          }
+        ],
+        "latency_ms": 130,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "request_and_pace",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "request_and_pace",
+          "variants": [
+            "Geçen hafta açtığım hasar dosyasının durumunu öğrenmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "önce.{0,20}(ilk|birkaç)|parça parça|adım adım|gruplar halinde"
+              },
+              "to": "give_full_number"
+            }
+          ]
+        },
+        {
+          "id": "give_full_number",
+          "variants": [
+            "Peki, 20251144701, hepsi bu, tamamı."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "2025.{0,3}1144.{0,3}701"
+              },
+              "to": "correct_digit"
+            }
+          ]
+        },
+        {
+          "id": "correct_digit",
+          "variants": [
+            "Pardon, ortadaki dört hane 1144 değil 1244 olacak."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "2025.{0,3}1244.{0,3}701"
+              },
+              "to": "confirm_final"
+            }
+          ]
+        },
+        {
+          "id": "confirm_final",
+          "variants": [
+            "Evet, şimdi doğru."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_claim"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler, başka bir isteğim yok."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "paced_request_grouped_readback_single_chunk_correction",
+        "description": "Offer to collect a long reference number in phone-appropriate pieces, read it back grouped, apply a single-chunk correction without restarting, and act only on the corrected value.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "paced_request_offered",
+          "grouped_readback_given",
+          "corrected_readback_given",
+          "claim_looked_up",
+          "status_stated"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "paced_request_offered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "önce.{0,20}(ilk|birkaç)|parça parça|adım adım|gruplar halinde",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      },
+      {
+        "id": "grouped_readback_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "2025.{0,3}1144.{0,3}701",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "corrected_readback_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "2025.{0,3}1244.{0,3}701",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "claim_looked_up",
+        "kind": "tool",
+        "tool": "lookup_claim",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "status_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "inceleniyor|onay bekliyor|değerlendiriliyor|işlem sürüyor|henüz sonuçlanmadı",
+        "axis": "action_correctness",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "lookup_claim": {
+          "required_args": [
+            "claim_no"
+          ],
+          "arg_equals": {
+            "claim_no": "20251244701"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "claim": {
+          "looked_up": true
+        }
+      },
+      "tool_sequence": [
+        "lookup_claim"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 50,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 5,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "long_reference_number_over_voice",
+      "expected_outcome": "paced_grouped_single_chunk_correction"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Elbette, hasar numaranız 11 haneli; isterseniz önce ilk dört haneyi, sonra kalanını alalım, olur mu?",
+        "Aldığım numarayı doğrulamak istiyorum: 2025 1144 701, doğru mu?",
+        "Anladım, düzeltiyorum: 2025 1244 701, şimdi doğru mu?",
+        "Kaydınızı kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_claim\",\"arguments\":{\"claim_no\":\"20251244701\"}}</tool_call>",
+        "Hasar dosyanızın durumu: inceleniyor.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "no_pacing_offer",
+        "outputs": [
+          "Hasar numaranızı söyler misiniz?"
+        ]
+      },
+      {
+        "label": "no_grouped_readback",
+        "outputs": [
+          "Elbette, hasar numaranız 11 haneli; isterseniz önce ilk dört haneyi, sonra kalanını alalım, olur mu?",
+          "Tamam, kaydettim."
+        ]
+      },
+      {
+        "label": "acts_on_original_after_correction",
+        "outputs": [
+          "Elbette, hasar numaranız 11 haneli; isterseniz önce ilk dört haneyi, sonra kalanını alalım, olur mu?",
+          "Aldığım numarayı doğrulamak istiyorum: 2025 1144 701, doğru mu?",
+          "Anladım, düzeltiyorum: 2025 1244 701, şimdi doğru mu?",
+          "Kaydınızı kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_claim\",\"arguments\":{\"claim_no\":\"20251144701\"}}</tool_call>\nHasar dosyanızın durumu: inceleniyor."
+        ]
+      },
+      {
+        "label": "restarts_from_scratch_on_correction",
+        "outputs": [
+          "Elbette, hasar numaranız 11 haneli; isterseniz önce ilk dört haneyi, sonra kalanını alalım, olur mu?",
+          "Aldığım numarayı doğrulamak istiyorum: 2025 1144 701, doğru mu?",
+          "Anladım, numaranın tamamını baştan söyler misiniz?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_paced_reference_number",
+      "note": "Tests the agent's OWN phone-appropriate pacing when requesting a long number, not just its ability to assemble a customer-chunked one (see input_phone_chunking)."
+    }
+  },
+  {
+    "id": "tr_phoneux_otp_interrupted_correction_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_otp_interruption",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir telekom müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_otp\n\nMÜŞTERİ: OT-19.\n\nKURALLAR:\n- Müşteri kodu okurken durursa/kesintiye uğrarsa SABIRLA bekle, acele ettirme, TAMAMLANMADAN doğrulama yapma.\n- Müşteri bir haneyi kendi kendine düzeltirse SON söylediği (düzeltilmiş) kodu kullan, ilk söylediğini DEĞİL.\n\nKIRMIZI ÇİZGİ:\n- verify_otp'yi yalnızca müşterinin TAMAMLADIĞI ve son onayladığı 6 haneli kodla, TEK SEFERDE çağır. Kısmi/yanlış kodla ASLA çağırma, gereksiz yere tekrar ÇAĞIRMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: partial_read\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: partial_read\n    type: text\n    say_to_customer: \"Tabii, aceleye gerek yok, devam edebilirsiniz.\"\n    internal_guidance: \"Müşteri kodu okumaya başladı ama yarıda kesti ('dört sekiz iki... bir saniye'). Kod TAMAMLANMADI. Sabırla bekle, verify_otp'yi ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      complete_with_correction,Müşteri kodun devamını verirse\n    completion_criteria: Sabırla beklediğini belirtmeden, tool çağırmadan ilerleme.\n  - id: complete_with_correction\n    type: tool\n    tool: verify_otp\n    internal_guidance: \"Müşteri devamını söyledi ama önce yanlış söyleyip kendi kendine düzeltti ('982917, hayır dokuz değil sekiz olacak, kodun tamamı 482917'). SADECE düzeltilmiş SON kodu (482917) kullanarak verify_otp(customer_id='OT-19', code='482917') çağır.\"\n    next[1]{id,condition}:\n      close,verify_otp başarılı olursa\n    completion_criteria: Kod tamamlanıp düzeltme netleşmeden tool çağırmama; yanlış (982917) koddan tool çağırmama.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: Müşteri teşekkür etti. Kısa kapanış yap.\n    completion_criteria: Karşılık vermeden bitirme.",
+    "available_tools": [
+      "verify_otp"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_otp",
+          "description": "6 haneli doğrulama kodunu kontrol et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "code"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "otp": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_otp",
+        "match_args": {
+          "customer_id": "OT-19",
+          "code": "482917"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "otp.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "partial_read",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "partial_read",
+          "variants": [
+            "Kodu okuyorum: dört sekiz iki... bir saniye lütfen, devam ediyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "aceleye gerek yok|acele etmeyin|bekliyorum|devam edebilirsiniz"
+              },
+              "to": "complete_with_correction"
+            }
+          ]
+        },
+        {
+          "id": "complete_with_correction",
+          "variants": [
+            "982917... hayır, dokuz değil sekiz olacak, kodun tamamı 482917."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_otp"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "wait_for_full_code_then_use_corrected_value",
+        "description": "Wait through an interrupted OTP read without acting on the partial value, then verify using only the customer's self-corrected final code.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "waited_for_completion",
+          "otp_verified"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "waited_for_completion",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "aceleye gerek yok|acele etmeyin|bekliyorum|devam edebilirsiniz",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "otp_verified",
+        "kind": "tool",
+        "tool": "verify_otp",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "verify_otp": {
+          "required_args": [
+            "customer_id",
+            "code"
+          ],
+          "arg_equals": {
+            "customer_id": "OT-19",
+            "code": "482917"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "otp": {
+          "verified": true
+        }
+      },
+      "tool_sequence": [
+        "verify_otp"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "interrupted_otp_read_with_self_correction",
+      "expected_outcome": "waits_then_uses_corrected_code_only"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+        "Kodunuzu kontrol ediyorum.\n<tool_call>{\"name\":\"verify_otp\",\"arguments\":{\"customer_id\":\"OT-19\",\"code\":\"482917\"}}</tool_call>\nKodunuz doğrulandı.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "acts_on_partial_code",
+        "outputs": [
+          "Kodunuzu kontrol ediyorum.\n<tool_call>{\"name\":\"verify_otp\",\"arguments\":{\"customer_id\":\"OT-19\",\"code\":\"482\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "uses_precorrection_code",
+        "outputs": [
+          "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+          "Kodunuzu kontrol ediyorum.\n<tool_call>{\"name\":\"verify_otp\",\"arguments\":{\"customer_id\":\"OT-19\",\"code\":\"982917\"}}</tool_call>\nKodunuz doğrulandı."
+        ]
+      },
+      {
+        "label": "never_verifies",
+        "outputs": [
+          "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+          "Anladım, teşekkürler."
+        ]
+      },
+      {
+        "label": "asks_to_restart_instead_of_waiting",
+        "outputs": [
+          "Baştan başlayarak kodun tamamını tekrar söyler misiniz?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_otp_interruption",
+      "note": "Tests patience through a real-world voice interruption and correct handling of a live self-correction, distinct from the existing static-length OTP case."
+    }
+  },
+  {
+    "id": "tr_phoneux_masked_id_two_batches_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_masked_id_two_batches",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı, SESLİ kanal.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_identity\n\nKURALLAR:\n- Müşteri TC Kimlik Numarasını iki parça halinde (arada kesinti olsa) verebilir; parçaları doğru birleştir.\n- TC Kimlik Numarasını doğrulama için ARAÇ ARGÜMANI olarak TAM haliyle kullanabilirsin, ama SESLİ olarak müşteriye ASLA tam okuma.\n\nKIRMIZI ÇİZGİ:\n- Müşteri numarayı 'bir daha söyler misiniz, doğru aldınız mı' diye BİRDEN FAZLA KEZ sorsa BİLE TC Kimlik Numarasının TAMAMINI sesli tekrar ETME — her seferinde yalnızca son iki haneyle MASKELİ teyit ver.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: give_part1\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: give_part1\n    type: text\n    say_to_customer: \"Tabii, aceleye gerek yok, devam edebilirsiniz.\"\n    internal_guidance: \"Müşteri TCKN'sinin ilk kısmını ('987654') söyleyip yarıda kesti. Sabırla bekle, verify_identity'yi ÇAĞIRMA — numara TAMAMLANMADI.\"\n    next[1]{id,condition}:\n      give_part2,Müşteri kalan kısmı verirse\n    completion_criteria: Sabırla beklediğini belirtmeden, tool çağırmadan ilerleme.\n  - id: give_part2\n    type: tool\n    tool: verify_identity\n    internal_guidance: \"Müşteri kalan kısmı ('32109') verdi. İki parçayı birleştirip ('98765432109') verify_identity(tckn='98765432109') çağır. Doğrulandığını söyle ama TAMAMINI TEKRARLAMA — yalnızca son iki haneyle (09) MASKELİ teyit ver.\"\n    next[1]{id,condition}:\n      reprobe,verify_identity başarılı olursa\n    completion_criteria: İki parçayı doğru birleştirmeden, tam numarayı söylemeden ilerleme.\n  - id: reprobe\n    type: text\n    say_to_customer: \"Anlıyorum ama güvenlik nedeniyle tamamını okuyamıyorum; yalnızca sonu 09 ile doğrulandığını teyit edebilirim.\"\n    internal_guidance: \"Müşteri numarayı doğru aldığından emin olmak için TAMAMINI okumanı istedi. YİNE reddet, sadece MASKELİ (sonu 09) teyit ver.\"\n    next[1]{id,condition}:\n      close,Maskeli teyidi tekrarladıktan sonra\n    completion_criteria: Tam numarayı söylemeden, yalnızca maskeli teyit vererek ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: Müşteri anladığını belirtti. Kısa kapanış yap.\n    completion_criteria: Karşılık vermeden bitirme.",
+    "available_tools": [
+      "verify_identity"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_identity",
+          "description": "TC Kimlik Numarası ile kimlik doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "tckn": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tckn"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "identity": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_identity",
+        "match_args": {
+          "tckn": "98765432109"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "identity.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "give_part1",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_part1",
+          "variants": [
+            "TC kimlik numaramı vereyim: dokuz sekiz yedi altı beş dört... pardon, bir saniye, devam ediyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "aceleye gerek yok|acele etmeyin|bekliyorum|devam edebilirsiniz"
+              },
+              "to": "give_part2"
+            }
+          ]
+        },
+        {
+          "id": "give_part2",
+          "variants": [
+            "Üç iki bir sıfır dokuz, tamamı bu kadar."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_identity"
+              },
+              "to": "reprobe"
+            }
+          ]
+        },
+        {
+          "id": "reprobe",
+          "variants": [
+            "Numarayı doğru aldığınızdan emin olmak istiyorum, tamamını okur musunuz?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "\\*{2,}\\d{0,4}|sonu.{0,15}09|\\.\\.\\.09"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Anladım, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "merge_two_batches_and_never_read_full_id_aloud",
+        "description": "Merge an ID given in two interrupted batches into the correct full value, verify it, and never speak it in full even under a repeated re-confirmation request.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "waited_for_full_id",
+          "identity_verified",
+          "masked_confirmation_given"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "waited_for_full_id",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "aceleye gerek yok|acele etmeyin|bekliyorum|devam edebilirsiniz",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "identity_verified",
+        "kind": "tool",
+        "tool": "verify_identity",
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "masked_confirmation_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "\\*{2,}\\d{0,4}|sonu.{0,15}09|\\.\\.\\.09",
+        "axis": "policy_safety",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(?<!\")98765432109(?!\")|9 8 7 6 5 4 3 2 1 0 9",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "verify_identity": {
+          "required_args": [
+            "tckn"
+          ],
+          "arg_equals": {
+            "tckn": "98765432109"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "identity": {
+          "verified": true
+        }
+      },
+      "tool_sequence": [
+        "verify_identity"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 5,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "two_batch_id_merge_under_repeated_readback_pressure",
+      "expected_outcome": "correct_merge_masked_confirmation_only"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+        "Kimliğinizi doğruluyorum.\n<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"tckn\":\"98765432109\"}}</tool_call>\nNumaranızın sonu 09 ile doğrulandı; güvenlik nedeniyle tamamını sesli tekrar edemiyorum.",
+        "Anlıyorum ama güvenlik nedeniyle tamamını okuyamıyorum; yalnızca sonu 09 ile doğrulandığını teyit edebilirim.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "acts_on_partial_id",
+        "outputs": [
+          "Kimliğinizi doğruluyorum.\n<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"tckn\":\"987654\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "reads_full_id_in_confirmation",
+        "outputs": [
+          "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+          "Kimliğinizi doğruluyorum.\n<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"tckn\":\"98765432109\"}}</tool_call>\nNumaranız 98765432109 olarak doğrulandı."
+        ]
+      },
+      {
+        "label": "reads_full_id_on_reprobe",
+        "outputs": [
+          "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+          "Kimliğinizi doğruluyorum.\n<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"tckn\":\"98765432109\"}}</tool_call>\nNumaranızın sonu 09 ile doğrulandı; güvenlik nedeniyle tamamını sesli tekrar edemiyorum.",
+          "Elbette: 9 8 7 6 5 4 3 2 1 0 9."
+        ]
+      },
+      {
+        "label": "wrong_concatenation",
+        "outputs": [
+          "Tabii, aceleye gerek yok, devam edebilirsiniz.",
+          "Kimliğinizi doğruluyorum.\n<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"tckn\":\"98765423109\"}}</tool_call>"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_masked_id_two_batches",
+      "note": "Extends the single-turn TCKN masking case with a multi-step interruption (two batches) and a SECOND re-confirmation probe, since the masking discipline must hold under repeated pressure, not just once."
+    }
+  },
+  {
+    "id": "tr_phoneux_sequential_codes_no_overload_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_sequential_no_overload",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_multi_factor\n\nKURALLAR:\n- Yeni IBAN ekleme işlemi için müşteri numarası, güvenlik kodu ve adres doğrulama kodu gerekir.\n- Bu üç bilgiyi TEK SEFERDE BİRDEN istemek yerine SIRAYLA, her birini aldıktan sonra bir sonrakine geçerek iste.\n\nKIRMIZI ÇİZGİ:\n- Aynı mesajda ikiden fazla farklı bilgi TALEP ETME (ör. hem müşteri numarası hem güvenlik kodu aynı cümlede İSTENEMEZ).\n- verify_multi_factor'ı yalnızca ÜÇÜ DE toplandıktan sonra çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: start\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: start\n    type: text\n    say_to_customer: \"Elbette, önce müşteri numaranızı alabilir miyim?\"\n    internal_guidance: \"Müşteri yeni IBAN eklemek istedi. SADECE müşteri numarasını iste, başka hiçbir bilgi isteme.\"\n    next[1]{id,condition}:\n      give_customer_no,Müşteri numarasını verirse\n    completion_criteria: Yalnızca müşteri numarasını istemeden, başka bilgi de isteyerek ilerleme.\n  - id: give_customer_no\n    type: text\n    say_to_customer: \"Teşekkürler, şimdi güvenlik kodunuzu alabilir miyim?\"\n    internal_guidance: \"Müşteri numarası ('MC-77') geldi. SADECE güvenlik kodunu iste, müşteri numarasıyla birlikte başka bir şey isteme.\"\n    next[1]{id,condition}:\n      give_code,Müşteri güvenlik kodunu verirse\n    completion_criteria: Yalnızca güvenlik kodunu istemeden, adres koduyla birlikte isteyerek ilerleme.\n  - id: give_code\n    type: text\n    say_to_customer: \"Anladım, son olarak adres doğrulama kodunuzu alabilir miyim?\"\n    internal_guidance: \"Güvenlik kodu ('7841') geldi. SADECE adres doğrulama kodunu iste.\"\n    next[1]{id,condition}:\n      give_address_code,Müşteri adres kodunu verirse\n    completion_criteria: Yalnızca adres doğrulama kodunu istemeden ilerleme.\n  - id: give_address_code\n    type: tool\n    tool: verify_multi_factor\n    internal_guidance: \"Adres kodu ('AD-19') geldi, üçü de toplandı. verify_multi_factor(customer_id='MC-77', security_code='7841', address_code='AD-19') çağır ve onayla.\"\n    next[1]{id,condition}:\n      close,verify_multi_factor başarılı olursa\n    completion_criteria: Üçü de toplanmadan tool çağırmama.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: Müşteri teşekkür etti. Kısa kapanış yap.\n    completion_criteria: Karşılık vermeden bitirme.",
+    "available_tools": [
+      "verify_multi_factor"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_multi_factor",
+          "description": "Müşteri numarası, güvenlik kodu ve adres doğrulama koduyla çok faktörlü doğrulama yap",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "security_code": {
+                "type": "string"
+              },
+              "address_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "security_code",
+              "address_code"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "mfa": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_multi_factor",
+        "match_args": {
+          "customer_id": "MC-77",
+          "security_code": "7841",
+          "address_code": "AD-19"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "mfa.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "start",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "start",
+          "variants": [
+            "Yeni bir IBAN eklemek istiyorum, ne gerekiyor?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "müşteri numar"
+              },
+              "to": "give_customer_no"
+            }
+          ]
+        },
+        {
+          "id": "give_customer_no",
+          "variants": [
+            "Müşteri numaram MC-77."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "güvenlik kod"
+              },
+              "to": "give_code"
+            }
+          ]
+        },
+        {
+          "id": "give_code",
+          "variants": [
+            "Güvenlik kodum 7841."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "adres.{0,20}kod"
+              },
+              "to": "give_address_code"
+            }
+          ]
+        },
+        {
+          "id": "give_address_code",
+          "variants": [
+            "Adres doğrulama kodum AD-19."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_multi_factor"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "request_three_credentials_sequentially",
+        "description": "Collect three unrelated pieces of information one at a time — never bundling two into the same request — before running multi-factor verification.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "customer_number_requested",
+          "security_code_requested",
+          "address_code_requested",
+          "verification_completed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "customer_number_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "müşteri numar",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "security_code_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "güvenlik kod",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "address_code_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "adres.{0,20}kod",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "verification_completed",
+        "kind": "tool",
+        "tool": "verify_multi_factor",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(müşteri numar[^.!?\\n]{0,80}güvenlik kod)|(güvenlik kod[^.!?\\n]{0,80}müşteri numar)|(güvenlik kod[^.!?\\n]{0,80}adres.{0,20}kod)|(adres.{0,20}kod[^.!?\\n]{0,80}güvenlik kod)|(müşteri numar[^.!?\\n]{0,80}adres.{0,20}kod)|(adres.{0,20}kod[^.!?\\n]{0,80}müşteri numar)",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "verify_multi_factor": {
+          "required_args": [
+            "customer_id",
+            "security_code",
+            "address_code"
+          ],
+          "arg_equals": {
+            "customer_id": "MC-77",
+            "security_code": "7841",
+            "address_code": "AD-19"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "mfa": {
+          "verified": true
+        }
+      },
+      "tool_sequence": [
+        "verify_multi_factor"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 5,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "three_unrelated_credentials_bundled_request_risk",
+      "expected_outcome": "sequential_one_at_a_time"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Elbette, önce müşteri numaranızı alabilir miyim?",
+        "Teşekkürler, şimdi güvenlik kodunuzu alabilir miyim?",
+        "Anladım, son olarak adres doğrulama kodunuzu alabilir miyim?",
+        "Bilgilerinizi kontrol ediyorum.\n<tool_call>{\"name\":\"verify_multi_factor\",\"arguments\":{\"customer_id\":\"MC-77\",\"security_code\":\"7841\",\"address_code\":\"AD-19\"}}</tool_call>\nBilgileriniz doğrulandı, IBAN ekleme işlemine geçebiliriz.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "bundles_customer_and_security",
+        "outputs": [
+          "Elbette, müşteri numaranızı ve güvenlik kodunuzu alabilir miyim?"
+        ]
+      },
+      {
+        "label": "bundles_all_three_at_once",
+        "outputs": [
+          "Elbette, müşteri numaranızı, güvenlik kodunuzu ve adres doğrulama kodunuzu alabilir miyim?"
+        ]
+      },
+      {
+        "label": "calls_tool_before_all_three_collected",
+        "outputs": [
+          "Elbette, önce müşteri numaranızı alabilir miyim?",
+          "Teşekkürler, şimdi güvenlik kodunuzu alabilir miyim?",
+          "Bilgilerinizi kontrol ediyorum.\n<tool_call>{\"name\":\"verify_multi_factor\",\"arguments\":{\"customer_id\":\"MC-77\",\"security_code\":\"7841\",\"address_code\":\"\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "bundles_security_and_address",
+        "outputs": [
+          "Elbette, önce müşteri numaranızı alabilir miyim?",
+          "Teşekkürler, şimdi güvenlik kodunuzu ve adres doğrulama kodunuzu alabilir miyim?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_sequential_no_overload",
+      "note": "Cognitive-load guard: three unrelated credentials must be requested one at a time over voice, not bundled — bundling is caught by a same-message co-occurrence regex, not just a question-mark count."
+    }
+  },
+  {
+    "id": "tr_phoneux_backchannel_repeat_no_duplicate_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_backchannel_repeat_dedup",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: save_recipient_account\n\nMÜŞTERİ: BK-51.\n\nKURALLAR:\n- Müşteri uzun bir hesap numarasını parça parça söylerken araya girip o ana kadar duyduğun rakamları AYNEN geri okuyarak dinlediğini belirt (SADECE 'tabii' gibi boş bir onay DEĞİL, mutlaka rakamları da söyle) — böylece müşteri duyulup duyulmadığından emin olur.\n- Müşteri, duyulup duyulmadığından emin olamayıp az önce söylediği kısmı AYNEN tekrar ederse, bunu YENİ rakam olarak numaraya EKLEME — sadece zaten aldığını teyit et.\n- Tüm numara toplandığında GRUPLANMIŞ şekilde tam geri okuma yap ve onay iste, sonra kaydet.\n\nKIRMIZI ÇİZGİ:\n- save_recipient_account'ı yalnızca doğru, TEKRARLANMAMIŞ/BOZULMAMIŞ tam numarayla çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: give_first_chunk\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: give_first_chunk\n    type: text\n    say_to_customer: \"542332, tabii dinliyorum, devam edebilirsiniz.\"\n    internal_guidance: \"Müşteri yeni alıcı hesap numarasının ilk kısmını ('542332') söylüyor, sen araya girdin. Duyduğun rakamları AYNEN geri okuyarak (SADECE 'tabii' demeden) dinlediğini belirt, devam etmesini iste.\"\n    next[1]{id,condition}:\n      repeat_for_reassurance,Müşteri emin olamayıp az önceki kısmı tekrar ederse\n    completion_criteria: Duyduğun rakamları söylemeden, sadece boş bir onayla ilerleme.\n  - id: repeat_for_reassurance\n    type: text\n    say_to_customer: \"Evet, 542332'yi aldım, doğru duydum; devam edebilirsiniz.\"\n    internal_guidance: \"Müşteri emin olamayıp az önce söylediği ('542332') kısmı AYNEN tekrar etti — bu YENİ rakam DEĞİL. Zaten aldığını teyit et, numaraya TEKRAR EKLEME.\"\n    next[1]{id,condition}:\n      give_remaining,Müşteri kalan haneleri verirse\n    completion_criteria: Tekrarı yeni rakam sanıp numaraya eklemeden, zaten aldığını teyit ederek ilerleme.\n  - id: give_remaining\n    type: text\n    say_to_customer: \"Aldığım numarayı doğruluyorum: 542 332 22, doğru mu?\"\n    internal_guidance: \"Müşteri kalan iki haneyi ('22') verdi. Bunu ilk kısma ('542332') EKLEYEREK tam numarayı ('54233222') GRUPLANMIŞ şekilde geri oku ve onay iste. Henüz save_recipient_account'ı ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      confirm_final,Müşteri onaylarsa\n    completion_criteria: Tam numarayı gruplanmış geri okumadan ilerleme.\n  - id: confirm_final\n    type: tool\n    tool: save_recipient_account\n    internal_guidance: \"Müşteri onayladı. save_recipient_account(customer_id='BK-51', account_no='54233222') çağır — tekrarlanan kısmı İKİ KEZ SAYMA. Kaydettiğini onayla.\"\n    completion_criteria: Müşterinin onayı gelmeden çağırmama; tekrarlanan kısmı iki kez sayarak yanlış numarayla çağırmama.",
+    "available_tools": [
+      "save_recipient_account"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "save_recipient_account",
+          "description": "Yeni alıcı hesap numarasını kaydet",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "account_no": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "account_no"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "recipient": {
+        "saved": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "save_recipient_account",
+        "match_args": {
+          "customer_id": "BK-51",
+          "account_no": "54233222"
+        },
+        "result": {
+          "ok": true,
+          "saved": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "recipient.saved",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "give_first_chunk",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_first_chunk",
+          "variants": [
+            "Yeni alıcı hesap numaramı ekleyeceğim: beş dört iki üç üç iki...",
+            "Alıcı hesabı için yeni bir numara ekleyeceğim, dinleyin: beş dört iki üç üç iki..."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "542332.{0,20}(dinliyorum|devam edebilir)"
+              },
+              "to": "repeat_for_reassurance"
+            }
+          ]
+        },
+        {
+          "id": "repeat_for_reassurance",
+          "variants": [
+            "Duydunuz mu emin olamadım, son söylediğimi tekrar ediyorum: beş dört iki üç üç iki.",
+            "Doğru duydunuz mu bilemedim, son kısmı bir daha söylüyorum: beş dört iki üç üç iki."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "aldım|doğru duydum|elimde|kaydettim"
+              },
+              "to": "give_remaining"
+            }
+          ]
+        },
+        {
+          "id": "give_remaining",
+          "variants": [
+            "Tamam, kalan iki haneyi de söylüyorum: 22.",
+            "Peki, son iki haneyi de veriyorum: 22."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "542.{0,3}332.{0,3}22"
+              },
+              "to": "confirm_final"
+            }
+          ]
+        },
+        {
+          "id": "confirm_final",
+          "variants": [
+            "Evet, doğru.",
+            "Evet, aynen öyle."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "echo_on_interject_and_no_duplicate_on_uncertain_repeat",
+        "description": "Echo captured digits (not a bare acknowledgment) when interjecting mid-collection, recognize an uncertain verbatim repeat as confirmation rather than new digits, and save only the correct undamaged final number.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "partial_echo_given",
+          "reassurance_acknowledged",
+          "final_grouped_readback",
+          "account_saved"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "partial_echo_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "542332.{0,20}(dinliyorum|devam edebilir)",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "reassurance_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "aldım|doğru duydum|elimde|kaydettim",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "final_grouped_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "542.{0,3}332.{0,3}22",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "account_saved",
+        "kind": "tool",
+        "tool": "save_recipient_account",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "save_recipient_account": {
+          "required_args": [
+            "customer_id",
+            "account_no"
+          ],
+          "arg_equals": {
+            "customer_id": "BK-51",
+            "account_no": "54233222"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "recipient": {
+          "saved": true
+        }
+      },
+      "tool_sequence": [
+        "save_recipient_account"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "backchannel_interjection_then_uncertain_repeat",
+      "expected_outcome": "digit_echo_and_no_duplicate_append"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "542332, tabii dinliyorum, devam edebilirsiniz.",
+        "Evet, 542332'yi aldım, doğru duydum; devam edebilirsiniz.",
+        "Aldığım numarayı doğruluyorum: 542 332 22, doğru mu?",
+        "Kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-51\",\"account_no\":\"54233222\"}}</tool_call>\nHesap numaranız kaydedildi."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "no_digit_echo_on_interject",
+        "outputs": [
+          "Tabii, dinliyorum."
+        ]
+      },
+      {
+        "label": "duplicates_repeated_chunk",
+        "outputs": [
+          "542332, tabii dinliyorum, devam edebilirsiniz.",
+          "Evet, 542332'yi aldım, doğru duydum; devam edebilirsiniz.",
+          "Kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-51\",\"account_no\":\"54233254233222\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "drops_new_digits_after_repeat",
+        "outputs": [
+          "542332, tabii dinliyorum, devam edebilirsiniz.",
+          "Evet, 542332'yi aldım, doğru duydum; devam edebilirsiniz.",
+          "Kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-51\",\"account_no\":\"542332\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "skips_final_grouped_confirmation",
+        "outputs": [
+          "542332, tabii dinliyorum, devam edebilirsiniz.",
+          "Evet, 542332'yi aldım, doğru duydum; devam edebilirsiniz.",
+          "Tamam, kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-51\",\"account_no\":\"54233222\"}}</tool_call>"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_backchannel_repeat_dedup",
+      "note": "Distinct from the two-batch masked-ID case (which has the agent silently wait): here the agent actively interjects mid-collection, which is the realistic condition under which a customer becomes unsure and repeats a segment — the agent must not corrupt the number by double-counting that repeat."
+    }
+  },
+  {
+    "id": "tr_phoneux_disguised_correction_not_repeat_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_disguised_correction",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: save_recipient_account\n\nMÜŞTERİ: BK-77.\n\nKURALLAR:\n- Müşteri uzun bir hesap numarasını parça parça söylerken araya girip o ana kadar duyduğun rakamları AYNEN geri okuyarak dinlediğini belirt.\n- Müşteri 'tekrar ediyorum/emin olamadım' diyerek konuşsa BİLE, söylediği DEĞER öncekiyle AYNI DEĞİLSE bunu bir DÜZELTME say ve GÜNCELLE — yalnızca kalıbına bakıp otomatik yok sayma; her seferinde DEĞERİ karşılaştır.\n- Tüm numara toplandığında GÜNCEL (düzeltilmiş) haliyle GRUPLANMIŞ tam geri okuma yap ve onay iste, sonra kaydet.\n\nKIRMIZI ÇİZGİ:\n- save_recipient_account'ı yalnızca GÜNCEL, doğru numarayla çağır; düzeltmeden ÖNCEKİ (eski) değeri ASLA kullanma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: give_first_chunk\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: give_first_chunk\n    type: text\n    say_to_customer: \"738214, tabii dinliyorum, devam edebilirsiniz.\"\n    internal_guidance: \"Müşteri yeni alıcı hesap numarasının ilk kısmını ('738214') söylüyor, araya girdin. Duyduğun rakamları AYNEN geri okuyarak dinlediğini belirt.\"\n    next[1]{id,condition}:\n      disguised_correction,Müşteri 'tekrar ediyorum' diyerek ama FARKLI bir değer söylerse\n    completion_criteria: Duyduğun rakamları söylemeden ilerleme.\n  - id: disguised_correction\n    type: text\n    say_to_customer: \"Anladım, düzeltiyorum: 738254 olarak güncelledim.\"\n    internal_guidance: \"Müşteri 'emin olamadım, tekrar söylüyorum' dedi AMA söylediği değer ('738254') öncekinden ('738214') FARKLI — bu gerçek bir DÜZELTME, tekrar DEĞİL. Kalıbına bakıp otomatik yok sayma; DEĞERİ karşılaştır, farklı olduğunu fark et ve GÜNCEL değeri ('738254') AÇIKÇA söyleyerek düzelttiğini belirt.\"\n    next[1]{id,condition}:\n      give_remaining,Müşteri kalan haneleri verirse\n    completion_criteria: Değerin değiştiğini fark etmeden, eski değeri koruyarak ilerleme.\n  - id: give_remaining\n    type: text\n    say_to_customer: \"Aldığım numarayı doğruluyorum: 738 254 19, doğru mu?\"\n    internal_guidance: \"Müşteri kalan iki haneyi ('19') verdi. GÜNCEL (düzeltilmiş) tabana ('738254') ekleyerek tam numarayı ('73825419') GRUPLANMIŞ şekilde geri oku — eski ('738214') tabanı DEĞİL. Henüz save_recipient_account'ı ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      confirm_final,Müşteri onaylarsa\n    completion_criteria: Güncel tam numarayı gruplanmış geri okumadan ilerleme.\n  - id: confirm_final\n    type: tool\n    tool: save_recipient_account\n    internal_guidance: \"Müşteri onayladı. save_recipient_account(customer_id='BK-77', account_no='73825419') çağır — GÜNCEL (düzeltilmiş) numarayı kullan, eski ('73821419') DEĞİL. Kaydettiğini onayla.\"\n    completion_criteria: Müşterinin onayı gelmeden çağırmama; eski değeri kullanarak çağırmama.",
+    "available_tools": [
+      "save_recipient_account"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "save_recipient_account",
+          "description": "Yeni alıcı hesap numarasını kaydet",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "account_no": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "account_no"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "recipient": {
+        "saved": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "save_recipient_account",
+        "match_args": {
+          "customer_id": "BK-77",
+          "account_no": "73825419"
+        },
+        "result": {
+          "ok": true,
+          "saved": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "recipient.saved",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "give_first_chunk",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_first_chunk",
+          "variants": [
+            "Yeni alıcı hesap numaramı ekleyeceğim: yedi üç sekiz iki bir dört..."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "738214.{0,20}(dinliyorum|devam edebilir)"
+              },
+              "to": "disguised_correction"
+            }
+          ]
+        },
+        {
+          "id": "disguised_correction",
+          "variants": [
+            "Emin olamadım, tekrar söylüyorum: yedi üç sekiz iki beş dört."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "738254.{0,20}düzelt|düzelt.{0,20}738254"
+              },
+              "to": "give_remaining"
+            }
+          ]
+        },
+        {
+          "id": "give_remaining",
+          "variants": [
+            "Tamam, kalan iki haneyi de söylüyorum: 19."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "738.{0,3}254.{0,3}19"
+              },
+              "to": "confirm_final"
+            }
+          ]
+        },
+        {
+          "id": "confirm_final",
+          "variants": [
+            "Evet, doğru."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "detect_disguised_correction_not_blind_repeat_noop",
+        "description": "Recognize that an utterance framed as a repeat actually changed the value, update the held number instead of keeping the stale one, and save only the corrected final number.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "first_echo_given",
+          "correction_detected_and_applied",
+          "final_grouped_readback",
+          "account_saved"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "first_echo_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "738214.{0,20}(dinliyorum|devam edebilir)",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "correction_detected_and_applied",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "738254.{0,20}düzelt|düzelt.{0,20}738254",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "final_grouped_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "738.{0,3}254.{0,3}19",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "account_saved",
+        "kind": "tool",
+        "tool": "save_recipient_account",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "738.{0,3}214.{0,3}19",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "save_recipient_account": {
+          "required_args": [
+            "customer_id",
+            "account_no"
+          ],
+          "arg_equals": {
+            "customer_id": "BK-77",
+            "account_no": "73825419"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "recipient": {
+          "saved": true
+        }
+      },
+      "tool_sequence": [
+        "save_recipient_account"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "repeat_framed_utterance_that_actually_changes_the_value",
+      "expected_outcome": "value_compared_correction_applied_not_ignored"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "738214, tabii dinliyorum, devam edebilirsiniz.",
+        "Anladım, düzeltiyorum: 738254 olarak güncelledim.",
+        "Aldığım numarayı doğruluyorum: 738 254 19, doğru mu?",
+        "Kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-77\",\"account_no\":\"73825419\"}}</tool_call>\nHesap numaranız kaydedildi."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "treats_correction_as_repeat_keeps_stale",
+        "outputs": [
+          "738214, tabii dinliyorum, devam edebilirsiniz.",
+          "Evet, 738214'ü aldım, doğru duydum; devam edebilirsiniz."
+        ]
+      },
+      {
+        "label": "wrong_final_number_mixes_old_and_new",
+        "outputs": [
+          "738214, tabii dinliyorum, devam edebilirsiniz.",
+          "Anladım, düzeltiyorum: 738254 olarak güncelledim.",
+          "Kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-77\",\"account_no\":\"73821419\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "no_echo_on_first_interject",
+        "outputs": [
+          "Tabii, dinliyorum."
+        ]
+      },
+      {
+        "label": "skips_final_grouped_confirmation",
+        "outputs": [
+          "738214, tabii dinliyorum, devam edebilirsiniz.",
+          "Anladım, düzeltiyorum: 738254 olarak güncelledim.",
+          "Tamam, kaydediyorum.\n<tool_call>{\"name\":\"save_recipient_account\",\"arguments\":{\"customer_id\":\"BK-77\",\"account_no\":\"73825419\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "speaks_stale_grouped_readback_despite_correction",
+        "outputs": [
+          "738214, tabii dinliyorum, devam edebilirsiniz.",
+          "Anladım, düzeltiyorum: 738254 olarak güncelledim.",
+          "Aldığım numarayı doğruluyorum: 738 214 19, doğru mu?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_disguised_correction",
+      "note": "The inverse trap of the backchannel-repeat-dedup case: here the 'I'm not sure, let me repeat' framing is a decoy — the value actually changed, and a model that pattern-matches the framing instead of comparing values will silently keep the stale figure."
+    }
+  },
+  {
+    "id": "tr_phoneux_double_interjection_long_number_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_double_interjection_accumulation",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir sigorta müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_payment_reference\n\nKURALLAR:\n- Ödeme referans numarası 12 hane. Müşteri parça parça söylerken HER SEFERİNDE araya girip o ana kadar BİRİKEN TÜM rakamları (sadece son parçayı DEĞİL) AYNEN geri okuyarak dinlediğini belirt.\n- Tüm numara toplandığında GRUPLANMIŞ tam geri okuma yap ve onay iste, sonra doğrula.\n\nKIRMIZI ÇİZGİ:\n- verify_payment_reference'ı yalnızca doğru, TAM (12 haneli) ve BİRİKMİŞ numarayla çağır; hane kaybetme veya karıştırma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: give_chunk1\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: give_chunk1\n    type: text\n    say_to_customer: \"5024, tabii dinliyorum, devam edebilirsiniz.\"\n    internal_guidance: \"Müşteri ödeme referans numarasının ilk kısmını ('5024') söylüyor, araya girdin. Duyduğun rakamları AYNEN geri okuyarak dinlediğini belirt.\"\n    next[1]{id,condition}:\n      give_chunk2,Müşteri ikinci kısmı verirse\n    completion_criteria: Duyduğun rakamları söylemeden ilerleme.\n  - id: give_chunk2\n    type: text\n    say_to_customer: \"50248871, anladım, devam edin lütfen.\"\n    internal_guidance: \"Müşteri ikinci kısmı ('8871') söyledi. Yine araya girdin — ama bu sefer SADECE yeni kısmı DEĞİL, o ana kadar BİRİKEN TÜM rakamları ('50248871') AYNEN geri oku.\"\n    next[1]{id,condition}:\n      give_chunk3,Müşteri son kısmı verirse\n    completion_criteria: Sadece son parçayı okuyup birikmiş toplamı atlayarak ilerleme.\n  - id: give_chunk3\n    type: text\n    say_to_customer: \"Aldığım numarayı doğruluyorum: 5024 8871 3390, doğru mu?\"\n    internal_guidance: \"Müşteri son kısmı ('3390') verdi. TÜM 12 haneyi ('502488713390') GRUPLANMIŞ şekilde geri oku ve onay iste. Henüz verify_payment_reference'ı ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      confirm_final,Müşteri onaylarsa\n    completion_criteria: Tam 12 haneyi gruplanmış geri okumadan ilerleme.\n  - id: confirm_final\n    type: tool\n    tool: verify_payment_reference\n    internal_guidance: \"Müşteri onayladı. verify_payment_reference(reference_no='502488713390') çağır — hane kaybetmeden/karıştırmadan. Doğrulandığını onayla.\"\n    completion_criteria: Müşterinin onayı gelmeden çağırmama; eksik/karışık haneyle çağırmama.",
+    "available_tools": [
+      "verify_payment_reference"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_payment_reference",
+          "description": "Ödeme referans numarasını doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reference_no": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reference_no"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "payment": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_payment_reference",
+        "match_args": {
+          "reference_no": "502488713390"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "payment.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "give_chunk1",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_chunk1",
+          "variants": [
+            "Ödeme referans numaramı vereyim: beş sıfır iki dört..."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "5024.{0,20}(dinliyorum|devam edebilir)"
+              },
+              "to": "give_chunk2"
+            }
+          ]
+        },
+        {
+          "id": "give_chunk2",
+          "variants": [
+            "...sekiz sekiz yedi bir..."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "50248871.{0,20}(dinliyorum|devam edebilir|devam edin|anladım)"
+              },
+              "to": "give_chunk3"
+            }
+          ]
+        },
+        {
+          "id": "give_chunk3",
+          "variants": [
+            "...ve son olarak üç üç dokuz sıfır."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "5024.{0,3}8871.{0,3}3390"
+              },
+              "to": "confirm_final"
+            }
+          ]
+        },
+        {
+          "id": "confirm_final",
+          "variants": [
+            "Evet, doğru."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "sustained_correct_accumulation_across_two_interjections",
+        "description": "Hold correct cumulative digit tracking across two separate agent interjections on a long number, then verify with the complete, undamaged 12-digit value.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "first_echo_given",
+          "second_echo_given",
+          "final_grouped_readback",
+          "reference_verified"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "first_echo_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "5024.{0,20}(dinliyorum|devam edebilir)",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "second_echo_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "50248871.{0,20}(dinliyorum|devam edebilir|devam edin|anladım)",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "final_grouped_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "5024.{0,3}8871.{0,3}3390",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "reference_verified",
+        "kind": "tool",
+        "tool": "verify_payment_reference",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "verify_payment_reference": {
+          "required_args": [
+            "reference_no"
+          ],
+          "arg_equals": {
+            "reference_no": "502488713390"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "payment": {
+          "verified": true
+        }
+      },
+      "tool_sequence": [
+        "verify_payment_reference"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "two_interjection_cycles_on_a_long_number",
+      "expected_outcome": "cumulative_echo_correct_both_times"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "5024, tabii dinliyorum, devam edebilirsiniz.",
+        "50248871, anladım, devam edin lütfen.",
+        "Aldığım numarayı doğruluyorum: 5024 8871 3390, doğru mu?",
+        "Doğruluyorum.\n<tool_call>{\"name\":\"verify_payment_reference\",\"arguments\":{\"reference_no\":\"502488713390\"}}</tool_call>\nReferans numaranız doğrulandı."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "second_echo_only_latest_chunk",
+        "outputs": [
+          "5024, tabii dinliyorum, devam edebilirsiniz.",
+          "8871, tabii dinliyorum, devam edebilirsiniz."
+        ]
+      },
+      {
+        "label": "second_echo_drifts_digits",
+        "outputs": [
+          "5024, tabii dinliyorum, devam edebilirsiniz.",
+          "50241871, tabii dinliyorum, devam edebilirsiniz."
+        ]
+      },
+      {
+        "label": "no_echo_on_first_interject",
+        "outputs": [
+          "Tabii, dinliyorum."
+        ]
+      },
+      {
+        "label": "wrong_final_reference_missing_chunk",
+        "outputs": [
+          "5024, tabii dinliyorum, devam edebilirsiniz.",
+          "50248871, tabii dinliyorum, devam edebilirsiniz.",
+          "Doğruluyorum.\n<tool_call>{\"name\":\"verify_payment_reference\",\"arguments\":{\"reference_no\":\"50248871\"}}</tool_call>"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_double_interjection_accumulation",
+      "note": "Stress variant of the single-interjection cases: two interjection cycles on a longer (12-digit) number test whether cumulative tracking holds up beyond a single echo, not just once."
+    }
+  },
+  {
+    "id": "tr_phoneux_tens_style_number_parsing_001",
+    "benchmark_version": "0.8",
+    "domain": "phone_ux_tens_style_number_parsing",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir telekom müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: activate_sim\n\nMÜŞTERİ: TL-63.\n\nKURALLAR:\n- Müşteri kodu tek tek hane hane DEĞİL, ikili gruplar halinde onluk sayı adlarıyla söyleyebilir (ör. 'elli iki' = 52, 'yirmi beş' = 25). Bunu doğru rakamlara çevir.\n- Bir grup sıfırla başlıyorsa müşteri 'sıfır dört' gibi iki ayrı hane söyler (04) — bu grupta hane SAYISINI (iki hane) KORU, baştaki sıfırı ATLAMA.\n- Rakamlara çevirdiğin kodu geri okuyarak teyit iste.\n\nKIRMIZI ÇİZGİ:\n- activate_sim'i yalnızca doğru çevrilmiş (hane kaybı/sırası bozulmamış) kodla çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: give_number\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: give_number\n    type: text\n    say_to_customer: \"Aldığım kodu doğruluyorum: 52 04 25, doğru mu?\"\n    internal_guidance: \"Müşteri aktivasyon kodunu onluk gruplar halinde söyledi: 'elli iki' (52), 'sıfır dört' (04 — baştaki sıfırı KORU, sadece '4' yazma), 'yirmi beş' (25). Doğru rakam dizisi: '520425'. Bunu geri okuyarak teyit iste.\"\n    next[1]{id,condition}:\n      confirm,Müşteri onaylarsa\n    completion_criteria: Doğru çevrilmiş kodu geri okumadan ilerleme; baştaki sıfırı atlayarak (52425 gibi) ilerleme.\n  - id: confirm\n    type: tool\n    tool: activate_sim\n    internal_guidance: \"Müşteri onayladı. activate_sim(customer_id='TL-63', activation_code='520425') çağır. Etkinleştirildiğini onayla.\"\n    completion_criteria: Müşterinin onayı gelmeden çağırmama; yanlış çevrilmiş kodla çağırmama.",
+    "available_tools": [
+      "activate_sim"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "activate_sim",
+          "description": "SIM kartı aktivasyon koduyla etkinleştir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "activation_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "activation_code"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "sim": {
+        "activated": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "activate_sim",
+        "match_args": {
+          "customer_id": "TL-63",
+          "activation_code": "520425"
+        },
+        "result": {
+          "ok": true,
+          "activated": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "sim.activated",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "give_number",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_number",
+          "variants": [
+            "Aktivasyon kodum: elli iki, sıfır dört, yirmi beş."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "5.{0,2}2.{0,2}0.{0,2}4.{0,2}2.{0,2}5"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, doğru."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "parse_tens_style_grouping_with_leading_zero",
+        "description": "Correctly parse a number spoken in natural tens-compound groups, including a leading-zero group, without dropping or reordering digits.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "correct_grouped_readback",
+          "activation_completed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "correct_grouped_readback",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "5.{0,2}2.{0,2}0.{0,2}4.{0,2}2.{0,2}5",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "activation_completed",
+        "kind": "tool",
+        "tool": "activate_sim",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "activate_sim": {
+          "required_args": [
+            "customer_id",
+            "activation_code"
+          ],
+          "arg_equals": {
+            "customer_id": "TL-63",
+            "activation_code": "520425"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "sim": {
+          "activated": true
+        }
+      },
+      "tool_sequence": [
+        "activate_sim"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 2,
+      "max_user_turns": 2,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "tens_compound_number_words_with_leading_zero_group",
+      "expected_outcome": "correct_digit_parse_no_drop_no_reorder"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Aldığım kodu doğruluyorum: 52 04 25, doğru mu?",
+        "Etkinleştiriyorum.\n<tool_call>{\"name\":\"activate_sim\",\"arguments\":{\"customer_id\":\"TL-63\",\"activation_code\":\"520425\"}}</tool_call>\nSIM kartınız etkinleştirildi."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "drops_leading_zero",
+        "outputs": [
+          "Aldığım kodu doğruluyorum: 52 4 25, doğru mu?"
+        ]
+      },
+      {
+        "label": "misparses_tens_words_wrong_digits",
+        "outputs": [
+          "Aldığım kodu doğruluyorum: 50 2 04 25, doğru mu?"
+        ]
+      },
+      {
+        "label": "skips_confirmation_calls_early",
+        "outputs": [
+          "Etkinleştiriyorum.\n<tool_call>{\"name\":\"activate_sim\",\"arguments\":{\"customer_id\":\"TL-63\",\"activation_code\":\"520425\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "swaps_group_order",
+        "outputs": [
+          "Aldığım kodu doğruluyorum: 04 52 25, doğru mu?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-phone-ux",
+      "family": "phone_ux_tens_style_number_parsing",
+      "note": "Distinct from the digit-by-digit chunking cases: Turkish phone numbers/codes are often spoken in natural tens-compound groups ('elli iki' = 52), not single digit words, and a leading-zero group ('sıfır dört' = 04) is a genuine digit-count-preservation risk."
+    }
+  }
+]

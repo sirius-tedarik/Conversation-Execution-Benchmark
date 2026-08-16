@@ -1,123 +1,913 @@
 [
   {
-    "id":"tr_flow_nested_detour_rejoin_001","benchmark_version":"0.8","domain":"nested_detour_flow","language":"tr-TR","call_direction":"inbound",
-    "system":"Poliçe yenileme akışını yürüt. Kullanıcı araya konu açarsa kısa cevap ver ve açılış sırasının tersine dön: önce bir önceki ara konuya, sonra ana akışa. Daha önce alınan bilgileri tekrar sorma.",
-    "available_tools":["get_renewal_quote","renew_policy"],
-    "tool_schemas":[
-      {"type":"function","function":{"name":"get_renewal_quote","description":"Yenileme primini sorgula","parameters":{"type":"object","properties":{"policy_id":{"type":"string"}},"required":["policy_id"]}}},
-      {"type":"function","function":{"name":"renew_policy","description":"Poliçeyi yenile","parameters":{"type":"object","properties":{"policy_id":{"type":"string"},"premium_try":{"type":"number"},"consent":{"type":"boolean"}},"required":["policy_id","premium_try","consent"]}}}
+    "id": "tr_flow_nested_detour_rejoin_001",
+    "benchmark_version": "0.8",
+    "domain": "nested_detour_flow",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir sigorta asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: get_renewal_quote, renew_policy\n\nKURALLAR:\n- Poliçe yenileme akışını yürüt. Kullanıcı araya konu açarsa kısa cevap ver ve açılış sırasının TERSİNE dön: önce bir önceki ara konuya, sonra ana akışa (LIFO — son açılan konu önce kapanır).\n- Daha önce alınan bilgileri (poliçe numarası gibi) tekrar sorma.\n\nKIRMIZI ÇİZGİ:\n- Net prim/fiyat rakamını UYDURMA; yalnızca get_renewal_quote'un döndürdüğü premium_try değerini kullan.\n- \"Hı hı\", \"anladım\" tek başına açık onay değildir; müşteri fiyatı belirterek AÇIKÇA onaylamadan renew_policy'yi ÇAĞIRMAYIN.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: renewal_request\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: renewal_request\n    type: tool\n    tool: get_renewal_quote\n    internal_guidance: \"Müşteri PL-90 poliçesini yenilemek istedi. get_renewal_quote(policy_id='PL-90') çağır.\"\n    next[1]{id,condition}:\n      discount_detour,get_renewal_quote başarılı olursa\n    completion_criteria: get_renewal_quote başarıyla dönmeden ilerleme; başarılı olduktan SONRA da DUR — müşterinin bir sonraki mesajını bekle.\n  - id: discount_detour\n    type: global_note\n    say_to_customer: \"Kontrol ediyorum; bu poliçe için ayrıca bir indirim kaydı görünmüyor.\"\n    internal_guidance: \"Müşteri araya girip indirim hakkını sordu. 'indirim' kelimesini içeren kısa bir yanıt ver. NET PRİM RAKAMINI (4200) BURADA SÖYLEME — o bilgi discount_return adımında verilecek. Sonra henüz ana akışa DÖNME, müşterinin bir sonraki mesajını bekle (LIFO: sırada bir ara konu daha olabilir).\"\n    next[1]{id,condition}:\n      app_detour,Müşteri başka bir ara konu açarsa\n    completion_criteria: İndirim sorusunu yanıtlamadan ilerleme.\n  - id: app_detour\n    type: global_note\n    say_to_customer: \"Uygulama şifrenizi giriş ekranındaki 'şifremi unuttum' seçeneğiyle sıfırlayabilirsiniz.\"\n    internal_guidance: \"Müşteri İKİNCİ bir ara konu açtı (uygulama şifresi). 'şifre' kelimesini içeren kısa bir yanıt ver. LIFO kuralı gereği ŞİMDİ SIRADAKİ EN SON açılan konuya (bu app_detour'a) cevap verdiğine göre, bir sonraki adımda ÖNCE indirim konusuna (discount_return) döneceksin, ana akışa değil.\"\n    next[1]{id,condition}:\n      discount_return,Müşteri indirim konusuna dönerse\n    completion_criteria: Şifre sorusunu yanıtlamadan ilerleme.\n  - id: discount_return\n    type: text\n    say_to_customer: \"Net priminiz 4200 TL olarak görünüyor.\"\n    internal_guidance: \"Müşteri indirim/net prim konusuna geri döndü. get_renewal_quote'un döndürdüğü premium_try değerini (4200) 'net prim' ifadesiyle birlikte SÖYLE — rakamı uydurma, tool sonucundakini kullan.\"\n    next[1]{id,condition}:\n      renewal_consent,Müşteri onaylarsa\n    completion_criteria: 'net prim' ifadesini ve doğru rakamı söylemeden ilerleme.\n  - id: renewal_consent\n    type: tool\n    tool: renew_policy\n    internal_guidance: \"Müşteri 4200 TL ile yenilemeyi AÇIKÇA onayladıktan SONRA renew_policy(policy_id='PL-90', premium_try=4200, consent=true) çağır.\"\n    completion_criteria: Müşterinin açık onayı gelmeden renew_policy'yi çağırma.",
+    "available_tools": [
+      "get_renewal_quote",
+      "renew_policy"
     ],
-    "initial_state":{"policy":{"renewed":false}},
-    "tool_contracts":[
-      {"name":"get_renewal_quote","match_args":{"policy_id":"PL-90"},
-       "result":{"ok":true,"premium_try":4200},
-       "state_patch":[{"op":"set","path":"quote","value":{"premium_try":4200}}],"latency_ms":180,"terminal":false},
-      {"name":"renew_policy","match_args":{"policy_id":"PL-90","premium_try":4200,"consent":true},
-       "result":{"ok":true,"renewal_id":"RN-55"},
-       "state_patch":[{"op":"set","path":"policy","value":{"renewed":true,"renewal_id":"RN-55"}}],"latency_ms":220,"terminal":true}
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_renewal_quote",
+          "description": "Yenileme primini sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "renew_policy",
+          "description": "Poliçeyi yenile",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              },
+              "premium_try": {
+                "type": "number"
+              },
+              "consent": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "policy_id",
+              "premium_try",
+              "consent"
+            ]
+          }
+        }
+      }
     ],
-    "user_plan":{"start":"renewal_request","max_detours":3,"nodes":[
-      {"id":"renewal_request","variants":["PL-90 poliçemi yenilemek istiyorum."],
-       "transitions":[{"when":{"tool_succeeded":"get_renewal_quote"},"to":"discount_detour"}]},
-      {"id":"discount_detour","variants":["Bir saniye, indirim hakkım var mı?"],"off_flow":true,"resume_to":"discount_return",
-       "transitions":[{"when":{"assistant_regex":"indirim"},"to":"app_detour"}]},
-      {"id":"app_detour","variants":["Bu arada uygulama şifremi de unuttum, nasıl sıfırlarım?"],"off_flow":true,"resume_to":"discount_return",
-       "transitions":[{"when":{"assistant_regex":"şifre"},"to":"discount_return"}]},
-      {"id":"discount_return","variants":["Tamam, indirim konusuna dönelim: net prim ne oldu?"],"off_flow":true,"resume_to":"renewal_consent",
-       "transitions":[{"when":{"assistant_regex":"net prim|4200"},"to":"renewal_consent"}]},
-      {"id":"renewal_consent","variants":["PL-90 yenilemesini 4200 TL ile onaylıyorum."],"terminal":true}
-    ]},
-    "objectives":[
-      {"id":"nested_detour_ordered_rejoin","description":"Answer a detour nested inside another detour, return to the outer detour topic first, and only then rejoin the renewal flow with the grounded premium.","axis":"flow_control","severity":"P0",
-       "required_milestones":["quote_retrieved","discount_answered","password_answered","discount_topic_resumed","policy_renewed"]}
-    ],
-    "milestones":[
-      {"id":"quote_retrieved","kind":"tool","tool":"get_renewal_quote","failed":false,"axis":"business_outcome","severity":"P0"},
-      {"id":"discount_answered","kind":"content","role":"assistant","regex":"indirim","axis":"flow_control","severity":"P1"},
-      {"id":"password_answered","kind":"content","role":"assistant","regex":"şifre","axis":"flow_control","severity":"P1"},
-      {"id":"discount_topic_resumed","kind":"content","role":"assistant","regex":"net prim","axis":"flow_control","severity":"P0"},
-      {"id":"policy_renewed","kind":"tool","tool":"renew_policy","failed":false,"axis":"business_outcome","severity":"P0"}
-    ],
-    "policies":{
-      "tool_prerequisites":{"renew_policy":["quote_retrieved","discount_topic_resumed"]},
-      "tool_requirements":{"renew_policy":{"required_args":["policy_id","premium_try","consent"],"arg_equals":{"policy_id":"PL-90","premium_try":4200,"consent":true},"severity":"P0"}},
-      "claim_requires_tool":[{"regex":"RN-55|yenilendi","tool":"renew_policy","severity":"P0"}],
-      "max_tool_repeats":1
+    "initial_state": {
+      "policy": {
+        "renewed": false
+      }
     },
-    "expected":{"state":{"policy":{"renewed":true}},"terminal_tools":["renew_policy"],"tool_sequence":["get_renewal_quote","renew_policy"]},
-    "conversation":{"max_words_per_turn":30,"max_questions_per_turn":1,"required_assistant_regex":["4200","indirim"]},
-    "flow":{"target_assistant_steps":6,"target_user_turns":5,"expected_detours":3,"expected_off_flow_span":3,"max_reasks":0,"required_resume_nodes":["discount_return","renewal_consent"],"reask_regex":"poliçe numaranızı tekrar|tekrar söyler misiniz"},
-    "runtime":{"max_model_latency_ms":8000},
-    "perturbations":{"flow":"nested_off_flow_detour","user_behavior":"interruption_inside_interruption","expected_outcome":"lifo_rejoin"},
-    "trials":3,"max_user_turns":5,"max_steps_per_turn":2,
-    "_mock_runs":[[
-      "Yenileme priminizi sorguluyorum.\n<tool_call>{\"name\":\"get_renewal_quote\",\"arguments\":{\"policy_id\":\"PL-90\"}}</tool_call>",
-      "PL-90 yenileme priminiz 4200 TL olarak göründü.",
-      "Evet, yıllık ödeme indirimi bu prime yansıtıldı.",
-      "Şifrenizi uygulamadaki şifremi unuttum adımından sıfırlayabilirsiniz.",
-      "İndirim uygulanmış hâliyle net prim 4200 TL.",
-      "Yenilemeyi tamamlıyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"PL-90\",\"premium_try\":4200,\"consent\":true}}</tool_call>"
-    ]],
-    "metadata":{"source":"synthetic-controlled","split":"public-nested-flow","family":"nested_detour_rejoin"}
+    "tool_contracts": [
+      {
+        "name": "get_renewal_quote",
+        "match_args": {
+          "policy_id": "PL-90"
+        },
+        "result": {
+          "ok": true,
+          "premium_try": 4200
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "quote",
+            "value": {
+              "premium_try": 4200
+            }
+          }
+        ],
+        "latency_ms": 180,
+        "terminal": false
+      },
+      {
+        "name": "renew_policy",
+        "match_args": {
+          "policy_id": "PL-90",
+          "premium_try": 4200,
+          "consent": true
+        },
+        "result": {
+          "ok": true,
+          "renewal_id": "RN-55"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "policy",
+            "value": {
+              "renewed": true,
+              "renewal_id": "RN-55"
+            }
+          }
+        ],
+        "latency_ms": 220,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "renewal_request",
+      "max_detours": 3,
+      "nodes": [
+        {
+          "id": "renewal_request",
+          "variants": [
+            "PL-90 poliçemi yenilemek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "get_renewal_quote"
+              },
+              "to": "discount_detour"
+            }
+          ]
+        },
+        {
+          "id": "discount_detour",
+          "variants": [
+            "Bir saniye, indirim hakkım var mı?"
+          ],
+          "off_flow": true,
+          "resume_to": "discount_return",
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "indirim|$consent_question"
+              },
+              "to": "app_detour"
+            }
+          ]
+        },
+        {
+          "id": "app_detour",
+          "variants": [
+            "Bu arada uygulama şifremi de unuttum, nasıl sıfırlarım?"
+          ],
+          "off_flow": true,
+          "resume_to": "discount_return",
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "şifre|$consent_question"
+              },
+              "to": "discount_return"
+            }
+          ]
+        },
+        {
+          "id": "discount_return",
+          "variants": [
+            "Tamam, indirim konusuna dönelim: net prim ne oldu?"
+          ],
+          "off_flow": true,
+          "resume_to": "renewal_consent",
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "net prim|4200|$consent_question"
+              },
+              "to": "renewal_consent"
+            }
+          ]
+        },
+        {
+          "id": "renewal_consent",
+          "variants": [
+            "PL-90 yenilemesini 4200 TL ile onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "nested_detour_ordered_rejoin",
+        "description": "Answer a detour nested inside another detour, return to the outer detour topic first, and only then rejoin the renewal flow with the grounded premium.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "quote_retrieved",
+          "discount_answered",
+          "password_answered",
+          "discount_topic_resumed",
+          "policy_renewed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "quote_retrieved",
+        "kind": "tool",
+        "tool": "get_renewal_quote",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "discount_answered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "indirim",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "password_answered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "şifre",
+        "axis": "flow_control",
+        "severity": "P1"
+      },
+      {
+        "id": "discount_topic_resumed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "net prim",
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "policy_renewed",
+        "kind": "tool",
+        "tool": "renew_policy",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "renew_policy": [
+          "quote_retrieved",
+          "discount_topic_resumed"
+        ]
+      },
+      "tool_requirements": {
+        "renew_policy": {
+          "required_args": [
+            "policy_id",
+            "premium_try",
+            "consent"
+          ],
+          "arg_equals": {
+            "policy_id": "PL-90",
+            "premium_try": 4200,
+            "consent": true
+          },
+          "severity": "P0"
+        }
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "RN-55|yenilendi",
+          "tool": "renew_policy",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "policy": {
+          "renewed": true
+        }
+      },
+      "terminal_tools": [
+        "renew_policy"
+      ],
+      "tool_sequence": [
+        "get_renewal_quote",
+        "renew_policy"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "4200",
+        "indirim"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 6,
+      "target_user_turns": 5,
+      "expected_detours": 3,
+      "expected_off_flow_span": 3,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "discount_return",
+        "renewal_consent"
+      ],
+      "reask_regex": "poliçe numaranızı tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "flow": "nested_off_flow_detour",
+      "user_behavior": "interruption_inside_interruption",
+      "expected_outcome": "lifo_rejoin"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Yenileme priminizi sorguluyorum.\n<tool_call>{\"name\":\"get_renewal_quote\",\"arguments\":{\"policy_id\":\"PL-90\"}}</tool_call>",
+        "PL-90 yenileme priminiz 4200 TL olarak göründü.",
+        "Evet, yıllık ödeme indirimi bu prime yansıtıldı.",
+        "Şifrenizi uygulamadaki şifremi unuttum adımından sıfırlayabilirsiniz.",
+        "İndirim uygulanmış hâliyle net prim 4200 TL.",
+        "Yenilemeyi tamamlıyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"PL-90\",\"premium_try\":4200,\"consent\":true}}</tool_call>"
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-nested-flow",
+      "family": "nested_detour_rejoin"
+    }
   },
   {
-    "id":"tr_endcall_race_barge_in_before_close_001","benchmark_version":"0.8","domain":"endcall_race_control","language":"tr-TR","call_direction":"inbound",
-    "system":"Kapanış cümlesine başladıktan sonra kullanıcı araya girerse görüşmeyi kapatma. Yeni talebi karşıla, sonucu araç çıktısına dayanarak bildir ve ancak ondan sonra end_call çağır.",
-    "available_tools":["lookup_refund_eta","end_call"],
-    "tool_schemas":[
-      {"type":"function","function":{"name":"lookup_refund_eta","description":"İade tarihini sorgula","parameters":{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}}},
-      {"type":"function","function":{"name":"end_call","description":"Görüşmeyi sonlandır","parameters":{"type":"object","properties":{"reason":{"type":"string"}},"required":["reason"]}}}
+    "id": "tr_endcall_race_barge_in_before_close_001",
+    "benchmark_version": "0.8",
+    "domain": "endcall_race_control",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri kimliği doğrulandı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: lookup_refund_eta, end_call\n\nKURALLAR:\n- Kapanış cümlesine başladıktan sonra kullanıcı araya girerse görüşmeyi kapatma.\n- Yeni talebi karşıla, sonucu araç çıktısına dayanarak bildir ve ancak ondan sonra end_call çağır.\n- Akıştaki node sırasını takip et; node'da KAL, koşul sağlanınca ilerle.\n\nKIRMIZI ÇİZGİ:\n- Kapanış cümlesine başladıktan SONRA müşteri araya girip yeni bir talep söylerse, görüşmeyi KAPATMA (end_call'ı ÇAĞIRMA). Önce yeni talebi karşıla, aracın döndürdüğü sonucu bildir; end_call'ı ANCAK bundan SONRA çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: closing_attempt\n  note: Karşılama ve kimlik doğrulama zaten yapıldı; müşteri işleminin tamamlandığını söyledi.\nsteps[4]:\n  - id: closing_attempt\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Müşteri işleminin tamamlandığını ve teşekkür ettiğini söyledi. Kapanış cümlesi söyle ('iyi günler' ifadesini geçir) ANCAK BU ADIMDA end_call'ı ÇAĞIRMA — müşteri araya girebilir, önce müşterinin bir sonraki mesajını BEKLE (DUR).\"\n    next[1]{id,condition}:\n      handle_barge_in,Müşteri kapanış sırasında araya girip yeni bir talep söylerse\n    completion_criteria: \"iyi günler\" ifadesini söylemeden ilerleme; end_call'ı bu adımda ÇAĞIRMA.\n  - id: handle_barge_in\n    type: tool\n    tool: lookup_refund_eta\n    internal_guidance: \"Müşteri kapanış cümlesi sırasında araya girip SP-14 siparişinin iade tarihini sordu. KIRMIZI ÇİZGİ: müşteri araya girdiğinde GÖRÜŞMEYİ KAPATMA, end_call'ı ÇAĞIRMA. Yeni talebi karşıla: lookup_refund_eta(order_id='SP-14') çağır.\"\n    next[1]{id,condition}:\n      disclose_eta,lookup_refund_eta başarılı olursa\n    completion_criteria: lookup_refund_eta başarıyla dönmeden ilerleme; bu adımda end_call'ı ÇAĞIRMA.\n  - id: disclose_eta\n    type: text\n    say_to_customer: \"İadeniz 3 iş günü içinde hesabınıza geçecek.\"\n    internal_guidance: \"lookup_refund_eta sonucundaki eta_days (3) değerini, TAM OLARAK '3 iş günü' ifadesiyle söyle. Bu adımda da end_call'ı HENÜZ ÇAĞIRMA; müşterinin kapanış onayını BEKLE (DUR).\"\n    next[1]{id,condition}:\n      final_close,Müşteri teşekkür edip kapatabileceğini söylerse\n    completion_criteria: \"3 iş günü\" ifadesini söylemeden ilerleme; end_call'ı bu adımda ÇAĞIRMA.\n  - id: final_close\n    type: tool\n    tool: end_call\n    internal_guidance: \"Müşteri yeni talebinin yanıtlandığını onayladı ve görüşmenin kapatılabileceğini belirtti. ŞİMDİ end_call(reason='task_completed') çağır.\"\n    completion_criteria: Müşterinin yeni talebi tam olarak karşılanıp kapanış onayı alınmadan end_call'ı çağırma.",
+    "available_tools": [
+      "lookup_refund_eta",
+      "end_call"
     ],
-    "initial_state":{"call":{"status":"active"}},
-    "tool_contracts":[
-      {"name":"lookup_refund_eta","match_args":{"order_id":"SP-14"},
-       "result":{"ok":true,"eta_days":3},
-       "state_patch":[{"op":"set","path":"refund","value":{"eta_days":3}}],"latency_ms":170,"terminal":false},
-      {"name":"end_call","result":{"ok":true},"state_patch":[{"op":"set","path":"call.status","value":"ended"}],"latency_ms":20,"terminal":true}
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_refund_eta",
+          "description": "İade tarihini sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
     ],
-    "user_plan":{"start":"closing_thanks","max_detours":0,"nodes":[
-      {"id":"closing_thanks","variants":["İşlem tamam, teşekkürler."],
-       "transitions":[{"when":{"assistant_regex":"iyi günler"},"to":"barge_in_question"}]},
-      {"id":"barge_in_question","variants":["Bir saniye, sözünüzü kestim; SP-14 iadem ne zaman yatar?"],
-       "transitions":[{"when":{"tool_succeeded":"lookup_refund_eta"},"to":"satisfied"}]},
-      {"id":"satisfied","variants":["Anladım, teşekkürler, kapatabilirsiniz."],"terminal":true}
-    ]},
-    "objectives":[
-      {"id":"no_close_while_user_still_speaking","description":"Abandon the closing sequence when the user barges in, answer the new request from a tool result, and end the call only afterwards.","axis":"flow_control","severity":"P0",
-       "required_milestones":["close_started","refund_answered","eta_disclosed","call_ended"]}
-    ],
-    "milestones":[
-      {"id":"close_started","kind":"content","role":"assistant","regex":"iyi günler","axis":"conversation_experience","severity":"P2"},
-      {"id":"refund_answered","kind":"tool","tool":"lookup_refund_eta","failed":false,"axis":"business_outcome","severity":"P0"},
-      {"id":"eta_disclosed","kind":"content","role":"assistant","regex":"3 iş günü","axis":"business_outcome","severity":"P1"},
-      {"id":"call_ended","kind":"terminal","tools":["end_call"],"axis":"flow_control","severity":"P1"}
-    ],
-    "policies":{
-      "termination_policy":{"tool":"end_call","mode":"required","allowed_reasons":["task_completed"],"required_milestones":["refund_answered","eta_disclosed"],"max_calls":1,"severity":"P0"},
-      "claim_requires_tool":[{"regex":"3 iş günü","tool":"lookup_refund_eta","severity":"P0"}],
-      "tool_requirements":{"lookup_refund_eta":{"required_args":["order_id"],"arg_equals":{"order_id":"SP-14"},"severity":"P0"}},
-      "max_tool_repeats":1
+    "initial_state": {
+      "call": {
+        "status": "active"
+      }
     },
-    "expected":{"state":{"call":{"status":"ended"},"refund":{"eta_days":3}},"terminal_tools":["end_call"],"tool_sequence":["lookup_refund_eta","end_call"]},
-    "conversation":{"max_words_per_turn":30,"max_questions_per_turn":1,"required_assistant_regex":["3 iş günü"]},
-    "flow":{"target_assistant_steps":4,"target_user_turns":3,"expected_detours":0,"max_reasks":0,"reask_regex":"sipariş numaranızı tekrar|tekrar söyler misiniz"},
-    "runtime":{"max_model_latency_ms":8000,"max_barge_in_stop_ms":250},
-    "perturbations":{"audio":"barge_in_during_closing","end_call_risk":"premature_close_race","expected_outcome":"answer_then_close"},
-    "trials":3,"max_user_turns":3,"max_steps_per_turn":2,
-    "_mock_runs":[[
-      "Rica ederim, iyi günler dilerim.",
-      "Tabii, hemen kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_refund_eta\",\"arguments\":{\"order_id\":\"SP-14\"}}</tool_call>",
-      "İadeniz 3 iş günü içinde hesabınıza geçecek.",
-      "Başka bir konu yoksa kapatıyorum, iyi günler.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"task_completed\"}}</tool_call>"
-    ]],
-    "_mock_audio_events":[
-      {"type":"user_speech_end","turn":0,"ts_ms":800},
-      {"type":"agent_speech_start","turn":0,"ts_ms":1150},
-      {"type":"user_barge_in","turn":1,"ts_ms":3100},
-      {"type":"agent_speech_stop","turn":1,"ts_ms":3190},
-      {"type":"user_speech_end","turn":1,"ts_ms":3800},
-      {"type":"agent_speech_start","turn":1,"ts_ms":4120}
+    "tool_contracts": [
+      {
+        "name": "lookup_refund_eta",
+        "match_args": {
+          "order_id": "SP-14"
+        },
+        "result": {
+          "ok": true,
+          "eta_days": 3
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "refund",
+            "value": {
+              "eta_days": 3
+            }
+          }
+        ],
+        "latency_ms": 170,
+        "terminal": false
+      },
+      {
+        "name": "end_call",
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.status",
+            "value": "ended"
+          }
+        ],
+        "latency_ms": 20,
+        "terminal": true
+      }
     ],
-    "metadata":{"source":"synthetic-controlled","split":"public-nested-flow","family":"endcall_barge_in_race"}
+    "user_plan": {
+      "start": "closing_thanks",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "closing_thanks",
+          "variants": [
+            "İşlem tamam, teşekkürler."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "iyi günler|$consent_question"
+              },
+              "to": "barge_in_question"
+            }
+          ]
+        },
+        {
+          "id": "barge_in_question",
+          "variants": [
+            "Bir saniye, sözünüzü kestim; SP-14 iadem ne zaman yatar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "lookup_refund_eta"
+              },
+              "to": "satisfied"
+            }
+          ]
+        },
+        {
+          "id": "satisfied",
+          "variants": [
+            "Anladım, teşekkürler, kapatabilirsiniz."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "no_close_while_user_still_speaking",
+        "description": "Abandon the closing sequence when the user barges in, answer the new request from a tool result, and end the call only afterwards.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "close_started",
+          "refund_answered",
+          "eta_disclosed",
+          "call_ended"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "close_started",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iyi günler",
+        "axis": "conversation_experience",
+        "severity": "P2"
+      },
+      {
+        "id": "refund_answered",
+        "kind": "tool",
+        "tool": "lookup_refund_eta",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "eta_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "3 iş günü",
+        "axis": "business_outcome",
+        "severity": "P1"
+      },
+      {
+        "id": "call_ended",
+        "kind": "terminal",
+        "tools": [
+          "end_call"
+        ],
+        "axis": "flow_control",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "required",
+        "allowed_reasons": [
+          "task_completed",
+          "request_completed",
+          "issue_resolved",
+          "call_completed"
+        ],
+        "required_milestones": [
+          "refund_answered",
+          "eta_disclosed"
+        ],
+        "max_calls": 1,
+        "severity": "P0"
+      },
+      "claim_requires_tool": [
+        {
+          "regex": "3 iş günü",
+          "tool": "lookup_refund_eta",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "lookup_refund_eta": {
+          "required_args": [
+            "order_id"
+          ],
+          "arg_equals": {
+            "order_id": "SP-14"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "call": {
+          "status": "ended"
+        },
+        "refund": {
+          "eta_days": 3
+        }
+      },
+      "terminal_tools": [
+        "end_call"
+      ],
+      "tool_sequence": [
+        "lookup_refund_eta",
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1,
+      "required_assistant_regex": [
+        "3 iş günü"
+      ]
+    },
+    "flow": {
+      "target_assistant_steps": 4,
+      "target_user_turns": 3,
+      "expected_detours": 0,
+      "max_reasks": 0,
+      "reask_regex": "sipariş numaranızı tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000,
+      "max_barge_in_stop_ms": 250
+    },
+    "perturbations": {
+      "audio": "barge_in_during_closing",
+      "end_call_risk": "premature_close_race",
+      "expected_outcome": "answer_then_close"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Rica ederim, iyi günler dilerim.",
+        "Tabii, hemen kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_refund_eta\",\"arguments\":{\"order_id\":\"SP-14\"}}</tool_call>",
+        "İadeniz 3 iş günü içinde hesabınıza geçecek.",
+        "Başka bir konu yoksa kapatıyorum, iyi günler.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"task_completed\"}}</tool_call>"
+      ]
+    ],
+    "_mock_audio_events": [
+      {
+        "type": "user_speech_end",
+        "turn": 0,
+        "ts_ms": 800
+      },
+      {
+        "type": "agent_speech_start",
+        "turn": 0,
+        "ts_ms": 1150
+      },
+      {
+        "type": "user_barge_in",
+        "turn": 1,
+        "ts_ms": 3100
+      },
+      {
+        "type": "agent_speech_stop",
+        "turn": 1,
+        "ts_ms": 3190
+      },
+      {
+        "type": "user_speech_end",
+        "turn": 1,
+        "ts_ms": 3800
+      },
+      {
+        "type": "agent_speech_start",
+        "turn": 1,
+        "ts_ms": 4120
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-nested-flow",
+      "family": "endcall_barge_in_race"
+    }
+  },
+  {
+    "id": "tr_flow_nested_detour_triple_chain_001",
+    "benchmark_version": "0.8",
+    "domain": "nested_detour_triple_chain_rejoin",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir sigorta müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: get_quote, renew_policy\n\nKURALLAR:\n- Müşteri art arda konu dışı sorular sorarsa, her birine KISA yanıt ver, sonra bir öncekine değil bir SONRAKİ konu dışı soruya veya ana akışa geç.\n- Akıştaki node sırasını/koşullarını takip et.\n\nKIRMIZI ÇİZGİ:\n- Üç konu dışı ara sorudan sonra bile yenileme talebini UNUTMA veya yanlış primi söyleme.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: main_request\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: main_request\n    type: tool\n    tool: get_quote\n    internal_guidance: \"Müşteri POL-44 poliçesini yenilemek istedi. get_quote(policy_id='POL-44') çağır. Sonucu (premium_try=2150.0) '2.150,00 TL' olarak söyle.\"\n    next[1]{id,condition}:\n      detour_a,get_quote başarılı olursa\n    completion_criteria: get_quote başarıyla dönmeden prim söyleme.\n  - id: detour_a\n    type: global_note\n    say_to_customer: Müşteri ödeme tarihi hakkında konu dışı bir soru sorarsa\n    internal_guidance: \"KISA bir yanıt ver, sonra akışa dönmeye hazır ol.\"\n    next[1]{id,condition}:\n      detour_b,Yanıtladıktan sonra\n    completion_criteria: Müşterinin sorusunu yanıtlamadan ilerleme.\n  - id: detour_b\n    type: global_note\n    say_to_customer: Müşteri indirim kodu hakkında konu dışı bir soru sorarsa\n    internal_guidance: \"KISA bir yanıt ver, sonra akışa dönmeye hazır ol.\"\n    next[1]{id,condition}:\n      detour_c,Yanıtladıktan sonra\n    completion_criteria: Müşterinin sorusunu yanıtlamadan ilerleme.\n  - id: detour_c\n    type: global_note\n    say_to_customer: Müşteri mobil uygulama hakkında konu dışı bir soru sorarsa\n    internal_guidance: \"KISA bir yanıt ver, sonra ana akışa (yenileme onayı) DÖN — üç ara sorudan SONRA prim tutarı 2.150,00 TL olarak AYNI kalmalı.\"\n    next[1]{id,condition}:\n      main_return,Yanıtladıktan sonra\n    completion_criteria: Müşterinin sorusunu yanıtlamadan veya ana akışa dönmeden ilerleme.\n  - id: main_return\n    type: tool\n    tool: renew_policy\n    internal_guidance: \"Müşteri yenilemeyi onayladı. renew_policy(policy_id='POL-44') çağır. Onaydan sonra primin 2.150,00 TL olarak AYNI kaldığını teyit et.\"\n    completion_criteria: Müşterinin onayı gelmeden çağırmama; primi farklı söylememe.",
+    "available_tools": [
+      "get_quote",
+      "renew_policy"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_quote",
+          "description": "Yenileme primini getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "renew_policy",
+          "description": "Poliçeyi yenile",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "policy": {
+        "renewed": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_quote",
+        "match_args": {
+          "policy_id": "POL-44"
+        },
+        "result": {
+          "ok": true,
+          "premium_try": 2150.0
+        },
+        "latency_ms": 130,
+        "terminal": false
+      },
+      {
+        "name": "renew_policy",
+        "match_args": {
+          "policy_id": "POL-44"
+        },
+        "result": {
+          "ok": true,
+          "renewal_id": "RN-61"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "policy",
+            "value": {
+              "renewed": true,
+              "id": "RN-61"
+            }
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "main_request",
+      "max_detours": 3,
+      "nodes": [
+        {
+          "id": "main_request",
+          "variants": [
+            "POL-44 poliçemi yenilemek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "get_quote"
+              },
+              "to": "detour_a"
+            }
+          ]
+        },
+        {
+          "id": "detour_a",
+          "variants": [
+            "Bu arada ödeme tarihini değiştirebilir miyim?"
+          ],
+          "off_flow": true,
+          "resume_to": "detour_b"
+        },
+        {
+          "id": "detour_b",
+          "variants": [
+            "Bir de indirim kodu var mı?"
+          ],
+          "off_flow": true,
+          "resume_to": "detour_c"
+        },
+        {
+          "id": "detour_c",
+          "variants": [
+            "Peki mobil uygulamadan da görebilir miyim?"
+          ],
+          "off_flow": true,
+          "resume_to": "main_return"
+        },
+        {
+          "id": "main_return",
+          "variants": [
+            "Tamam, yenilemeyi onaylıyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "triple_chained_detour_survives_to_correct_rejoin",
+        "description": "Answer three sequentially chained off-topic asides and still return to renew the policy at the unchanged quoted premium.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "quote_read",
+          "policy_renewed",
+          "premium_unchanged_at_close"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "quote_read",
+        "kind": "tool",
+        "tool": "get_quote",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "policy_renewed",
+        "kind": "tool",
+        "tool": "renew_policy",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "premium_unchanged_at_close",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "2\\.150,00",
+        "axis": "action_correctness",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "get_quote": {
+          "required_args": [
+            "policy_id"
+          ],
+          "arg_equals": {
+            "policy_id": "POL-44"
+          },
+          "severity": "P0"
+        },
+        "renew_policy": {
+          "required_args": [
+            "policy_id"
+          ],
+          "arg_equals": {
+            "policy_id": "POL-44"
+          },
+          "severity": "P0"
+        }
+      },
+      "tracked_values": [
+        {
+          "id": "premium",
+          "tool": "get_quote",
+          "path": "premium_try",
+          "kind": "currency_try",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "policy": {
+          "renewed": true
+        }
+      },
+      "terminal_tools": [
+        "renew_policy"
+      ],
+      "tool_sequence": [
+        "get_quote",
+        "renew_policy"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "target_assistant_steps": 6,
+      "target_user_turns": 5,
+      "expected_detours": 3,
+      "expected_off_flow_span": 3,
+      "max_reasks": 0,
+      "required_resume_nodes": [
+        "detour_b",
+        "detour_c",
+        "main_return"
+      ],
+      "reask_regex": "poliçe numaranızı tekrar|tekrar söyler misiniz"
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "three_link_chained_detour_before_rejoin",
+      "expected_outcome": "correct_rejoin_unchanged_value"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Teklifinizi kontrol ediyorum.\n<tool_call>{\"name\":\"get_quote\",\"arguments\":{\"policy_id\":\"POL-44\"}}</tool_call>",
+        "POL-44 için yenileme priminiz 2.150,00 TL.",
+        "Ödeme tarihinizi değiştirmek için ayrı bir talep oluşturmanız gerekiyor, size yönlendirme yapabilirim.",
+        "Şu anda aktif bir indirim kodum yok, ama sorgulatabilirim.",
+        "Evet, bu bilgileri mobil uygulamada da görüntüleyebilirsiniz. Prim tutarınız 2.150,00 TL olarak değişmedi.",
+        "Yenilemenizi onaylıyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"POL-44\"}}</tool_call>\nPoliçeniz yenilendi, prim 2.150,00 TL olarak aynı kaldı."
+      ]
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-nested",
+      "family": "nested_detour_triple_chain",
+      "note": "A genuine 3-link detour chain (A resumes to B, B resumes to C, C resumes to main) rather than two siblings converging on one return node — tests flow.py's rejoin-skip logic at a depth the existing 2-level case never exercises."
+    }
   }
 ]

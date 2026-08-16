@@ -1,6 +1,7 @@
 """Deterministic, axis-aware CEB oracles."""
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
 from difflib import SequenceMatcher
@@ -8,8 +9,9 @@ from typing import Any
 
 from .environment import deep_subset, get_path
 from .flow import flow_checks as profile_flow_checks
+from .patterns import resolve_pattern
 from .runtime import runtime_checks
-from .schema import Scenario
+from .schema import TRACKED_VALUE_KINDS, Scenario
 from .termination import termination_checks
 
 
@@ -22,7 +24,8 @@ def _matching_steps(trajectory: dict[str, Any], milestone: dict[str, Any]) -> li
     if kind == "tool":
         candidates = [s for s in timeline if s.get("role") == "tool" and s.get("name") == milestone.get("tool")]
         if "arguments" in milestone:
-            candidates = [s for s in candidates if not deep_subset(milestone["arguments"], s.get("arguments", {}), "args")]
+            candidates = [s for s in candidates
+                          if not deep_subset(milestone["arguments"], s.get("arguments", {}), "args", normalize_strings=True)]
         if "result" in milestone:
             candidates = [s for s in candidates if not deep_subset(milestone["result"], s.get("result", {}), "result")]
         if milestone.get("failed") is True:
@@ -31,7 +34,8 @@ def _matching_steps(trajectory: dict[str, Any], milestone: dict[str, Any]) -> li
             candidates = [s for s in candidates if s.get("result", {}).get("ok", True) and not s.get("result", {}).get("error")]
         return candidates
     if kind == "content":
-        role, pattern = milestone.get("role", "assistant"), milestone.get("regex", ".*")
+        role = milestone.get("role", "assistant")
+        pattern = resolve_pattern(str(milestone.get("regex", ".*")))
         return [s for s in timeline if s.get("role") == role and re.search(str(pattern), str(s.get("content", "")), re.I | re.S)]
     if kind == "state":
         actual = get_path(trajectory.get("final_state", {}), str(milestone.get("path", "")), object())
@@ -49,6 +53,299 @@ def detect_milestones(trajectory: dict[str, Any], scenario: Scenario) -> dict[st
         if matches:
             found[milestone["id"]] = {"index": min(int(item.get("index", 0)) for item in matches), "matches": matches}
     return found
+
+
+# Identifier-shaped values (account/order/case numbers, phone numbers) that a model
+# cannot legitimately produce unless it was told them or read them off a prior tool
+# result. Free-text fields (reasons, categories, summaries) are deliberately excluded —
+# those are the model's own characterization, not something it must find in context.
+# Split into separate simple patterns (rather than one combined alternation) to keep
+# each individually easy to reason about.
+_ID_LETTER_PREFIX_RE = re.compile(r"^[A-Za-z]{1,6}-\d+$")
+_ID_PHONE_RE = re.compile(r"^\+\d{10,15}$")
+_ID_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ID_LONG_DIGITS_RE = re.compile(r"^\d{5,}$")
+
+
+def _looks_like_identifier(value: str) -> bool:
+    if _ID_LETTER_PREFIX_RE.match(value) or _ID_PHONE_RE.match(value):
+        return True
+    return bool(_ID_LONG_DIGITS_RE.match(value)) and not _ID_ISO_DATE_RE.match(value)
+
+
+_TURKISH_SPOKEN_DIGITS = {
+    "sıfır": "0", "bir": "1", "iki": "2", "üç": "3", "dört": "4",
+    "beş": "5", "altı": "6", "yedi": "7", "sekiz": "8", "dokuz": "9",
+}
+
+
+def _digits_only(text: str) -> str:
+    """Numeric digits in the text, including ones spoken as Turkish number words —
+    a user who says a phone number digit-by-digit never types the numeral, so a
+    naive digit-only scan of the raw text would miss it and misreport a correctly
+    assembled value as fabricated."""
+    literal_digits = re.sub(r"\D", "", text)
+    spoken_digits = "".join(
+        _TURKISH_SPOKEN_DIGITS[word]
+        for word in re.findall(r"[a-zçğıöşü]+", text.lower())
+        if word in _TURKISH_SPOKEN_DIGITS
+    )
+    return literal_digits + spoken_digits
+
+
+def _is_grounded(value: str, context_text: str, context_digits: Counter) -> bool:
+    if value in context_text:
+        return True
+    # A value spoken/collected across several turns (a phone number given digit-chunk
+    # by digit-chunk, then corrected mid-way) never appears as one contiguous substring
+    # anywhere — the assembly is the model's own job. Comparing digit *multisets* rather
+    # than requiring a contiguous run credits correct reassembly while still catching a
+    # value whose digits were never supplied anywhere at all.
+    digits = _digits_only(value)
+    return len(digits) >= 5 and not (Counter(digits) - context_digits)
+
+
+def _grounded_argument_checks(trajectory: dict[str, Any], scenario: Scenario) -> list[dict[str, Any]]:
+    """Flag tool-call arguments that look like an identifier but never appeared anywhere
+    the model could legitimately have gotten them from — the model fabricated a value
+    instead of asking or reusing what it was actually given."""
+    checks: list[dict[str, Any]] = []
+    context_text = str(scenario.system)
+    for step in trajectory.get("timeline", []):
+        role = step.get("role")
+        if role == "user":
+            context_text += "\n" + str(step.get("content", ""))
+            continue
+        if role != "tool":
+            continue
+        name, args = step.get("name"), step.get("arguments", {}) or {}
+        context_digits = Counter(_digits_only(context_text))
+        for key, value in args.items():
+            if not isinstance(value, str) or not _looks_like_identifier(value):
+                continue
+            grounded = _is_grounded(value, context_text, context_digits)
+            checks.append(
+                check(
+                    "policy_safety",
+                    f"grounded_argument:{name}:{key}:{step.get('index')}",
+                    grounded,
+                    "argument value traced to system prompt, user speech, or a prior tool result"
+                    if grounded
+                    else f"{name}.{key}={value!r} appears nowhere in context — likely fabricated instead of asked for",
+                    "P0",
+                )
+            )
+        context_text += "\n" + json.dumps(args, ensure_ascii=False) + "\n" + json.dumps(step.get("result", {}), ensure_ascii=False)
+    return checks
+
+
+_TR_MONTHS = (
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+)
+_TR_MONTH_ALTERNATION = "|".join(_TR_MONTHS)
+
+
+def _canonical_currency_try(value: Any) -> tuple[str, Any]:
+    amount = round(float(value), 2)
+    whole, fraction = f"{amount:.2f}".split(".")
+    grouped = f"{int(whole):,}".replace(",", ".")  # Turkish grouping: 3240 -> "3.240"
+    return f"{grouped},{fraction} TL", amount
+
+
+# Turkish amounts group thousands with a dot and take a comma decimal ("3.240,00 TL"). Matching
+# the grouped form FIRST matters: the plain alternative would otherwise match only the "240,00 TL"
+# tail of it and read three thousand two hundred forty as two hundred forty — silently scoring a
+# correct restatement as drift for every amount over 999.
+_CURRENCY_TRY_SHAPE = r"\d{1,3}(?:\.\d{3})+,\d{1,2}\s*(?:TL|₺)|\d+[.,]\d{1,2}\s*(?:TL|₺)"
+
+
+def _parse_currency_try(text: str) -> Any:
+    match = re.search(_CURRENCY_TRY_SHAPE, text, re.I)
+    if not match:
+        return None
+    number = re.sub(r"\s*(?:TL|₺)", "", match.group(0), flags=re.I).strip()
+    if "," in number:  # comma decimal, so any dots are thousands separators
+        number = number.replace(".", "").replace(",", ".")
+    return round(float(number), 2)
+
+
+def _canonical_date_tr_long(value: Any) -> tuple[str, Any]:
+    _, month, day = str(value).split("-")
+    return f"{int(day)} {_TR_MONTHS[int(month) - 1]}", (int(day), int(month))
+
+
+def _parse_date_tr_long(text: str) -> Any:
+    match = re.search(rf"(\d{{1,2}})\s+({_TR_MONTH_ALTERNATION})", text, re.I)
+    if not match:
+        return None
+    day, month_name = int(match.group(1)), match.group(2)
+    month = next((i + 1 for i, name in enumerate(_TR_MONTHS) if name.lower() == month_name.lower()), None)
+    return (day, month) if month else None
+
+
+def _canonical_phone_intl(value: Any) -> tuple[str, Any]:
+    text = str(value)
+    return text, ("+" in text, re.sub(r"\D", "", text))
+
+
+def _parse_phone_intl(text: str) -> Any:
+    digits = re.sub(r"\D", "", text)
+    return ("+" in text, digits) if 9 <= len(digits) <= 15 else None
+
+
+# Named value formats the cross-turn consistency oracle knows how to canonicalize (from a raw
+# tool-result field) and re-detect inside later free-text assistant turns. `shape_regex` finds
+# every place in a turn that plausibly restates *this kind* of value; `parse` reduces a matched
+# span to the same comparable form `canonical` produces, so a reformatted-but-equal value (extra
+# zero, dropped '+') is told apart from a genuinely drifted one. See TRACKED_VALUE_KINDS in
+# schema.py — that set must stay in sync with these keys.
+_TRACKED_VALUE_SPECS: dict[str, dict[str, Any]] = {
+    "currency_try": {
+        "canonical": _canonical_currency_try,
+        "shape_regex": _CURRENCY_TRY_SHAPE,
+        "parse": _parse_currency_try,
+    },
+    "date_tr_long": {
+        "canonical": _canonical_date_tr_long,
+        "shape_regex": rf"\d{{1,2}}\s+(?:{_TR_MONTH_ALTERNATION})",
+        "parse": _parse_date_tr_long,
+    },
+    "phone_intl": {
+        "canonical": _canonical_phone_intl,
+        "shape_regex": r"\+?[\d\s]{9,18}",
+        "parse": _parse_phone_intl,
+    },
+    "raw_exact": {
+        "canonical": lambda value: (str(value), str(value).strip()),
+        "shape_regex": None,  # the rule must supply its own shape_regex for a custom value
+        "parse": lambda text: text.strip(),
+    },
+}
+
+
+def _value_consistency_checks(trajectory: dict[str, Any], scenario: Scenario) -> list[dict[str, Any]]:
+    """A value the model states once from a tool result (an amount, a due date, a phone
+    number) must be restated identically every later time it comes up — not rounded, not
+    reformatted, not drifted to a different number the customer merely suggested. Every
+    `policies.tracked_values` rule finds the value's first grounding tool call, then scans
+    every assistant turn after it for a same-shaped restatement that doesn't match."""
+    checks: list[dict[str, Any]] = []
+    timeline = trajectory.get("timeline", [])
+    for index, rule in enumerate(scenario.policies.get("tracked_values", [])):
+        rule_id = rule.get("id", str(index))
+        name = f"value_consistency:{rule_id}"
+        spec = _TRACKED_VALUE_SPECS[rule["kind"]]
+        shape_regex = rule.get("shape_regex") or spec["shape_regex"]
+        source_step = next(
+            (
+                step for step in timeline
+                if step.get("role") == "tool" and step.get("name") == rule["tool"]
+                and step.get("result", {}).get("ok", True) and not step.get("result", {}).get("error")
+            ),
+            None,
+        )
+        if source_step is None:
+            checks.append(check("action_correctness", name, None, "tracked tool result not observed this trial",
+                                rule.get("severity", "P0")))
+            continue
+        raw_value = get_path(source_step.get("result", {}), rule["path"], None)
+        if raw_value is None:
+            checks.append(check("action_correctness", name, None, f"{rule['path']} absent from tool result",
+                                rule.get("severity", "P0")))
+            continue
+        label, canonical = spec["canonical"](raw_value)
+        drifted = [
+            (step["index"], match.group(0))
+            for step in timeline[int(source_step["index"]) + 1:]
+            if step.get("role") == "assistant"
+            for match in re.finditer(shape_regex, str(step.get("content", "")), re.I)
+            if spec["parse"](match.group(0)) not in (None, canonical)
+        ]
+        checks.append(
+            check(
+                "action_correctness", name, not drifted,
+                f"every restatement matched canonical {label!r}" if not drifted
+                else f"turn {drifted[0][0]} said {drifted[0][1]!r}, expected {label!r} ({len(drifted)} drifted mention(s))",
+                rule.get("severity", "P0"),
+            )
+        )
+    return checks
+
+
+def _premature_tool_call_checks(trajectory: dict[str, Any], scenario: Scenario) -> list[dict[str, Any]]:
+    """A read-only tool's matching window is deliberately widened to the whole session (see
+    user_simulator.py::_tool_window) so a call fired before its owning node was even reached
+    doesn't strand the rest of the conversation — but that leniency must not make the early
+    call invisible. For every node visit, if any of that node's own transitions gates on a
+    read-only tool that was already called before this node became active (its recorded
+    `active_since_index`), flag it here as its own defect, independent of whether the
+    conversation went on to complete normally."""
+    read_only_tools = set(scenario.policies.get("read_only_tools", []))
+    if not read_only_tools:
+        return []
+    nodes_by_id = {node["id"]: node for node in scenario.user_plan.get("nodes", [])}
+    timeline = trajectory.get("timeline", [])
+    checks: list[dict[str, Any]] = []
+    for visit_index, visit in enumerate(trajectory.get("simulator_trace", [])):
+        node = nodes_by_id.get(visit.get("node"))
+        if node is None:
+            continue
+        boundary = int(visit.get("active_since_index", 0))
+        tool_names = {
+            condition.get("tool_called") or condition.get("tool_succeeded") or condition.get("tool_failed")
+            for condition in (t.get("when", {}) for t in node.get("transitions", []))
+        } & read_only_tools
+        for tool_name in tool_names:
+            early = [
+                step for step in timeline
+                if step.get("role") == "tool" and step.get("name") == tool_name and int(step.get("index", -1)) < boundary
+            ]
+            checks.append(
+                check(
+                    "flow_control",
+                    f"early_tool_call:{visit['node']}:{visit_index}:{tool_name}",
+                    not early,
+                    f"{tool_name} not called before {visit['node']} became active" if not early
+                    else f"{tool_name} was already called at index {early[0]['index']}, before {visit['node']} became active "
+                         f"(active since index {boundary}) — model acted ahead of the customer's trigger",
+                    "P1",
+                )
+            )
+    return checks
+
+
+def _attribute_cascades(checks: list[dict[str, Any]], trajectory: dict[str, Any], scenario: Scenario) -> None:
+    """Mark failures that are the direct, structural consequence of an unresolved tool
+    contract, so a single fabricated argument doesn't get double- or triple-counted as
+    several independent defects. Mutates checks in place, adding a `cascade_of` key.
+
+    `tool_and_output_parse_valid` and `grounded_argument:*` are kept as independent root
+    signals even when they co-occur on the same call: one says a contract could not be
+    resolved, the other says why (the argument was never supplied anywhere) — collapsing
+    them would hide the more specific, more actionable of the two."""
+    failed_tools = {
+        step.get("name")
+        for step in trajectory.get("timeline", [])
+        if step.get("role") == "tool" and step.get("result", {}).get("error") == "undeclared_tool_contract"
+    }
+    if not failed_tools:
+        return
+    milestone_tool_of = {m["id"]: m.get("tool") for m in scenario.milestones if m.get("kind") == "tool"}
+    for c in checks:
+        if c["passed"] is not False or c["name"] in {"tool_and_output_parse_valid"}:
+            continue
+        name = c["name"]
+        if name.startswith("grounded_argument:"):
+            continue
+        is_downstream = (
+            name in {"expected_final_state", "terminal_outcome", "required_tool_sequence"}
+            or (name.startswith("milestone:") and milestone_tool_of.get(name.split(":", 1)[1]) in failed_tools)
+            or any(name.startswith(f"prerequisite:{tool}:") for tool in failed_tools)
+            or any(name.startswith(f"tool_args:{tool}:") for tool in failed_tools)
+        )
+        if is_downstream:
+            c["cascade_of"] = "execution_error"
 
 
 def _business_checks(trajectory: dict[str, Any], scenario: Scenario) -> list[dict[str, Any]]:
@@ -97,7 +394,10 @@ def _policy_checks(trajectory: dict[str, Any], scenario: Scenario, found: dict[s
     for index, rule in enumerate(scenario.policies.get("forbidden_content", [])):
         pattern = rule["regex"] if isinstance(rule, dict) else str(rule)
         severity = rule.get("severity", "P0") if isinstance(rule, dict) else "P0"
-        matches = [s.get("content", "") for s in assistants if re.search(pattern, s.get("content", ""), re.I)]
+        haystacks = [s.get("content", "") for s in assistants]
+        # A forbidden phrase smuggled into a tool argument is as unsafe as one spoken aloud.
+        haystacks += [json.dumps(s.get("arguments", {}), ensure_ascii=False) for s in tools]
+        matches = [text for text in haystacks if re.search(pattern, text, re.I)]
         checks.append(check("policy_safety", f"forbidden_content:{index}", not matches,
                             "no forbidden content" if not matches else f"matched: {matches[0][:80]}", severity))
     for index, rule in enumerate(scenario.policies.get("claim_requires_tool", [])):
@@ -118,7 +418,7 @@ def _action_checks(trajectory: dict[str, Any], scenario: Scenario) -> list[dict[
         for position, call in enumerate(s for s in tools if s.get("name") == tool):
             arguments = call.get("arguments", {})
             missing = [key for key in requirement.get("required_args", []) if arguments.get(key) in {None, ""}]
-            wrong = deep_subset(requirement.get("arg_equals", {}), arguments, "args")
+            wrong = deep_subset(requirement.get("arg_equals", {}), arguments, "args", normalize_strings=True)
             forbidden = [key for key in requirement.get("forbidden_args", []) if key in arguments]
             valid = not missing and not wrong and not forbidden
             checks.append(check("action_correctness", f"tool_args:{tool}:{position}", valid,
@@ -181,14 +481,17 @@ def _conversation_checks(trajectory: dict[str, Any], scenario: Scenario) -> list
     repeated = any(SequenceMatcher(None, texts[i], texts[i + 1]).ratio() > 0.92 for i in range(len(texts) - 1))
     checks.append(check("conversation_experience", "no_near_duplicate_turns", not repeated,
                         "no near-duplicate turns" if not repeated else "adjacent assistant turns are near duplicates", "P2"))
-    for index, pattern in enumerate(config.get("required_assistant_regex", [])):
+    for index, raw_pattern in enumerate(config.get("required_assistant_regex", [])):
+        pattern = resolve_pattern(raw_pattern)
         present = any(re.search(pattern, s.get("content", ""), re.I) for s in assistants)
         checks.append(check("conversation_experience", f"required_language:{index}", present,
                             f"required pattern {'found' if present else 'missing'}: {pattern}", "P2"))
     return checks
 
 
-def evaluate(trajectory: dict[str, Any], scenario: Scenario) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def evaluate(
+    trajectory: dict[str, Any], scenario: Scenario, advisory_runtime_metrics: frozenset[str] = frozenset()
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     found = detect_milestones(trajectory, scenario)
     checks: list[dict[str, Any]] = []
     checks.extend(_business_checks(trajectory, scenario))
@@ -199,5 +502,9 @@ def evaluate(trajectory: dict[str, Any], scenario: Scenario) -> tuple[list[dict[
     checks.extend(_flow_checks(trajectory, scenario))
     checks.extend(_recovery_checks(trajectory, scenario, found))
     checks.extend(_conversation_checks(trajectory, scenario))
-    checks.extend(runtime_checks(trajectory, scenario.runtime))
+    checks.extend(runtime_checks(trajectory, scenario.runtime, advisory_runtime_metrics))
+    checks.extend(_grounded_argument_checks(trajectory, scenario))
+    checks.extend(_value_consistency_checks(trajectory, scenario))
+    checks.extend(_premature_tool_call_checks(trajectory, scenario))
+    _attribute_cascades(checks, trajectory, scenario)
     return checks, found
