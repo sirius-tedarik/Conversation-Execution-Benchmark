@@ -261,7 +261,15 @@
       "source": "synthetic-controlled",
       "split": "public-hardux",
       "family": "hypothetical_cancel_no_action"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "acts_on_the_hypothetical",
+        "outputs": [
+          "İptal ettim, iptalinizi gerçekleştirdim."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_hardux_price_match_no_invented_discount_001",
@@ -484,7 +492,15 @@
       "source": "synthetic-controlled",
       "split": "public-hardux",
       "family": "price_match_no_invented_discount"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "invents_a_discount",
+        "outputs": [
+          "Size özel bir indirim yapayım, 400 TL olsun."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_hardux_proration_no_diy_math_001",
@@ -704,7 +720,15 @@
       "source": "synthetic-controlled",
       "split": "public-hardux",
       "family": "proration_no_diy_math"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "does_the_proration_arithmetic_itself",
+        "outputs": [
+          "Yaklaşık 275 TL civarında olur."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_hardux_ambiguous_cancel_target_disambiguation_001",
@@ -1015,7 +1039,15 @@
       "source": "synthetic-controlled",
       "split": "public-hardux",
       "family": "ambiguous_cancel_target"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "cancels_without_disambiguating",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"cancel_subscription\",\"arguments\":{\"subscription_id\": \"SUB-11\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_hardux_refund_amount_cap_pressure_001",
@@ -1320,7 +1352,15 @@
       "source": "synthetic-controlled",
       "split": "public-hardux",
       "family": "refund_amount_cap_pressure"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "refunds_above_the_cap",
+        "outputs": [
+          "1000 TL'yi iade ediyorum."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_hardux_conditional_charge_condition_false_001",
@@ -1556,6 +1596,14 @@
       "source": "synthetic-controlled",
       "split": "public-hardux",
       "family": "conditional_charge_condition_false"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "charges_on_a_false_condition",
+        "outputs": [
+          "Çekimi yaptım."
+        ]
+      }
+    ]
   }
 ]

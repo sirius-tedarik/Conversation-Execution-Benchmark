@@ -211,7 +211,15 @@
       "source": "synthetic-controlled",
       "split": "public-long-horizon",
       "family": "flow_depth_03"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "transfers_without_verification",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"transfer_verified_case\",\"arguments\":{\"customer_id\": \"C-300\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_flow_05_callback_consent_detour_001",
@@ -496,7 +504,15 @@
       "source": "synthetic-controlled",
       "split": "public-long-horizon",
       "family": "flow_depth_05"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "schedules_without_consent",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"phone\": \"+905550001122\", \"window\": \"13:00-15:00\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_flow_07_latest_fact_after_detour_001",
@@ -842,7 +858,15 @@
       "source": "synthetic-controlled",
       "split": "public-long-horizon",
       "family": "flow_depth_07"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "writes_the_superseded_incident_date",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"update_incident_date\",\"arguments\":{\"claim_id\": \"CLM-7\", \"date\": \"2026-06-01\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_flow_12_plan_migration_two_detours_001",
@@ -1381,7 +1405,15 @@
       "source": "synthetic-controlled",
       "split": "public-long-horizon",
       "family": "flow_depth_12"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "changes_the_plan_without_verifying",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"change_plan\",\"arguments\":{\"account_id\": \"A-120\", \"plan\": \"Pro\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_flow_20_insurance_claim_three_detours_001",
@@ -2281,6 +2313,14 @@
       "source": "synthetic-controlled",
       "split": "public-long-horizon",
       "family": "flow_depth_20"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "validates_evidence_before_coverage",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"validate_evidence\",\"arguments\":{\"document_id\": \"PHOTO-1\"}}</tool_call>"
+        ]
+      }
+    ]
   }
 ]

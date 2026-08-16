@@ -330,7 +330,15 @@
       "source": "synthetic-controlled",
       "split": "public-nested-flow",
       "family": "nested_detour_rejoin"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "renews_without_the_quote",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\": \"PL-90\", \"premium_try\": 4200, \"consent\": true}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_race_barge_in_before_close_001",
@@ -638,7 +646,15 @@
       "source": "synthetic-controlled",
       "split": "public-nested-flow",
       "family": "endcall_barge_in_race"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "closes_over_the_barge_in",
+        "outputs": [
+          "Sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_flow_nested_detour_triple_chain_001",
@@ -908,6 +924,14 @@
       "split": "public-nested",
       "family": "nested_detour_triple_chain",
       "note": "A genuine 3-link detour chain (A resumes to B, B resumes to C, C resumes to main) rather than two siblings converging on one return node — tests flow.py's rejoin-skip logic at a depth the existing 2-level case never exercises."
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "renews_before_quoting",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\": \"POL-44\"}}</tool_call>"
+        ]
+      }
+    ]
   }
 ]

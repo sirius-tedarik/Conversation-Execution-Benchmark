@@ -31,6 +31,16 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
     assert apply_gate(summary, manifest)["passed"]
 
 
+def test_every_case_proves_it_can_detect_its_own_defect():
+    """A case with no negative fixture shows only that it accepts correct behaviour. Half the
+    suite was in that state; this keeps it from returning. The pack tests check each fixture
+    fails, and tools/audit_cases.py additionally checks it fails for a reason a truncated
+    reference would not produce, so a fixture cannot pass this by merely stopping early."""
+    scenarios = load_scenarios(ROOT / "cases")
+    missing = [scenario.id for scenario in scenarios if not scenario.mock_negative_runs]
+    assert not missing, f"{len(missing)} case(s) prove nothing about detection: {missing[:5]}"
+
+
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
     assert len(scenarios) >= 200

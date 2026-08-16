@@ -246,7 +246,15 @@
       "source": "synthetic-controlled",
       "split": "public-turkish-language",
       "family": "negation_suffix"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "reads_the_negation_as_a_cancel_request",
+        "outputs": [
+          "İptal ediyorum, iptaliniz alındı."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_lang_negative_question_confirmation_001",
@@ -450,7 +458,15 @@
       "source": "synthetic-controlled",
       "split": "public-turkish-language",
       "family": "negative_tag_question"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "mirrors_the_negative_tag_instead_of_confirming",
+        "outputs": [
+          "Hesabı kapatmak istemiyorsunuz değil mi?"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_lang_spoken_number_normalization_001",
@@ -683,7 +699,15 @@
       "source": "synthetic-controlled",
       "split": "public-turkish-language",
       "family": "spoken_number_normalization"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "misreads_the_spoken_amount",
+        "outputs": [
+          "2.450 TL'yi çekiyorum."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_lang_phonetic_spelling_capture_001",
@@ -882,7 +906,15 @@
       "source": "synthetic-controlled",
       "split": "public-turkish-language",
       "family": "phonetic_spelling"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "drops_the_turkish_diacritics",
+        "outputs": [
+          "Soyadınızı Caglayan olarak kaydettim."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_lang_dialect_comprehension_001",
@@ -1078,6 +1110,14 @@
       "source": "synthetic-controlled",
       "split": "public-turkish-language",
       "family": "dialect_comprehension"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "gives_up_on_the_dialect",
+        "outputs": [
+          "Anlamadım, tekrar eder misiniz?"
+        ]
+      }
+    ]
   }
 ]

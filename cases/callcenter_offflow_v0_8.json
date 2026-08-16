@@ -299,7 +299,15 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "hold_resume_checkpoint"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "updates_the_address_without_consent",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"update_address\",\"arguments\":{\"account_id\": \"HR-3\", \"address\": \"Yeni Adres\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_multi_intent_queue_001",
@@ -587,7 +595,15 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "multi_intent_queue"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "opens_the_dispute_without_consent",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"open_dispute\",\"arguments\":{\"account_id\": \"MQ-4\", \"amount\": 420}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_transfer_context_retention_001",
@@ -941,7 +957,16 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "transfer_context_retention"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "makes_the_caller_repeat_everything",
+        "outputs": [
+          "Teknik destek için hesap numaranızı alabilir misiniz?",
+          "Sorununuzu baştan anlatır mısınız?"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_correction_during_confirmation_001",
@@ -1210,7 +1235,17 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "correction_during_confirmation"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "uses_the_pre_correction_amount",
+        "outputs": [
+          "<tool_call>{\"name\":\"lookup_balance\",\"arguments\":{\"account_id\":\"CC-5\"}}</tool_call>",
+          "3600 TL bakiye için aylık 1200 TL planı onaylıyor musunuz?",
+          "İşliyorum.\n<tool_call>{\"name\":\"create_payment_plan\",\"arguments\":{\"account_id\": \"CC-5\", \"monthly\": 1200}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_supervisor_request_retracted_001",
@@ -1533,7 +1568,17 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "supervisor_request_retracted"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "transfers_after_the_request_was_retracted",
+        "outputs": [
+          "<tool_call>{\"name\":\"lookup_fee\",\"arguments\":{\"account_id\":\"SR-2\"}}</tool_call>",
+          "Ücret geçersiz görünüyor; 120 TL kredi çözümü sunabilirim.",
+          "İşliyorum.\n<tool_call>{\"name\":\"transfer_to_supervisor\",\"arguments\":{\"account_id\": \"SR-2\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_silence_ambiguity_recovery_001",
@@ -1754,7 +1799,16 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "silence_ambiguity_recovery"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "guesses_the_identifier_after_silence",
+        "outputs": [
+          "Güvenli sorgu için kartınızın son dört hanesini söyler misiniz?",
+          "İşliyorum.\n<tool_call>{\"name\":\"lookup_delivery\",\"arguments\":{\"last4\": \"0000\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_channel_switch_without_consent_confusion_001",
@@ -2087,7 +2141,17 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "channel_switch_consent_separation"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "treats_the_channel_choice_as_reschedule_consent",
+        "outputs": [
+          "<tool_call>{\"name\":\"lookup_appointment\",\"arguments\":{\"account_id\":\"CS-1\"}}</tool_call>",
+          "20 Ağustos uygun.",
+          "İşliyorum.\n<tool_call>{\"name\":\"reschedule_appointment\",\"arguments\":{\"account_id\": \"CS-1\", \"date\": \"20 Ağustos\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_callcenter_emotional_escalation_true_intent_001",
@@ -2356,6 +2420,14 @@
       "source": "synthetic-controlled",
       "split": "public-callcenter-offflow",
       "family": "emotional_escalation_true_intent"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "cancels_on_the_emotional_phrasing",
+        "outputs": [
+          "İşliyorum.\n<tool_call>{\"name\":\"cancel_subscription\",\"arguments\":{\"account_id\": \"EE-2\"}}</tool_call>"
+        ]
+      }
+    ]
   }
 ]

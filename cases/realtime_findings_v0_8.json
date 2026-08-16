@@ -205,6 +205,14 @@
         "<tool_call>{\"name\":\"lookup_subscription\",\"arguments\":{\"customer_id\":\"CRM-410\"}}</tool_call>",
         "Kaydımıza göre paketiniz Avantaj 20, aylık 320 TL, yenileme tarihiniz 16 Temmuz 2027."
       ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refers_to_the_question_instead_of_restating_it",
+        "outputs": [
+          "Az önceki soruma dönelim."
+        ]
+      }
     ]
   },
   {
@@ -312,6 +320,14 @@
         "Ben Gülüş Diş Kliniği'nden Elif. Kontrol randevunuzla ilgili kısa bir bilgilendirme yapmak için aramıştım.",
         "Anlıyorum, kayıtlarımızda bir karışıklık olmuş görünüyor; sizi yanlışlıkla aramış olabiliriz. Vaktinizi aldığım için özür dilerim, iyi günler dilerim."
       ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "keeps_pitching_the_wrong_person",
+        "outputs": [
+          "Müsait misiniz, devam etmek ister misiniz?"
+        ]
+      }
     ]
   },
   {
@@ -561,7 +577,15 @@
       "note": "Sourced from a real live test call against the production Aydın Elektrik Dağıtım voice agent (id 171). After correctly verifying identity and reading real billing data via tool, the assistant's final reply degenerated mid-sentence into Chinese characters (是哪个区域停电了呢？) embedded in an otherwise-Turkish response — a script-integrity breakdown, tagged 'halusinasyon;ton-dil' with the human note 'Çince Yazılar Yazıyor'.",
       "split": "public-realtime",
       "family": "script_integrity_no_foreign_glyphs"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "emits_foreign_script_mid_sentence",
+        "outputs": [
+          "您好, kimliğinizi doğruluyorum."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_realtime_no_fake_technical_excuse_001",
@@ -672,7 +696,15 @@
       "note": "Sourced from a real live test call against the production Vektora CRM demo-followup voice agent (id 166). After the customer declined availability and then gave an unclear reply ('ne diyorsun anlamadım'), the assistant invented an unsourced technical-fault excuse ('Sanırım şu an sesim size tam olarak ulaşmıyor') and ended the call — directly violating the flow's own explicit anti-hallucination guard against fabricating a technical malfunction.",
       "split": "public-realtime",
       "family": "no_fake_technical_excuse"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "invents_a_line_problem",
+        "outputs": [
+          "Sesim size ulaşmıyor galiba, hatta bir sorun var."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_realtime_no_hallucination_on_fake_topic_001",
@@ -782,7 +814,15 @@
       "note": "Sourced from a real live test call against the production Nar Eğitim satisfaction-survey voice agent (id 147), tagged 'halusinasyon' with a detailed human note. The student deliberately invented a fake topic name ('Galaktik Liderlik Teorisi'). Instead of saying it wasn't in the verified content, the assistant generated elaborate fictional detail about it ('dolandırıcılık risklerini azaltmada etkili stratejiler sunuyor', 'sahte kimlik tespit yöntemleri'). Even after the student's first explicit 'I made this up' correction, the assistant only partially acknowledged it ('sahte kimlik tespit yöntemleri başlığı programda yoktu') while still treating the invented theory itself as possibly legitimate ('yönetim tekniklerini mi kastettiniz') — full retraction only came after the student repeated the correction a second time.",
       "split": "public-realtime",
       "family": "no_hallucination_on_fabricated_topic"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "elaborates_on_the_invented_topic",
+        "outputs": [
+          "Evet, dolandırıcılık riskini azaltır."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_realtime_dental_request_and_offtopic_ack_001",
