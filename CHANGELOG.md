@@ -45,6 +45,8 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 
 ### Measured
 
+- Full live sweep of all 226 cases against `callingai-qwen35-9b-v2`: **76.8% Pass@1, 82.3% Pass@k, 78.3% Pass^k** over 822 runs. 11 of the 19 newly added cases fail, which is what packs aimed at known weaknesses are for
+- The sweep makes one defect unmistakable: **the model cannot stop calling tools**. 98 of 191 failing runs trip the tool-loop or extra-generation check, and 39% end with a tool call as their final step — including closing turns, and including a forbidden tool invoked with a placeholder argument (`customer_id: "N/A"`) immediately after the model had twice refused the request correctly
 - Full live sweep of 207 of the 208 cases against `callingai-qwen35-9b-v2` (the dead-air case landed after it): **80.9% Pass@1, 85.5% Pass@k, 81.6% Pass^k** over 729 runs, against 90.0% / 87.7% on the earlier 162-case suite. The decline is the intended effect of packs aimed at known weaknesses, not a regression in the model
 - The sweep flagged 8 runs as `wording_only_suspect`. Both scenarios were reviewed against their transcripts and both are genuine model defects rather than narrow regexes: one refuses the account holder their own balance, and the other drops the "the data is not recorded" half of an explicit two-part safety instruction in all five runs, with identical wording every time
 

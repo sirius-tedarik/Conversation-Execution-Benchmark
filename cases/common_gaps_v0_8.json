@@ -106,7 +106,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "mükerrer|iki kez|hatam[ıi]z|haklısınız"
+                "assistant_regex": "mükerrer|iki kez|çift çekim|çifte çekim|hatam[ıi]z|haklısınız"
               },
               "to": "fix"
             }
@@ -152,7 +152,7 @@
         "id": "error_acknowledged",
         "kind": "content",
         "role": "assistant",
-        "regex": "mükerrer|iki kez|hatam[ıi]z|haklısınız",
+        "regex": "mükerrer|iki kez|çift çekim|çifte çekim|hatam[ıi]z|haklısınız",
         "axis": "conversation_experience",
         "severity": "P0"
       },
