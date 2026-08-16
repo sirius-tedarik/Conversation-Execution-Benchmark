@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 163
+    assert len(scenarios) == 165
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 155
-    assert len({scenario.domain for scenario in scenarios}) >= 154
+    assert len(scenarios) >= 157
+    assert len({scenario.domain for scenario in scenarios}) >= 156
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -249,6 +249,24 @@ def test_a_stalling_agent_makes_the_caller_hang_up():
     assert any(item["name"] == "customer_did_not_abandon" and item["passed"] is False
                for item in score_run(abandoned, stall)["checks"])
     assert not run_scenario(MockRunner(stall.mock_runs[0]), stall, seed=17)["customer_abandoned"]
+
+
+def test_chaos_pack_concentrates_hard_traps_in_reachable_calls():
+    """The 22-turn chaotic case proved the model collapses around turn 4, which leaves its
+    later traps untested in practice. These are the same traps at a length the model can
+    actually reach, so a failure means the trap caught it rather than the length did."""
+    scenarios = load_scenarios(ROOT / "cases" / "chaos_v0_8.json")
+    assert len(scenarios) == 2
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "chaos_misquoted_figure_pressure", "chaos_lookalike_override_authority",
+    }
+    for scenario in scenarios:
+        assert len(scenario.user_plan["nodes"]) <= 8, f"{scenario.id}: too long to stay reachable"
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
 
 
 def test_phone_ux_pack_covers_number_and_code_requests_over_voice():

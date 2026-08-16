@@ -33,8 +33,8 @@ CEB evaluates the **whole execution trajectory**.
 
 | | Public pilot `v0.8` |
 |---|---|
-| Scenarios | 163 executable Turkish cases |
-| Domains | 162 operational and safety domains |
+| Scenarios | 165 executable Turkish cases |
+| Domains | 164 operational and safety domains |
 | Direction | Inbound and outbound |
 | Trials | 3 per scenario by default |
 | Evaluation axes | 7, reported separately |
@@ -62,7 +62,7 @@ Expected summary:
 
 ```text
 CEB 0.8 — mock-reference
-scenarios=163 runs=513 eligible=True
+scenarios=165 runs=519 eligible=True
 Pass@1=100.00% Pass@k=100.00% Pass^k=100.00%
 release_gate=PASS
 ```
