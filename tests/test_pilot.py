@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 192
+    assert len(scenarios) == 202
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 184
-    assert len({scenario.domain for scenario in scenarios}) >= 183
+    assert len(scenarios) >= 194
+    assert len({scenario.domain for scenario in scenarios}) >= 193
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -389,6 +389,25 @@ def test_common_behaviors_pack_covers_ten_everyday_call_shapes():
     scenarios = load_scenarios(ROOT / "cases" / "common_behaviors_v0_8.json")
     assert len(scenarios) == 10
     assert len({s.metadata["family"] for s in scenarios}) == 10
+    for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_common_behaviors_second_pack_covers_ten_more_call_shapes():
+    """Ten more everyday behaviours, all distinct from the first pack: minimal backchannel
+    replies, a request for the agent's own opinion, an ambiguous date, a named employee, a
+    turn with no content, a self-contradicting instruction, a competitor comparison, a
+    'just this once' waiver request, a document the agent cannot issue, and a delegated
+    decision."""
+    scenarios = load_scenarios(ROOT / "cases" / "common_behaviors_2_v0_8.json")
+    assert len(scenarios) == 10
+    assert len({s.metadata["family"] for s in scenarios}) == 10
+    first = {s.metadata["family"] for s in load_scenarios(ROOT / "cases" / "common_behaviors_v0_8.json")}
+    assert not first & {s.metadata["family"] for s in scenarios}
     for scenario in scenarios:
         result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
         assert result["passed"], [item for item in result["checks"] if item["passed"] is False]

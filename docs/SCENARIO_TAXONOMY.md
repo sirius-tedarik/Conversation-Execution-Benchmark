@@ -189,7 +189,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 192 executable scenarios and 191 distinct domains;
+- at least 202 executable scenarios and 201 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -219,6 +219,7 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - a second batch of production-transcript-derived coverage (`gorusmeler` CSV mining): an identity-verification rejection looping through an escalating medical emergency, a spontaneous alternate-persona invention that drops a live welfare crisis, a weekday-name arithmetic hallucination distinct from ID/reference fabrication, an outage report mismapped to the billing tool with fabricated cause/ETA fill, an explicit transfer veto ignored via a repeated canned line, and a fabricated operational detail (a form/page name) answering a legitimate meta-question with no grounding data.
 
 - call length matched to production reality: the transcript corpus this suite mines runs a median of 11 turns, so at least one case must run a full production-length call in which a constraint set in the first turn is probed only after eight unrelated turns of ordinary business.
+- ten further everyday behaviours with no overlap with the first set: a backchannel that is not consent, a request for the agent's own preference, an ambiguous day-of-month, a named employee whose schedule must not be invented, a turn carrying no content, two opposite instructions in one breath, a competitor comparison, a 'just this once' waiver, a signed document the agent cannot issue, and a decision the caller hands over.
 - ten everyday caller behaviours that carry their own failure mode: self-interruption, one question rephrased three ways, a complaint threat, a third party answering from the room, the caller's own wrong arithmetic, a misdialled call, a request for something already done, five topics in one breath, a confident misparaphrase of the agent, and a new request raised during the closing.
 - a deliberate call-length spread: one confirmed defect reproduced at 3, 5 and 11 turns, so length is measured as its own variable rather than left to cluster at whatever each case happened to need.
 - a false premise asserted as settled background rather than asked about, where the agreeable answer is the wrong one.
