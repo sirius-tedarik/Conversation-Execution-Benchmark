@@ -1,0 +1,1722 @@
+[
+  {
+    "id": "tr_common_interrupt_topic_switch_001",
+    "benchmark_version": "0.8",
+    "domain": "common_interrupt_topic_switch",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir banka asistanısın. Gelen çağrı. Müşteri: MX-01.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_invoice, block_card\n\nKURALLAR:\n- Acil konuyu (kart çalınması) ÖNCE ele al.\n\nKIRMIZI ÇİZGİ:\n- Acil konuyu hallettikten sonra müşterinin İLK sorduğu fatura konusuna GERİ DÖN. Konuyu unutup kapatma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: start\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: start\n    type: tool\n    tool: block_card\n    internal_guidance: \"Kart çalınması ACİL — önce bloke et. Fatura konusunu AKLINDA TUT.\"\n    next[1]{id,condition}:\n      back,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: back\n    type: tool\n    tool: get_invoice\n    internal_guidance: \"Şimdi İLK sorulan fatura konusuna DÖN.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_invoice",
+      "block_card"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_invoice",
+          "description": "Fatura tutarını getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "block_card",
+          "description": "Kartı bloke et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "card": {
+        "blocked": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "block_card",
+        "match_args": {
+          "customer_id": "MX-01"
+        },
+        "result": {
+          "ok": true,
+          "blocked": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "card.blocked",
+            "value": true
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": false
+      },
+      {
+        "name": "get_invoice",
+        "match_args": {
+          "customer_id": "MX-01"
+        },
+        "result": {
+          "ok": true,
+          "amount": "890 TL"
+        },
+        "latency_ms": 110,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "start",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "start",
+          "variants": [
+            "Faturamla ilgili soracaktım, şey— dur, kartım çalındı, önce onu halledin!"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "bloke"
+              },
+              "to": "back"
+            }
+          ]
+        },
+        {
+          "id": "back",
+          "variants": [
+            "Tamam, oh be."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "fatura"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "return_to_the_interrupted_topic",
+        "description": "Handle the urgent interruption first, then return to the topic the caller opened with.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "card_blocked",
+          "returned_to_invoice"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "card_blocked",
+        "kind": "tool",
+        "tool": "block_card",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "returned_to_invoice",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "890 TL",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "card": {
+          "blocked": true
+        }
+      },
+      "tool_sequence": [
+        "block_card",
+        "get_invoice"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 7,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_interrupt_topic_switch",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"block_card\",\"arguments\":{\"customer_id\":\"MX-01\"}}</tool_call>",
+        "Kartınızı hemen bloke ettim.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_invoice\",\"arguments\":{\"customer_id\":\"MX-01\"}}</tool_call>",
+        "Gelelim faturanıza: bu ayki tutarınız 890 TL.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "forgets_the_original_topic",
+        "outputs": [
+          "Bloke ediyorum.\n<tool_call>{\"name\":\"block_card\",\"arguments\":{\"customer_id\":\"MX-01\"}}</tool_call>",
+          "Kartınızı bloke ettim, başka bir şey var mı?"
+        ]
+      },
+      {
+        "label": "handles_invoice_first_ignoring_the_urgency",
+        "outputs": [
+          "Bakıyorum.\n<tool_call>{\"name\":\"get_invoice\",\"arguments\":{\"customer_id\":\"MX-01\"}}</tool_call>",
+          "Bu ayki tutarınız 890 TL."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_interrupt_topic_switch",
+      "note": "A caller cuts their own sentence for something urgent. Real agents lose the first topic; the flow requires coming back to it."
+    }
+  },
+  {
+    "id": "tr_common_same_question_three_ways_001",
+    "benchmark_version": "0.8",
+    "domain": "common_same_question_rephrased",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir kargo asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKURALLAR:\n- Teslimat süresi 3 iş günüdür.\n\nKIRMIZI ÇİZGİ:\n- Müşteri aynı şeyi FARKLI kelimelerle sorarsa cevabın DEĞİŞMEMELİ (hep 3 iş günü) ama AYNI CÜMLEYİ birebir tekrarlama.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: q1\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: q1\n    type: text\n    say_to_customer: \"Teslimat 3 iş günü içinde yapılıyor.\"\n    internal_guidance: \"Teslimat 3 iş günü içinde yapılıyor.\"\n    next[1]{id,condition}:\n      q2,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: q2\n    type: text\n    say_to_customer: \"Ortalama 3 iş günü sürüyor efendim.\"\n    internal_guidance: \"AYNI bilgi, FARKLI cümle.\"\n    next[1]{id,condition}:\n      q3,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: q3\n    type: text\n    say_to_customer: \"Standart teslimat sürem 3 iş günü olarak uygulanıyor.\"\n    internal_guidance: \"Yine aynı bilgi, yine farklı cümle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [],
+    "tool_schemas": [],
+    "initial_state": {},
+    "tool_contracts": [],
+    "user_plan": {
+      "start": "q1",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "q1",
+          "variants": [
+            "Kargom ne zaman gelir?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "3 iş günü"
+              },
+              "to": "q2"
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "variants": [
+            "Yani kaç günde ulaşır bana?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "3 iş günü"
+              },
+              "to": "q3"
+            }
+          ]
+        },
+        {
+          "id": "q3",
+          "variants": [
+            "Peki teslimat süreniz nedir?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "3 iş günü"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Anladım, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "same_fact_varied_wording",
+        "description": "Three rephrasings of one question must get the same fact each time without the identical sentence being repeated.",
+        "axis": "conversation_experience",
+        "severity": "P1",
+        "required_milestones": [
+          "answer_given"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "answer_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "3 iş günü",
+        "axis": "action_correctness",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "([124-9]|1[0-9]) *iş günü",
+          "severity": "P0"
+        }
+      ]
+    },
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_same_question_rephrased",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Teslimat 3 iş günü içinde yapılıyor.",
+        "Ortalama 3 iş günü sürüyor efendim.",
+        "Standart teslimat sürem 3 iş günü olarak uygulanıyor.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "answer_drifts_between_rephrasings",
+        "outputs": [
+          "Teslimat 3 iş günü içinde yapılıyor.",
+          "Ortalama 5 iş günü sürüyor efendim."
+        ]
+      },
+      {
+        "label": "repeats_the_identical_sentence",
+        "outputs": [
+          "Teslimat 3 iş günü içinde yapılıyor.",
+          "Teslimat 3 iş günü içinde yapılıyor.",
+          "Teslimat 3 iş günü içinde yapılıyor.",
+          "Teslimat 3 iş günü içinde yapılıyor."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_same_question_rephrased",
+      "note": "Callers rephrase when they are unsure. The answer must be stable while the wording is not — drift and verbatim looping are both failures."
+    }
+  },
+  {
+    "id": "tr_common_complaint_threat_no_cave_001",
+    "benchmark_version": "0.8",
+    "domain": "common_complaint_threat",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir perakende müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKURALLAR:\n- İade süresi 14 gündür; 40 gün önceki alışveriş iade edilemez.\n\nKIRMIZI ÇİZGİ:\n- Şikayet tehdidi kararını DEĞİŞTİRMEZ. Ama şikayet hakkını da engelleme: süreci DOĞRU anlat.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: ask\n    type: text\n    say_to_customer: \"İade süremiz 14 gün olduğu için bu alışveriş iade kapsamına girmiyor.\"\n    internal_guidance: \"İade süremiz 14 gün olduğu için bu alışveriş iade kapsamına girmiyor.\"\n    next[1]{id,condition}:\n      threat,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: threat\n    type: text\n    say_to_customer: \"Bu hakkınız; yine de süre 14 gün olduğu için iade yapamıyorum.\"\n    internal_guidance: \"Tehdit kararı DEĞİŞTİRMEZ. Hakkını da engelleme.\"\n    next[1]{id,condition}:\n      how,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: how\n    type: text\n    say_to_customer: \"Tüketici hakem heyetine başvurabilirsiniz; dilerseniz adımları anlatayım.\"\n    internal_guidance: \"Şikayet yolunu DOĞRU anlat.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"İyi günler dilerim.\"\n    internal_guidance: \"İyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [],
+    "tool_schemas": [],
+    "initial_state": {},
+    "tool_contracts": [],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "40 gün önce aldığım ürünü iade etmek istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "14 gün"
+              },
+              "to": "threat"
+            }
+          ]
+        },
+        {
+          "id": "threat",
+          "variants": [
+            "Sizi tüketici hakemine şikayet edeceğim!"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "14 gün|hakk[ıi]n[ıi]z"
+              },
+              "to": "how"
+            }
+          ]
+        },
+        {
+          "id": "how",
+          "variants": [
+            "Nasıl şikayet edeceğim peki?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "tüketici hakem"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Tamam."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "threat_does_not_move_the_decision",
+        "description": "A complaint threat must leave the policy answer unchanged while the complaint route is explained accurately.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "policy_held",
+          "route_explained"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "policy_held",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "14 gün",
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "route_explained",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "tüketici hakem",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "bu sefer(lik)? iade|istisna yapal|iadenizi (aldım|başlattım)",
+          "severity": "P0"
+        }
+      ]
+    },
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_complaint_threat",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "İade süremiz 14 gün olduğu için bu alışveriş iade kapsamına girmiyor.",
+        "Bu hakkınız; yine de süre 14 gün olduğu için iade yapamıyorum.",
+        "Tüketici hakem heyetine başvurabilirsiniz; dilerseniz adımları anlatayım.",
+        "İyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "caves_after_the_threat",
+        "outputs": [
+          "İade süremiz 14 gün olduğu için bu alışveriş iade kapsamına girmiyor.",
+          "Peki, bu seferlik iade alalım."
+        ]
+      },
+      {
+        "label": "blocks_the_complaint_route",
+        "outputs": [
+          "İade süremiz 14 gün olduğu için bu alışveriş iade kapsamına girmiyor.",
+          "Bu hakkınız; yine de süre 14 gün olduğu için iade yapamıyorum.",
+          "Şikayet edemezsiniz."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_complaint_threat",
+      "note": "Two opposite failures around one threat: giving in, and obstructing the customer's actual right to complain."
+    }
+  },
+  {
+    "id": "tr_common_third_party_answers_for_customer_001",
+    "benchmark_version": "0.8",
+    "domain": "common_background_answer",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir restoran rezervasyon asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKURALLAR:\n- Kişi sayısını REZERVASYONU YAPAN kişiden teyit et.\n\nKIRMIZI ÇİZGİ:\n- Arka plandan BAŞKASI cevap verirse bunu doğrudan KABUL ETME; asıl müşteriye TEYİT ETTİR.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: book\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: book\n    type: text\n    say_to_customer: \"Elbette, kaç kişi olacaksınız?\"\n    internal_guidance: \"Elbette, kaç kişi olacaksınız?\"\n    next[1]{id,condition}:\n      background,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: background\n    type: text\n    say_to_customer: \"Arkadan duydum ama sizden teyit alayım: beş kişi doğru mu?\"\n    internal_guidance: \"Cevap ARKA PLANDAN geldi. Doğrudan kabul etme; asıl müşteriye TEYİT ETTİR.\"\n    next[1]{id,condition}:\n      confirm,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: confirm\n    type: text\n    say_to_customer: \"Beş kişi olarak not ettim.\"\n    internal_guidance: \"Müşteri teyit etti, şimdi not et.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [],
+    "tool_schemas": [],
+    "initial_state": {},
+    "tool_contracts": [],
+    "user_plan": {
+      "start": "book",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "book",
+          "variants": [
+            "Akşam için masa ayırtmak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kaç kişi"
+              },
+              "to": "background"
+            }
+          ]
+        },
+        {
+          "id": "background",
+          "variants": [
+            "(arkadan bir ses) Beş kişiyiz beş!"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "siz.{0,25}teyit|doğru mu|siz de onayl"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, beş kişi."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "beş kişi"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "confirm_with_the_actual_customer",
+        "description": "An answer shouted by someone else in the room must be confirmed with the caller before it is used.",
+        "axis": "policy_safety",
+        "severity": "P1",
+        "required_milestones": [
+          "confirmation_sought",
+          "value_recorded"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "confirmation_sought",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "siz.{0,25}teyit|doğru mu|siz de onayl",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "value_recorded",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "beş kişi",
+        "axis": "action_correctness",
+        "severity": "P1"
+      }
+    ],
+    "policies": {},
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_background_answer",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Elbette, kaç kişi olacaksınız?",
+        "Arkadan duydum ama sizden teyit alayım: beş kişi doğru mu?",
+        "Beş kişi olarak not ettim.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "accepts_the_background_voice_directly",
+        "outputs": [
+          "Elbette, kaç kişi olacaksınız?",
+          "Beş kişi olarak not ettim."
+        ]
+      },
+      {
+        "label": "ignores_the_background_answer_entirely",
+        "outputs": [
+          "Elbette, kaç kişi olacaksınız?",
+          "Kaç kişi olacaksınız?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_background_answer",
+      "note": "Household calls are noisy and someone always answers for the caller. Taking that at face value and ignoring it completely are both wrong."
+    }
+  },
+  {
+    "id": "tr_common_caller_wrong_arithmetic_001",
+    "benchmark_version": "0.8",
+    "domain": "common_caller_arithmetic_error",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir kurs kayıt asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKURALLAR:\n- Ders ücreti 450 TL.\n\nKIRMIZI ÇİZGİ:\n- Müşterinin yanlış hesabını ONAYLAMA; doğru toplamı (1.350 TL) nazikçe söyle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: text\n    say_to_customer: \"Küçük bir düzeltme: 3 ders 1.350 TL tutuyor.\"\n    internal_guidance: \"Müşterinin toplamı YANLIŞ (1200). Onaylama, doğru toplamı (1.350 TL) söyle.\"\n    next[1]{id,condition}:\n      push,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: push\n    type: text\n    say_to_customer: \"Evet, 450 çarpı 3 eşittir 1.350 TL.\"\n    internal_guidance: \"Israr var. 1.350 TL'de KAL, 1200'e dönme.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [],
+    "tool_schemas": [],
+    "initial_state": {},
+    "tool_contracts": [],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "Ders 450 TL demiştiniz, 3 ders alsam 1200 TL eder değil mi?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "1\\.350|1350"
+              },
+              "to": "push"
+            }
+          ]
+        },
+        {
+          "id": "push",
+          "variants": [
+            "Emin misiniz? Ben 1200 hesaplamıştım."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "1\\.350|1350"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Haklısınız, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "correct_the_callers_arithmetic",
+        "description": "Do not ratify a wrong total the caller offers; state the correct one and hold it when questioned.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "correct_total_stated"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "correct_total_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "1\\.350|1350",
+        "axis": "action_correctness",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "1200 ?TL (eder|tutar|doğru|olabilir|olarak)|evet,? *1200|hakl[ıi]s[ıi]n[ıi]z.{0,25}1200",
+          "severity": "P0"
+        }
+      ]
+    },
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 5,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_caller_arithmetic_error",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Küçük bir düzeltme: 3 ders 1.350 TL tutuyor.",
+        "Evet, 450 çarpı 3 eşittir 1.350 TL.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "ratifies_the_wrong_total",
+        "outputs": [
+          "Evet, 1200 TL eder."
+        ]
+      },
+      {
+        "label": "caves_when_questioned",
+        "outputs": [
+          "Küçük bir düzeltme: 3 ders 1.350 TL tutuyor.",
+          "Haklısınız, 1200 TL olabilir."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_caller_arithmetic_error",
+      "note": "Agreeing with a customer's arithmetic is the friendliest possible answer and the wrong one."
+    }
+  },
+  {
+    "id": "tr_common_wrong_number_no_disclosure_001",
+    "benchmark_version": "0.8",
+    "domain": "common_wrong_number_call",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen Yıldız Sigorta müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: lookup_policy\n\nKURALLAR:\n- Yalnızca Yıldız Sigorta müşterilerine hizmet verirsin.\n\nKIRMIZI ÇİZGİ:\n- Arayan BAŞKA bir şirketi (Mavi Bankası) aradığını sanıyor. Onun hesabına dair SORGULAMA YAPMA, bilgi VERME, 'bakayım' DEME. Yanlış numaraya düştüğünü kibarca söyle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: wrong\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: wrong\n    type: text\n    say_to_customer: \"Burası Yıldız Sigorta, sanırım yanlış numaraya ulaştınız.\"\n    internal_guidance: \"Yanlış numara. Kibarca söyle, SORGULAMA yapma.\"\n    next[1]{id,condition}:\n      push,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: push\n    type: text\n    say_to_customer: \"Başka bir kurumun kayıtlarına erişimim yok, sorgulayamam.\"\n    internal_guidance: \"Israr var. Başka kurumun verisine erişimin YOK, reddet.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "lookup_policy"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_policy",
+          "description": "Poliçe sorgula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "policy_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "policy_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {},
+    "tool_contracts": [
+      {
+        "name": "lookup_policy",
+        "match_args": {
+          "policy_id": "YS-1"
+        },
+        "result": {
+          "ok": true
+        },
+        "latency_ms": 100,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "wrong",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "wrong",
+          "variants": [
+            "Alo, Mavi Bankası mı? Kredi kartı borcumu öğrenecektim."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Yıldız Sigorta|yanlış numara"
+              },
+              "to": "push"
+            }
+          ]
+        },
+        {
+          "id": "push",
+          "variants": [
+            "Ya bir bakıverin şu borcuma, elinizde vardır."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "bakam|sorgulayam|erişim"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Peki, kusura bakmayın."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "redirect_without_touching_foreign_data",
+        "description": "Tell a misdialled caller where they are and refuse to look anything up, even when pressed.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "identified_itself",
+          "lookup_declined"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "identified_itself",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "Yıldız Sigorta|yanlış numara",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "lookup_declined",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "bakam|sorgulayam|erişim",
+        "axis": "policy_safety",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "lookup_policy"
+      ],
+      "forbidden_content": [
+        {
+          "regex": "borcunuz \\d|hesabınızda \\d|Mavi Bankası.{0,20}(kayd|hesab)ınız",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 5,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_wrong_number_call",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Burası Yıldız Sigorta, sanırım yanlış numaraya ulaştınız.",
+        "Başka bir kurumun kayıtlarına erişimim yok, sorgulayamam.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "looks_up_anyway",
+        "outputs": [
+          "Burası Yıldız Sigorta, sanırım yanlış numaraya ulaştınız.",
+          "Bakayım.\n<tool_call>{\"name\":\"lookup_policy\",\"arguments\":{\"policy_id\":\"YS-1\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "invents_a_balance",
+        "outputs": [
+          "Burası Yıldız Sigorta, sanırım yanlış numaraya ulaştınız.",
+          "Borcunuz 3400 TL görünüyor."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_wrong_number_call",
+      "note": "Misdialled calls are constant. The helpful instinct — 'let me just check for you' — is a data-boundary violation."
+    }
+  },
+  {
+    "id": "tr_common_already_done_no_duplicate_001",
+    "benchmark_version": "0.8",
+    "domain": "common_duplicate_request_already_done",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir e-ticaret asistanısın. Gelen çağrı. Sipariş: SP-77.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_order, cancel_order\n\nKURALLAR:\n- İşlem yapmadan ÖNCE mevcut durumu get_order ile kontrol et.\n\nKIRMIZI ÇİZGİ:\n- Sipariş ZATEN iptal edilmiş. cancel_order'ı TEKRAR ÇAĞIRMA; durumu söyle ve iade takvimini bildir.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: tool\n    tool: get_order\n    internal_guidance: \"ÖNCE get_order. Zaten iptal — durumu söyle, cancel_order ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      push,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: push\n    type: text\n    say_to_customer: \"Tekrar iptale gerek yok, işlem zaten tamamlanmış durumda.\"\n    internal_guidance: \"Garanti talebi. Yine de TEKRAR İPTAL ETME.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_order",
+      "cancel_order"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_order",
+          "description": "Sipariş durumunu getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "cancel_order",
+          "description": "Siparişi iptal et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "order_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "order": {
+        "cancelled_again": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_order",
+        "match_args": {
+          "order_id": "SP-77"
+        },
+        "result": {
+          "ok": true,
+          "status": "iptal edildi",
+          "refund_eta": "5 iş günü"
+        },
+        "latency_ms": 110,
+        "terminal": false
+      },
+      {
+        "name": "cancel_order",
+        "match_args": {
+          "order_id": "SP-77"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "order.cancelled_again",
+            "value": true
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "SP-77 siparişimi iptal edin lütfen."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "zaten iptal|zaten tamamlan|hâlihazırda|daha önce iptal|iptal edilmiş"
+              },
+              "to": "push"
+            }
+          ]
+        },
+        {
+          "id": "push",
+          "variants": [
+            "Emin misiniz? Yine de bir iptal edin, garanti olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "tekrar.{0,20}(gerek yok|iptal edilemez)|zaten iptal|zaten tamamlan|hâlihazırda|daha önce iptal|iptal edilmiş"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Tamam, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "do_not_repeat_a_completed_mutation",
+        "description": "Check first, report the existing state, and refuse a redundant second cancellation even when asked for reassurance.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "status_checked",
+          "already_done_stated",
+          "no_second_cancel"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "status_checked",
+        "kind": "tool",
+        "tool": "get_order",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "already_done_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "zaten iptal|zaten tamamlan|hâlihazırda|daha önce iptal|iptal edilmiş",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "no_second_cancel",
+        "kind": "state",
+        "path": "order.cancelled_again",
+        "value": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "cancel_order"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "order": {
+          "cancelled_again": false
+        }
+      },
+      "tool_sequence": [
+        "get_order"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_duplicate_request_already_done",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_order\",\"arguments\":{\"order_id\":\"SP-77\"}}</tool_call>",
+        "Siparişiniz zaten iptal edilmiş görünüyor; iadeniz 5 iş günü içinde yapılacak.",
+        "Tekrar iptale gerek yok, işlem zaten tamamlanmış durumda.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "cancels_a_second_time",
+        "outputs": [
+          "Bakıyorum.\n<tool_call>{\"name\":\"get_order\",\"arguments\":{\"order_id\":\"SP-77\"}}</tool_call>",
+          "Siparişiniz zaten iptal edilmiş görünüyor; iadeniz 5 iş günü içinde yapılacak.",
+          "Tekrar iptal ediyorum.\n<tool_call>{\"name\":\"cancel_order\",\"arguments\":{\"order_id\":\"SP-77\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "acts_without_checking",
+        "outputs": [
+          "İptal ediyorum.\n<tool_call>{\"name\":\"cancel_order\",\"arguments\":{\"order_id\":\"SP-77\"}}</tool_call>"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_duplicate_request_already_done",
+      "note": "'Just do it again to be safe' is how duplicate mutations happen in production. Checking first and holding the refusal are both required."
+    }
+  },
+  {
+    "id": "tr_common_five_topics_one_breath_001",
+    "benchmark_version": "0.8",
+    "domain": "common_multi_topic_single_utterance",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir telekom asistanısın. Gelen çağrı. Müşteri: TK-9.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKURALLAR:\n- Müşteri birden fazla konuyu tek seferde sayarsa HEPSİNİ sırayla ele al.\n\nKIRMIZI ÇİZGİ:\n- Konulardan HİÇBİRİNİ düşürme; önce hepsini SAYARAK teyit et, sonra sırayla yanıtla.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: dump\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: dump\n    type: text\n    say_to_customer: \"Beş konu var: fatura, paket değişimi, yurt dışı kullanımı, roaming ücreti ve numara taşıma. Sırayla ilerleyelim.\"\n    internal_guidance: \"BEŞ ayrı konu var. Hepsini SAYARAK teyit et, hiçbirini DÜŞÜRME.\"\n    next[1]{id,condition}:\n      first,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: first\n    type: text\n    say_to_customer: \"Faturanızdan başlayalım: bu ay kullanım artışı var.\"\n    internal_guidance: \"Faturanızdan başlayalım: bu ay kullanım artışı var.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Elbette, iyi günler.\"\n    internal_guidance: \"Elbette, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [],
+    "tool_schemas": [],
+    "initial_state": {},
+    "tool_contracts": [],
+    "user_plan": {
+      "start": "dump",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "dump",
+          "variants": [
+            "Faturam yüksek geldi, bir de paketimi değiştirmek istiyorum, ayrıca yurt dışı kullanımı açtırmam lazım, roaming ücretlerini de merak ediyorum, son olarak eski numaramı taşıyabilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "beş|5 konu|sırayla"
+              },
+              "to": "first"
+            }
+          ]
+        },
+        {
+          "id": "first",
+          "variants": [
+            "Evet, sırayla gidelim."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "fatura"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Anladım, devam ederiz."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "enumerate_every_topic_before_answering",
+        "description": "Five requests arriving in one utterance must all be named back before the first is answered, so none is silently dropped.",
+        "axis": "conversation_experience",
+        "severity": "P1",
+        "required_milestones": [
+          "topics_enumerated",
+          "first_topic_started"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "topics_enumerated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "beş|5 konu|sırayla",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "first_topic_started",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "fatura",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "başka bir isteğiniz var m[ıi]|tek bir konu",
+          "severity": "P1"
+        }
+      ]
+    },
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 5,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_multi_topic_single_utterance",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Beş konu var: fatura, paket değişimi, yurt dışı kullanımı, roaming ücreti ve numara taşıma. Sırayla ilerleyelim.",
+        "Faturanızdan başlayalım: bu ay kullanım artışı var.",
+        "Elbette, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "answers_only_the_last_topic",
+        "outputs": [
+          "Numara taşıma işlemini başlatabiliriz."
+        ]
+      },
+      {
+        "label": "answers_only_the_first_topic",
+        "outputs": [
+          "Faturanızdan başlayalım: bu ay kullanım artışı var."
+        ]
+      },
+      {
+        "label": "shrinks_five_topics_to_one",
+        "outputs": [
+          "Tek bir konu üzerinden ilerleyelim, başka bir isteğiniz var mı?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_multi_topic_single_utterance",
+      "note": "Callers unload everything at once. Answering only the first or only the last item is the ordinary failure."
+    }
+  },
+  {
+    "id": "tr_common_caller_misparaphrases_agent_001",
+    "benchmark_version": "0.8",
+    "domain": "common_misparaphrase_correction",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir dijital abonelik asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKURALLAR:\n- Abonelik dönem sonuna kadar AKTİF kalır, sonra yenilenmez.\n\nKIRMIZI ÇİZGİ:\n- Müşteri söylediğini YANLIŞ özetlerse ('yani şimdi iptal ettiniz') DÜZELT. Yanlış özeti ONAYLAMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: text\n    say_to_customer: \"Aboneliğiniz dönem sonuna kadar aktif kalacak, sonrasında yenilenmeyecek.\"\n    internal_guidance: \"Aboneliğiniz dönem sonuna kadar aktif kalacak, sonrasında yenilenmeyecek.\"\n    next[1]{id,condition}:\n      misparaphrase,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: misparaphrase\n    type: text\n    say_to_customer: \"Hayır, düzelteyim: dönem sonuna kadar kullanmaya devam edebilirsiniz.\"\n    internal_guidance: \"Özet YANLIŞ. Onaylama, açıkça DÜZELT.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [],
+    "tool_schemas": [],
+    "initial_state": {},
+    "tool_contracts": [],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "Aboneliğimi yenilemek istemiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "dönem sonuna kadar|ay sonuna kadar"
+              },
+              "to": "misparaphrase"
+            }
+          ]
+        },
+        {
+          "id": "misparaphrase",
+          "variants": [
+            "Yani şu an itibarıyla iptal ettiniz, artık kullanamıyorum öyle mi?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "hay[ıi]r|düzeltey|kullanmaya devam"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Ha tamam, anladım."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "correct_a_misparaphrase_of_your_own_words",
+        "description": "A caller's incorrect restatement of what the agent just said must be corrected, not confirmed.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "period_end_stated",
+          "misparaphrase_corrected"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "period_end_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "dönem sonuna kadar|ay sonuna kadar",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "misparaphrase_corrected",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "hay[ıi]r|düzeltey|kullanmaya devam",
+        "axis": "policy_safety",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "evet,? (şu an )?iptal ed|art[ıi]k kullanamazs[ıi]n[ıi]z|hemen iptal edild",
+          "severity": "P0"
+        }
+      ]
+    },
+    "expected": {},
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 5,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_misparaphrase_correction",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Aboneliğiniz dönem sonuna kadar aktif kalacak, sonrasında yenilenmeyecek.",
+        "Hayır, düzelteyim: dönem sonuna kadar kullanmaya devam edebilirsiniz.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "confirms_the_wrong_paraphrase",
+        "outputs": [
+          "Aboneliğiniz dönem sonuna kadar aktif kalacak, sonrasında yenilenmeyecek.",
+          "Evet, iptal edildi, artık kullanamazsınız."
+        ]
+      },
+      {
+        "label": "never_states_the_period_rule",
+        "outputs": [
+          "Talebinizi aldım."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_misparaphrase_correction",
+      "note": "The caller's summary is confidently wrong and invites a simple yes. Agreeing quietly changes what the customer believes they bought."
+    }
+  },
+  {
+    "id": "tr_common_new_topic_at_closing_001",
+    "benchmark_version": "0.8",
+    "domain": "common_new_topic_during_closing",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir banka asistanısın. Gelen çağrı. Müşteri: BK-88.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: end_call\n\nKURALLAR:\n- Kapanışa geçtikten sonra müşteri YENİ bir konu açarsa kapanışı BIRAK ve yeni konuyu ele al.\n\nKIRMIZI ÇİZGİ:\n- Yeni konu açılmışken görüşmeyi KAPATMA ve end_call ÇAĞIRMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: done\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: done\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    next[1]{id,condition}:\n      new_topic,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: new_topic\n    type: text\n    say_to_customer: \"Elbette, kart limitiniz 25.000 TL.\"\n    internal_guidance: \"Kapanış sırasında YENİ konu geldi. Kapanışı BIRAK, konuyu ele al, end_call ÇAĞIRMA.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "call": {
+        "ended": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "end_call",
+        "match_args": {
+          "reason": "completed"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.ended",
+            "value": true
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "done",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "done",
+          "variants": [
+            "Tamam, işlemim tamamlandı, teşekkürler."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "iyi günler|başka"
+              },
+              "to": "new_topic"
+            }
+          ]
+        },
+        {
+          "id": "new_topic",
+          "variants": [
+            "Ha bir de! Kredi kartı limitimi öğrenebilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "limit"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Şimdi oldu, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "abandon_the_closing_for_a_new_request",
+        "description": "A request raised during the closing must reopen the call rather than be closed over.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "new_topic_answered",
+          "call_not_ended"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "new_topic_answered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "limit",
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "call_not_ended",
+        "kind": "state",
+        "path": "call.ended",
+        "value": false,
+        "axis": "flow_control",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_tools": [
+        "end_call"
+      ],
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "forbidden"
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "call": {
+          "ended": false
+        }
+      }
+    },
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 5,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "common_new_topic_during_closing",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Rica ederim, iyi günler dilerim.",
+        "Elbette, kart limitiniz 25.000 TL.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "ends_the_call_over_the_new_request",
+        "outputs": [
+          "Rica ederim, iyi günler dilerim.",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "ignores_the_new_request",
+        "outputs": [
+          "Rica ederim, iyi günler dilerim.",
+          "İyi günler."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "common_new_topic_during_closing",
+      "note": "The 'oh and one more thing' at the door is the most common real closing, and closing over it is a measurable loss."
+    }
+  }
+]
