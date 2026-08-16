@@ -230,7 +230,15 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "typo_abbreviation_robustness"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "gives_up_on_the_misspelled_input",
+        "outputs": [
+          "Anlamadım, tekrar eder misiniz?"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_barge_in_correction_001",
@@ -486,7 +494,16 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "barge_in_correction"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ships_to_the_corrected_away_address",
+        "outputs": [
+          "KT-19 için kartı Kadıköy adresine göndereceğim; teyit eder misiniz?",
+          "Kartınız Kadıköy adresine gönderildi."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_phone_chunked_collection_edit_001",
@@ -771,7 +788,27 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "phone_chunk_assembly_edit"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "saves_the_pre_correction_number",
+        "outputs": [
+          "0552 aldım, devam edebilirsiniz.",
+          "0552 332 aldım, kalan dört haneyi alabilir miyim?",
+          "Numaranız 0552 332 2212, toplam 11 hane. Doğru mu?",
+          "Kaydediyorum.\n<tool_call>{\"name\":\"save_phone\",\"arguments\":{\"customer_id\":\"MS-12\",\"msisdn\":\"05523322212\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "restarts_collection_instead_of_editing",
+        "outputs": [
+          "0552 aldım, devam edebilirsiniz.",
+          "0552 332 aldım, kalan dört haneyi alabilir miyim?",
+          "Numaranız 0552 332 2212, toplam 11 hane. Doğru mu?",
+          "Numaranızı baştan alabilir miyim?"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_otp_six_digit_length_001",
@@ -986,7 +1023,15 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "otp_length_validation"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "accepts_the_five_digit_code",
+        "outputs": [
+          "48291 kodunu doğruladım, kodunuz doğrulandı."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_relative_date_disambiguation_001",
@@ -1210,7 +1255,15 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "relative_date_disambiguation"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "picks_a_date_without_asking",
+        "outputs": [
+          "4 Ağustos için oluşturuyorum."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_language_switch_midcall_001",
@@ -1437,7 +1490,16 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "midcall_language_switch"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "keeps_answering_in_turkish_after_the_switch",
+        "outputs": [
+          "Tabii, SP-31 için kontrol ediyorum.",
+          "Sipariş durumunuz: kargoya verildi."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_background_crosstalk_ignored_001",
@@ -1702,7 +1764,16 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "background_crosstalk"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "acts_on_the_background_speech",
+        "outputs": [
+          "AB-7 aboneliğinin iptalini onaylıyor musunuz?",
+          "Tabii Ayşe, faturanızı getiriyorum, masaya bırakayım."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_input_dtmf_keypad_entry_001",
@@ -1991,6 +2062,14 @@
       "source": "synthetic-controlled",
       "split": "public-input-robustness",
       "family": "dtmf_keypad_entry"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "asks_the_caller_to_say_the_digits_aloud",
+        "outputs": [
+          "Rakamları yüksek sesle söyler misiniz?"
+        ]
+      }
+    ]
   }
 ]
