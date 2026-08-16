@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 219
+    assert len(scenarios) == 226
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -43,11 +43,11 @@ def test_every_case_proves_it_can_detect_its_own_defect():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 211
-    assert len({scenario.domain for scenario in scenarios}) >= 210
+    assert len(scenarios) >= 218
+    assert len({scenario.domain for scenario in scenarios}) >= 217
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
-    assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 12
+    assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 16
     assert any(scenario.perturbations.get("adversarial") == "prompt_injection" for scenario in scenarios)
     assert any(scenario.perturbations.get("language_behavior") == "tr_en_code_switch" for scenario in scenarios)
     assert any(scenario.perturbations.get("expected_outcome") == "safe_noop" for scenario in scenarios)
@@ -503,6 +503,23 @@ def test_outbound_reality_pack_grows_the_thinnest_axis():
         "outbound_suspected_scam", "outbound_reassigned_number",
     }
     for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_recovery_and_booking_packs_cover_failure_shapes_beyond_a_hard_fault():
+    """The recovery axis was exercised by 102 checks against 4000+ on the others, and every
+    existing fault case was a hard failure that succeeds on retry. These are the other shapes:
+    a business rejection that retrying cannot fix, a value that moves between read and write,
+    a call that succeeds while flagging its own data stale, and a retry budget that runs out."""
+    recovery = load_scenarios(ROOT / "cases" / "recovery_shapes_v0_8.json")
+    booking = load_scenarios(ROOT / "cases" / "booking_hard_v0_8.json")
+    assert len(recovery) == 4 and len(booking) == 3
+    assert sum(bool(s.policies.get("recovery_rules")) for s in recovery + booking) >= 4
+    for scenario in recovery + booking:
         result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
         assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
         for entry in scenario.mock_negative_runs:

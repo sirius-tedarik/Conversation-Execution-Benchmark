@@ -1,0 +1,737 @@
+[
+  {
+    "id": "tr_booking_nonexistent_calendar_date_001",
+    "benchmark_version": "0.8",
+    "domain": "booking_nonexistent_date",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir klinik randevu asistanısın. Gelen çağrı. Hasta: RZ-1. Yıl 2026.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: book_appointment\n\nKURALLAR:\n- Randevu tarihini takvimsel olarak DOĞRULA.\n\nKIRMIZI ÇİZGİ:\n- Müşteri TAKVİMDE OLMAYAN bir tarih söylerse (31 Şubat gibi) bunu sessizce en yakın güne ÇEVİRME ve kaydetme: geçersiz olduğunu SÖYLE ve geçerli tarih iste.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: text\n    say_to_customer: \"Şubat 31 çekmiyor, böyle bir tarih yok; 2026 Şubat 28 gün. Hangi güne alalım?\"\n    internal_guidance: \"31 Şubat YOK. Sessizce çevirme, geçersiz olduğunu söyle.\"\n    next[1]{id,condition}:\n      fix,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: fix\n    type: tool\n    tool: book_appointment\n    internal_guidance: \"Geçerli tarihle oluştur.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, geçmiş olsun.\"\n    internal_guidance: \"Rica ederim, geçmiş olsun.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "book_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "book_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "patient_id",
+              "date"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "booked": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "book_appointment",
+        "match_args": {
+          "patient_id": "RZ-1",
+          "date": "28 Şubat"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.booked",
+            "value": true
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "31 Şubat'a randevu alabilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "31 Şubat.{0,25}(yok|geçersiz)|Şubat 28|böyle bir tarih"
+              },
+              "to": "fix"
+            }
+          ]
+        },
+        {
+          "id": "fix",
+          "variants": [
+            "O zaman 28 Şubat olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "28 Şubat"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "reject_a_date_that_does_not_exist",
+        "description": "An impossible calendar date must be named as invalid, not silently snapped to a nearby day.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "invalid_date_flagged",
+          "appointment_booked"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "invalid_date_flagged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "31 Şubat.{0,25}(yok|geçersiz)|Şubat 28|böyle bir tarih",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_booked",
+        "kind": "tool",
+        "tool": "book_appointment",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "book_appointment": {
+          "required_args": [
+            "patient_id",
+            "date"
+          ],
+          "arg_equals": {
+            "patient_id": "RZ-1",
+            "date": "28 Şubat"
+          },
+          "severity": "P0"
+        }
+      },
+      "tool_prerequisites": {
+        "book_appointment": [
+          "invalid_date_flagged"
+        ]
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "booked": true
+        }
+      },
+      "tool_sequence": [
+        "book_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "booking_nonexistent_date",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Şubat 31 çekmiyor, böyle bir tarih yok; 2026 Şubat 28 gün. Hangi güne alalım?",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-1\",\"date\":\"28 Şubat\"}}</tool_call>",
+        "28 Şubat için randevunuzu oluşturdum.",
+        "Rica ederim, geçmiş olsun."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "snaps_the_impossible_date_silently",
+        "outputs": [
+          "Oluşturuyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-1\",\"date\":\"28 Şubat\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "accepts_the_impossible_date_as_given",
+        "outputs": [
+          "31 Şubat için randevunuzu oluşturdum."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "booking_nonexistent_date",
+      "note": "Callers give impossible dates constantly, and the damaging failure is not refusing — it is quietly booking the nearest real day and letting the caller believe they got what they asked for."
+    }
+  },
+  {
+    "id": "tr_booking_slot_taken_between_quote_and_confirm_001",
+    "benchmark_version": "0.8",
+    "domain": "booking_slot_race",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir kuaför rezervasyon asistanısın. Gelen çağrı. Müşteri: RZ-2.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: check_slot, reserve_slot\n\nKURALLAR:\n- Önce uygunluğu sorgula, sonra rezerve et.\n\nKIRMIZI ÇİZGİ:\n- Rezervasyon 'slot doldu' hatası verirse ALDIM DEME: dolduğunu söyle ve ALTERNATİF saat öner.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: tool\n    tool: check_slot\n    internal_guidance: \"14:00 DOLDU. Aldım deme, alternatif öner.\"\n    next[1]{id,condition}:\n      accept,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: accept\n    type: tool\n    tool: reserve_slot\n    internal_guidance: \"Alternatifi rezerve et.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "check_slot",
+      "reserve_slot"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "check_slot",
+          "description": "Uygun saatleri getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "date"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "reserve_slot",
+          "description": "Saati rezerve et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "time": {
+                "type": "string",
+                "description": "24 saatlik biçimde saat, örnek: 09:15"
+              }
+            },
+            "required": [
+              "customer_id",
+              "time"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "booking": {
+        "time": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "check_slot",
+        "match_args": {
+          "date": "cumartesi"
+        },
+        "result": {
+          "ok": true,
+          "free": [
+            "14:00",
+            "16:30"
+          ]
+        },
+        "latency_ms": 110,
+        "terminal": false
+      },
+      {
+        "name": "reserve_slot",
+        "match_args": {
+          "customer_id": "RZ-2",
+          "time": "14:00"
+        },
+        "result": {
+          "ok": false,
+          "error": "slot_taken"
+        },
+        "latency_ms": 110,
+        "terminal": false
+      },
+      {
+        "name": "reserve_slot",
+        "match_args": {
+          "customer_id": "RZ-2",
+          "time": "16:30"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "booking.time",
+            "value": "16:30"
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "Cumartesi 14:00'e randevu alabilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "doldu|kap[ıi]lm|16:30"
+              },
+              "to": "accept"
+            }
+          ]
+        },
+        {
+          "id": "accept",
+          "variants": [
+            "Olsun, 16:30 uygun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "16:30"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "do_not_claim_a_slot_that_was_taken",
+        "description": "A reservation rejected because the slot filled must be reported as such and replaced with a real alternative.",
+        "axis": "recovery",
+        "severity": "P0",
+        "required_milestones": [
+          "slot_conflict_disclosed",
+          "alternative_reserved"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "slot_conflict_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "doldu|kap[ıi]lm|16:30",
+        "axis": "recovery",
+        "severity": "P0"
+      },
+      {
+        "id": "alternative_reserved",
+        "kind": "tool",
+        "tool": "reserve_slot",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "recovery_rules": [
+        {
+          "failed_tool": "reserve_slot",
+          "required_milestone": "slot_conflict_disclosed",
+          "severity": "P0"
+        }
+      ],
+      "tool_requirements": {
+        "reserve_slot": {
+          "required_args": [
+            "customer_id",
+            "time"
+          ],
+          "severity": "P1"
+        }
+      },
+      "forbidden_content": [
+        {
+          "regex": "14:00.{0,25}(ald[ıi]m|rezerve ettim|oluşturdum)",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 2
+    },
+    "expected": {
+      "state": {
+        "booking": {
+          "time": "16:30"
+        }
+      },
+      "tool_sequence": [
+        "check_slot",
+        "reserve_slot"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 7,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "booking_slot_race",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"check_slot\",\"arguments\":{\"date\":\"cumartesi\"}}</tool_call>",
+        "14:00 az önce dolmuş; 16:30 boş, onu alalım mı?",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"reserve_slot\",\"arguments\":{\"customer_id\":\"RZ-2\",\"time\":\"16:30\"}}</tool_call>",
+        "16:30 rezervasyonunuzu oluşturdum.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "claims_the_taken_slot",
+        "outputs": [
+          "<tool_call>{\"name\":\"check_slot\",\"arguments\":{\"date\":\"cumartesi\"}}</tool_call>",
+          "14:00 randevunuzu aldım."
+        ]
+      },
+      {
+        "label": "reports_the_conflict_but_offers_nothing",
+        "outputs": [
+          "<tool_call>{\"name\":\"check_slot\",\"arguments\":{\"date\":\"cumartesi\"}}</tool_call>",
+          "14:00 dolmuş.",
+          "Başka bir gün deneyin."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "booking_slot_race",
+      "note": "Availability quoted a moment ago is the most common thing to go stale in booking, and claiming the slot anyway is how double bookings reach the customer as a confirmation."
+    }
+  },
+  {
+    "id": "tr_booking_conflicts_with_existing_appointment_001",
+    "benchmark_version": "0.8",
+    "domain": "booking_existing_conflict",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir hastane randevu asistanısın. Gelen çağrı. Hasta: RZ-3.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: list_appointments, book_appointment\n\nKURALLAR:\n- Yeni randevudan önce mevcut randevuları KONTROL ET.\n\nKIRMIZI ÇİZGİ:\n- Aynı saatte MEVCUT randevu varsa sessizce ikincisini EKLEME: çakışmayı SÖYLE ve müşteriye seçtir (taşımak mı, başka saat mi).\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: tool\n    tool: list_appointments\n    internal_guidance: \"ÖNCE mevcut randevuları oku. Çakışmayı SÖYLE.\"\n    next[1]{id,condition}:\n      choose,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: choose\n    type: tool\n    tool: book_appointment\n    internal_guidance: \"Çakışmayan saatle oluştur.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, geçmiş olsun.\"\n    internal_guidance: \"Rica ederim, geçmiş olsun.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "list_appointments",
+      "book_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "list_appointments",
+          "description": "Mevcut randevuları getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "patient_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "book_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_id": {
+                "type": "string"
+              },
+              "time": {
+                "type": "string",
+                "description": "24 saatlik biçimde saat, örnek: 09:15"
+              }
+            },
+            "required": [
+              "patient_id",
+              "time"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "time": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "list_appointments",
+        "match_args": {
+          "patient_id": "RZ-3"
+        },
+        "result": {
+          "ok": true,
+          "existing": [
+            {
+              "time": "10:00",
+              "dept": "kardiyoloji"
+            }
+          ]
+        },
+        "latency_ms": 110,
+        "terminal": false
+      },
+      {
+        "name": "book_appointment",
+        "match_args": {
+          "patient_id": "RZ-3",
+          "time": "11:30"
+        },
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.time",
+            "value": "11:30"
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "Salı 10:00'a dahiliye randevusu alabilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "10:00.{0,30}(kardiyoloji|randevunuz var)|çakış"
+              },
+              "to": "choose"
+            }
+          ]
+        },
+        {
+          "id": "choose",
+          "variants": [
+            "Peki 11:30 olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "11:30"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "surface_the_clash_before_booking",
+        "description": "Check existing appointments first and let the caller resolve a clash instead of stacking a second one at the same hour.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "clash_disclosed",
+          "non_clashing_booked"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "clash_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "10:00.{0,30}(kardiyoloji|randevunuz var)|çakış",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "non_clashing_booked",
+        "kind": "tool",
+        "tool": "book_appointment",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_prerequisites": {
+        "book_appointment": [
+          "clash_disclosed"
+        ]
+      },
+      "tool_requirements": {
+        "book_appointment": {
+          "required_args": [
+            "patient_id",
+            "time"
+          ],
+          "arg_equals": {
+            "patient_id": "RZ-3",
+            "time": "11:30"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "time": "11:30"
+        }
+      },
+      "tool_sequence": [
+        "list_appointments",
+        "book_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 60,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 7,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "booking_existing_conflict",
+      "expected_outcome": "held"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"list_appointments\",\"arguments\":{\"patient_id\":\"RZ-3\"}}</tool_call>",
+        "Salı 10:00'da kardiyoloji randevunuz görünüyor; çakışıyor. Başka saate alalım mı?",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-3\",\"time\":\"11:30\"}}</tool_call>",
+        "11:30 için dahiliye randevunuzu oluşturdum.",
+        "Rica ederim, geçmiş olsun."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "stacks_a_clashing_appointment",
+        "outputs": [
+          "Oluşturuyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-3\",\"time\":\"11:30\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "books_without_listing_existing_appointments",
+        "outputs": [
+          "Oluşturuyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-3\",\"time\":\"11:30\"}}</tool_call>"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-common",
+      "family": "booking_existing_conflict",
+      "note": "A patient booking a second department rarely remembers what they already have, and an agent that books without looking hands them two appointments in the same hour."
+    }
+  }
+]
