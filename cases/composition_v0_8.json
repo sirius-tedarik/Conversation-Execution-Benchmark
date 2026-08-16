@@ -482,7 +482,7 @@
     "domain": "comp_ambiguity_stack",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Sen bir restoran rezervasyon asistanısın. Gelen çağrı. Bugün 28 Eylül.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: book_table\n\nKURALLAR:\n- Rezervasyon için tarih ve kişi sayısı gerekir.\n\nKIRMIZI ÇİZGİ:\n- İçeriksiz turda niyet VARSAYMA.\n- Arka plandan gelen cevabı asıl müşteriye TEYİT ETTİR.\n- Zıt talimatta BİRİNİ SEÇME, netleştir.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: mumble\n  note: Karşılama zaten yapıldı.\nsteps[6]:\n  - id: mumble\n    type: text\n    say_to_customer: \"Elbette, hangi tarih için düşünüyorsunuz?\"\n    internal_guidance: \"İçerik yok, VARSAYMA.\"\n    next[1]{id,condition}:\n      ambiguous,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: ambiguous\n    type: text\n    say_to_customer: \"Hangi ayın 5'i olduğunu teyit edelim: Ekim'in 5'i mi?\"\n    internal_guidance: \"Ay belirsiz, SOR.\"\n    next[1]{id,condition}:\n      background,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: background\n    type: text\n    say_to_customer: \"Ekim'in 5'i, not aldım. Arkadan duydum ama sizden teyit alayım: dört kişi doğru mu?\"\n    internal_guidance: \"Cevap arkadan geldi, TEYİT ETTİR.\"\n    next[1]{id,condition}:\n      contradiction,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: contradiction\n    type: text\n    say_to_customer: \"Netleştirelim: rezervasyonu oluşturayım mı?\"\n    internal_guidance: \"Zıt talimat, BİRİNİ SEÇME.\"\n    next[1]{id,condition}:\n      decide,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: decide\n    type: tool\n    tool: book_table\n    internal_guidance: \"5 Ekim için dört kişilik rezervasyonunuzu oluşturdum.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "system": "Sen bir restoran rezervasyon asistanısın. Gelen çağrı. Bugün 28 Eylül.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: book_table\n\nKURALLAR:\n- Rezervasyon için tarih ve kişi sayısı gerekir.\n- book_table'a tarihi müşterinin TEYİT ETTİĞİ Türkçe biçimde gönder; ISO biçime ÇEVİRME ve YIL EKLEME.\n\nKIRMIZI ÇİZGİ:\n- İçeriksiz turda niyet VARSAYMA.\n- Arka plandan gelen cevabı asıl müşteriye TEYİT ETTİR.\n- Zıt talimatta BİRİNİ SEÇME, netleştir.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: mumble\n  note: Karşılama zaten yapıldı.\nsteps[6]:\n  - id: mumble\n    type: text\n    say_to_customer: \"Elbette, hangi tarih için düşünüyorsunuz?\"\n    internal_guidance: \"İçerik yok, VARSAYMA.\"\n    next[1]{id,condition}:\n      ambiguous,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: ambiguous\n    type: text\n    say_to_customer: \"Hangi ayın 5'i olduğunu teyit edelim: Ekim'in 5'i mi?\"\n    internal_guidance: \"Ay belirsiz, SOR.\"\n    next[1]{id,condition}:\n      background,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: background\n    type: text\n    say_to_customer: \"Ekim'in 5'i, not aldım. Arkadan duydum ama sizden teyit alayım: dört kişi doğru mu?\"\n    internal_guidance: \"Cevap arkadan geldi, TEYİT ETTİR.\"\n    next[1]{id,condition}:\n      contradiction,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: contradiction\n    type: text\n    say_to_customer: \"Netleştirelim: rezervasyonu oluşturayım mı?\"\n    internal_guidance: \"Zıt talimat, BİRİNİ SEÇME.\"\n    next[1]{id,condition}:\n      decide,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: decide\n    type: tool\n    tool: book_table\n    internal_guidance: \"5 Ekim için dört kişilik rezervasyonunuzu oluşturdum.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
     "available_tools": [
       "book_table"
     ],
@@ -496,7 +496,8 @@
             "type": "object",
             "properties": {
               "date": {
-                "type": "string"
+                "type": "string",
+                "description": "Türkçe gün ve ay adı (örnek: 12 Mart). ISO biçime çevirme, yıl ekleme."
               },
               "party_size": {
                 "type": "integer"
@@ -753,7 +754,7 @@
       "source": "synthetic-controlled",
       "split": "public-common",
       "family": "comp_ambiguity_stack",
-      "note": "Four ambiguity sources in one booking, each of which the model resolves correctly when it is the only thing happening."
+      "note": "Four ambiguity sources in one booking, each of which the model resolves correctly when it is the only thing happening. The date format is documented in the schema because the model was observed converting the confirmed '5 Ekim' into '2023-10-05', inventing a year the conversation never contained."
     }
   }
 ]
