@@ -165,7 +165,7 @@ For `k` trials per scenario:
 
 `Pass^k` is the production-oriented reliability measure. Release thresholds are versioned in [`benchmark.json`](benchmark.json).
 
-`benchmark.json`'s gate (`p0_failures: 0`, `pass_pow_k: 1.0`, every axis at 90–100) is calibrated for the deterministic mock self-test, not a live model — it exists to catch harness regressions, so a real model will not clear it. For evaluating an actual model against a ship/no-ship bar, use [`benchmark.release.json`](benchmark.release.json) instead: `ceb --manifest benchmark.release.json ...`. Its thresholds are calibrated from measured live sweeps against `callingai-qwen35-9b-v2` (89.8% Pass@1, 88.8% Pass^k on the full 143-case suite) — adjust them for your own release bar as evidence accumulates.
+`benchmark.json`'s gate (`p0_failures: 0`, `pass_pow_k: 1.0`, every axis at 90–100) is calibrated for the deterministic mock self-test, not a live model — it exists to catch harness regressions, so a real model will not clear it. For evaluating an actual model against a ship/no-ship bar, use [`benchmark.release.json`](benchmark.release.json) instead: `ceb --manifest benchmark.release.json ...`. Its thresholds are calibrated from measured live sweeps against `callingai-qwen35-9b-v2` — most recently 90.0% Pass@1 and 87.7% Pass^k over 510 runs of a 162-case suite. Newer packs added since that sweep target known weaknesses and score lower, so expect the figure to fall as coverage grows: a suite that stops finding failures has stopped measuring. Adjust the thresholds for your own release bar as evidence accumulates.
 
 ### Reference harness result
 

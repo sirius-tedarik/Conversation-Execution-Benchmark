@@ -8,7 +8,21 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 
 ### Added
 
-- Nine new case packs — `behavior_gaps`, `call_conduct`, `consistency_deep`, `consistency_hard`, `hard_ux`, `parallel_traps`, `phone_ux`, `realtime_findings`, and `turkish_callcenter_hard` — growing default public evaluation from 83 to 160 scenarios across 159 distinct domains
+- Default public evaluation grows from 83 to **207 scenarios across 206 distinct domains**, in twenty-six case packs
+- `behavior_gaps`, `call_conduct`, `consistency_deep`, `consistency_hard`, `hard_ux`, `parallel_traps`, `phone_ux`, `realtime_findings`, and `turkish_callcenter_hard` packs
+- `long_call` and `scope_ladder` packs give the suite a deliberate call-length spread. The production transcripts this suite is mined from run a median of 11 turns while the suite ran a median of 3, so constraint decay had no room to appear. One case runs 22 turns; a ladder repeats one confirmed defect at 3, 5 and 11 turns so length is measured as its own variable
+- `chaos` and `composition` packs. Four controlled probes established that this model's failures are **compositional** — neither flow length, nor semantically adjacent steps, nor a vague opener, nor the post-tool generation slot, nor a contentless confirmation turn reproduces on its own what a genuinely messy call does. The composition cases therefore stack three to five traps that each pass individually, so any failure is attributable to composition alone
+- `common_behaviors` and `common_behaviors_2`: twenty everyday caller behaviours, one per case, with a test asserting the two packs share no family so the second cannot drift into paraphrases of the first
+- `constraint_scope` pack: a restriction must bind only what it names, tested on the channel, object and person axes
+- `cross_domain` pack carries failure modes with no banking equivalent — an allergen the data does not cover while a severe allergy is stated, a dosing question that is medical advice, and a brake fault the caller wants booked two weeks out
+- `off_script` pack leaves one user-plan turn with no step in the flow the model receives, so improvisation is measured rather than assumed. Fluency is scored through its observable proxies: stays in role, invents no capability, returns to the pending task
+- `loop_and_carry` and `premise_and_compound` packs: the two everyday shapes that produce a repetition loop, information hand-off across a whole call, a false premise asserted as settled background, and a compound request whose halves carry different permission levels
+- `user_plan.abandon_when`: the caller now hangs up on an agent that repeats a contentless holding phrase, scored as a P1 `customer_did_not_abandon` check. 43 of 178 real calls ended exactly that way, and the suite previously had no notion of the customer abandoning
+- TOON system-prompt format for authoring scenario flows (`src/ceb/toon.py`, `src/ceb/patterns.py`)
+- Self-contained interactive HTML report renderer (`src/ceb/report.py`) with filter/search/expand/CSV export, written automatically alongside every JSON report
+- Static case auditor (`tools/audit_cases.py`) catching self-inconsistent rules: a forbidden-content regex that matches the case's own reference answer, a rule no negative fixture exercises, a milestone the reference transcript never satisfies, or a behavioural phrase hand-written where a canonical shared pattern already owns it
+- `benchmark.release.json` — a release-gate manifest calibrated from measured live sweeps, distinct from `benchmark.json`'s deterministic mock self-test gate
+- `--concurrency` flag on the CLI for parallel live sweeps
 - `phone_ux` pack: phone-appropriate UX for requesting/collecting numbers and codes over voice — agent-initiated pacing, interrupted-code self-correction, masked-ID readback under repeated pressure, sequential no-overload credential collection, backchannel-repeat deduplication, disguised-correction detection, sustained multi-interjection accumulation, and natural tens-compound number-word parsing
 - `realtime_findings` pack extended with six cases mined from real production test transcripts: an identity-verification loop overriding a medical emergency, spontaneous persona reinvention abandoning a live crisis, weekday-name arithmetic hallucination, an outage report misrouted to the billing tool with fabricated cause/ETA, a transfer veto ignored via a repeated canned line, and a fabricated operational detail answering a legitimate no-data question
 - `parallel_traps` pack: cases holding several unrelated policy/action disciplines live in the same call, so passing requires all of them at once
@@ -22,6 +36,23 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 
 - Regex-too-narrow case bugs found via live sweeps against `callingai-qwen35-9b-v2`, verified independently against captured transcripts before widening
 - `read_only_tools` policy plus an independent `early_tool_call` check, closing a turn-scoped matching gap where an early tool call could permanently break a node's transition
+- 33 hand-written behavioural regexes now delegate to the canonical shared patterns that already own them, so widening one reaches every case instead of one case at a time
+- Several cases split information a competent agent says in one breath across two steps, which scored good service as racing ahead. The affected cases went from 0/5 to 5/5 live with no change to the model; the rule is now that a follow-up a human would volunteer unasked belongs to the same step
+- Several content milestones matched the right string in the wrong turn — a value stated legitimately earlier also satisfied a late-call check, so fixtures that never performed the late behaviour still passed. Late-call milestones are now anchored on wording unique to their turn
+
+### Known model findings (left undisturbed)
+
+These reproduce against `callingai-qwen35-9b-v2` and are deliberately **not** worked around in the cases:
+
+- Repetition stall: after two good simplifications the model tries to close on a still-confused caller, then repeats one sentence verbatim until the caller hangs up
+- An emotional disclosure pushes it into executing an irreversible action before the confirmation its own flow requires, then executing it again
+- A restriction naming one person is generalised to everyone, so the account holder is refused their own balance
+- Two sources disagreeing is resolved silently in favour of the first, without querying the second
+- A safety warning is delivered correctly and the action it requires is never completed
+- Undeclared tools are invented, and a fabricated system-slowness excuse covers the gap
+- Completed mutations are repeated after the closing
+- A date confirmed with the caller in Turkish is converted to ISO with a year the conversation never contained; one run emitted template placeholders as argument names
+- In a 22-turn chaotic call the model delivers a later step's answer before its trigger and desynchronises by turn 4
 
 ### Planned
 
