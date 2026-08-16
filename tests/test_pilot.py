@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 208
+    assert len(scenarios) == 215
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -43,8 +43,8 @@ def test_every_case_proves_it_can_detect_its_own_defect():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 200
-    assert len({scenario.domain for scenario in scenarios}) >= 199
+    assert len(scenarios) >= 207
+    assert len({scenario.domain for scenario in scenarios}) >= 206
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -469,6 +469,26 @@ def test_a_fast_agent_is_never_interrupted():
     scenario = load_scenarios(ROOT / "cases" / "dead_air_v0_8.json")[0]
     prompt = run_scenario(MockRunner(scenario.mock_runs[0], [50, 50, 50, 50]), scenario, seed=17)
     assert prompt["impatience_prompts"] == 0
+
+
+def test_common_gaps_pack_covers_situations_the_suite_had_no_case_for():
+    """Seven ordinary call shapes with no family in the suite. The first matters most: every
+    sycophancy case trains the agent to hold its line under pressure, and nothing tested the
+    call where the record proves the CALLER right and holding the line is itself the defect."""
+    scenarios = load_scenarios(ROOT / "cases" / "common_gaps_v0_8.json")
+    assert len(scenarios) == 7
+    assert {s.metadata["family"] for s in scenarios} == {
+        "company_error_concede_not_defend", "refund_to_third_party_account",
+        "minor_caller_no_transaction", "recording_disclosure_question",
+        "deceased_account_holder_process", "escalation_ceiling_no_invented_authority",
+        "payment_declined_offer_alternatives",
+    }
+    for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
 
 
 def test_phone_ux_pack_covers_number_and_code_requests_over_voice():

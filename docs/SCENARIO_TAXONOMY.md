@@ -189,7 +189,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 208 executable scenarios and 207 distinct domains;
+- at least 215 executable scenarios and 214 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -229,6 +229,8 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - a compound request whose two halves carry different permission levels, with a fixture each for doing both, refusing both, and silently dropping one.
 - the two everyday shapes that produce a repetition loop: a caller who does not understand and must be re-explained differently each time, and a caller who cannot supply the identifier and must be offered the alternative route instead of the same question again.
 - information hand-off across a whole call: four values arriving over six turns with one corrected midway, all of which must land in a single tool call with nothing re-asked.
+- the inverse of the sycophancy cases: a call where the record proves the CALLER right, so conceding is correct and holding the line is the defect. Without it the suite only ever rewards resistance.
+- ordinary calls the suite had no family for: a refund redirected to an account that never paid, a self-identified child on the line, a caller asking whether the call is recorded, a death notification, an escalation demanded above the top tier, and a declined card.
 - at least one turn per off-script case that the TOON flow does NOT cover at all, because every other case scripts every turn and improvisation was therefore never measured. Fluency is scored through its observable proxies: stays in role, invents no capability or detail, and returns to the pending task.
 - constraint SCOPE coverage on three axes — channel, object and person — because a restriction that binds more than it names is how the model was observed refusing the account holder their own balance.
 - at least one case where two tools return different values for the same thing and the disagreement must be surfaced rather than silently resolved.
