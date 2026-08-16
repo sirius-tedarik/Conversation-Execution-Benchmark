@@ -1,0 +1,765 @@
+[
+  {
+    "id": "tr_loop_rephrase_when_not_understood_001",
+    "benchmark_version": "0.8",
+    "domain": "loop_rephrase_not_repeat",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir elektrik faturası asistanısın. Gelen çağrı. Müşteri: EL-80.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_bill_breakdown\n\nKURALLAR:\n- Fatura dökümünü get_bill_breakdown ile getir.\n- İLK açıklamanı istediğin gibi kur; net ve sade başlaman iyidir.\n- Müşteri anlamadığını söylerse AYNI cümleyi TEKRARLAMA; her seferinde YENİ ve bir kademe daha sade bir anlatım kur.\n\nKIRMIZI ÇİZGİ:\n- Aynı açıklamayı iki kez KURMA. İkinci açıklamada tüketim artışını (300 → 450 kWh) SOMUT sayılarla anlat; müşteri hâlâ anlamazsa üçüncüde daha da sadeleştir.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: ask\n    type: tool\n    tool: get_bill_breakdown\n    internal_guidance: \"Bu dönem tüketim artışı ve birim fiyat değişimi yansımış.\"\n    next[1]{id,condition}:\n      again_one,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: again_one\n    type: text\n    say_to_customer: \"Şöyle anlatayım: geçen ay 300 kWh, bu ay 450 kWh harcamışsınız.\"\n    internal_guidance: \"Müşteri ANLAMADI. AYNI cümleyi kurma; somut sayılarla (300 -> 450 kWh) yeniden anlat.\"\n    next[1]{id,condition}:\n      again_two,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: again_two\n    type: text\n    say_to_customer: \"Kısaca: bu ay geçen aya göre daha fazla elektrik kullanmışsınız, fatura da o yüzden arttı.\"\n    internal_guidance: \"Müşteri YİNE anlamadı. Bir kademe DAHA sadeleştir, teknik kelime kullanma.\"\n    next[1]{id,condition}:\n      got_it,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: got_it\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_bill_breakdown"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_bill_breakdown",
+          "description": "Fatura dökümünü getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "bill": {
+        "explained": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_bill_breakdown",
+        "match_args": {
+          "customer_id": "EL-80"
+        },
+        "result": {
+          "ok": true,
+          "prev_kwh": 300,
+          "curr_kwh": 450,
+          "unit_price_change": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "bill.explained",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "Faturam neden bu kadar yüksek geldi?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kWh|tüketim|birim fiyat|harca|artt"
+              },
+              "to": "again_one"
+            }
+          ]
+        },
+        {
+          "id": "again_one",
+          "variants": [
+            "Anlamadım, ne demek şimdi bu?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "450|300"
+              },
+              "to": "again_two"
+            }
+          ],
+          "fallback_to": "again_one"
+        },
+        {
+          "id": "again_two",
+          "variants": [
+            "Yine anlamadım, ben yaşlıyım, biraz daha basit anlatın."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "daha fazla|fazla elektrik"
+              },
+              "to": "got_it"
+            }
+          ],
+          "fallback_to": "again_two"
+        },
+        {
+          "id": "got_it",
+          "variants": [
+            "Ha, şimdi anladım, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "re_explain_differently_each_time",
+        "description": "Two 'I did not understand' turns must each produce a genuinely simpler, different explanation rather than the same sentence again.",
+        "axis": "conversation_experience",
+        "severity": "P1",
+        "required_milestones": [
+          "explained_at_all",
+          "explained_with_numbers",
+          "explained_plainly"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "explained_at_all",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "kWh|tüketim|birim fiyat|harca|artt",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "explained_with_numbers",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "450",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "explained_plainly",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "daha fazla|fazla elektrik",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "bill": {
+          "explained": true
+        }
+      },
+      "tool_sequence": [
+        "get_bill_breakdown"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 55,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 8,
+      "max_user_turns": 6,
+      "max_reasks": 2
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "loop_rephrase_not_repeat",
+      "expected_outcome": "varied_not_repeated"
+    },
+    "trials": 5,
+    "max_user_turns": 6,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_bill_breakdown\",\"arguments\":{\"customer_id\":\"EL-80\"}}</tool_call>",
+        "Bu dönem tüketim artışı ve birim fiyat değişimi yansımış.",
+        "Şöyle anlatayım: geçen ay 300 kWh, bu ay 450 kWh harcamışsınız.",
+        "Kısaca: bu ay geçen aya göre daha fazla elektrik kullanmışsınız, fatura da o yüzden arttı.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "repeats_the_same_sentence_until_the_caller_gives_up",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_bill_breakdown\",\"arguments\":{\"customer_id\":\"EL-80\"}}</tool_call>",
+          "Bu dönem tüketim artışı ve birim fiyat değişimi yansımış.",
+          "Bu dönem tüketim artışı ve birim fiyat değişimi yansımış.",
+          "Bu dönem tüketim artışı ve birim fiyat değişimi yansımış.",
+          "Bu dönem tüketim artışı ve birim fiyat değişimi yansımış."
+        ]
+      },
+      {
+        "label": "never_reaches_plain_language",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_bill_breakdown\",\"arguments\":{\"customer_id\":\"EL-80\"}}</tool_call>",
+          "Bu dönem tüketim artışı ve birim fiyat değişimi yansımış.",
+          "Şöyle anlatayım: geçen ay 300 kWh, bu ay 450 kWh harcamışsınız.",
+          "Endeks farkı ve birim fiyat artışı kaynaklı."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-loop",
+      "family": "loop_rephrase_not_repeat",
+      "note": "The most ordinary loop in a real call: the caller does not understand and the agent says the same sentence again. The node self-loops so a repeating agent keeps getting re-prompted until abandon_when ends the call."
+    }
+  },
+  {
+    "id": "tr_loop_offer_alternative_when_caller_cannot_answer_001",
+    "benchmark_version": "0.8",
+    "domain": "loop_alternative_identification",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir banka müşteri hizmetleri asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: verify_by_phone\n\nKURALLAR:\n- Doğrulama için müşteri numarası gerekir.\n- Müşteri numarasını BİLMİYORSA aynı soruyu TEKRAR SORMA; ALTERNATİF doğrulama yolu (kayıtlı telefon numarası) ÖNER ve onunla devam et.\n\nKIRMIZI ÇİZGİ:\n- 'Müşteri numaranızı alabilir miyim' cümlesini İKİNCİ KEZ KURMA. Müşteri bilmiyorsa hemen alternatif yol öner.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: need_id\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: need_id\n    type: text\n    say_to_customer: \"Elbette, müşteri numaranızı alabilir miyim?\"\n    internal_guidance: \"Elbette, müşteri numaranızı alabilir miyim?\"\n    next[1]{id,condition}:\n      again_cannot,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: again_cannot\n    type: text\n    say_to_customer: \"Sorun değil, kayıtlı telefon numaranızla da doğrulayabiliriz. Numaranızı alabilir miyim?\"\n    internal_guidance: \"Müşteri numarasını BİLMİYOR. Aynı soruyu TEKRAR SORMA; kayıtlı telefonla doğrulamayı ÖNER.\"\n    next[1]{id,condition}:\n      gives_phone,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: gives_phone\n    type: tool\n    tool: verify_by_phone\n    internal_guidance: \"Kimliğiniz doğrulandı.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "verify_by_phone"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_by_phone",
+          "description": "Kayıtlı telefonla doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "msisdn": {
+                "type": "string",
+                "description": "Başında sıfır, boşluksuz 11 hane"
+              }
+            },
+            "required": [
+              "msisdn"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "identity": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_by_phone",
+        "match_args": {
+          "msisdn": "05321234567"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "identity.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "need_id",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "need_id",
+          "variants": [
+            "Hesabımla ilgili bir sorun var, yardım eder misiniz?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "müşteri numar"
+              },
+              "to": "again_cannot"
+            }
+          ]
+        },
+        {
+          "id": "again_cannot",
+          "variants": [
+            "Müşteri numaram mı? Onu bilmiyorum ki, nerede yazıyor?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "telefon"
+              },
+              "to": "gives_phone"
+            }
+          ],
+          "fallback_to": "again_cannot"
+        },
+        {
+          "id": "gives_phone",
+          "variants": [
+            "Telefonum 0532 123 45 67."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "doğrulandı"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "switch_path_instead_of_re_asking",
+        "description": "When the caller cannot supply the customer number, offer the alternative identification route rather than asking the same question again.",
+        "axis": "conversation_experience",
+        "severity": "P1",
+        "required_milestones": [
+          "asked_once",
+          "alternative_offered",
+          "verified"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "asked_once",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "müşteri numar",
+        "axis": "conversation_experience",
+        "severity": "P2"
+      },
+      {
+        "id": "alternative_offered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "telefon",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "verified",
+        "kind": "tool",
+        "tool": "verify_by_phone",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "identity": {
+          "verified": true
+        }
+      },
+      "tool_sequence": [
+        "verify_by_phone"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 55,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 8,
+      "max_user_turns": 6,
+      "max_reasks": 2
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "loop_alternative_identification",
+      "expected_outcome": "varied_not_repeated"
+    },
+    "trials": 5,
+    "max_user_turns": 6,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Elbette, müşteri numaranızı alabilir miyim?",
+        "Sorun değil, kayıtlı telefon numaranızla da doğrulayabiliriz. Numaranızı alabilir miyim?",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"verify_by_phone\",\"arguments\":{\"msisdn\":\"05321234567\"}}</tool_call>",
+        "Kimliğiniz doğrulandı.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "re_asks_the_same_question",
+        "outputs": [
+          "Elbette, müşteri numaranızı alabilir miyim?",
+          "Elbette, müşteri numaranızı alabilir miyim?",
+          "Elbette, müşteri numaranızı alabilir miyim?"
+        ]
+      },
+      {
+        "label": "dead_ends_without_an_alternative",
+        "outputs": [
+          "Elbette, müşteri numaranızı alabilir miyim?",
+          "Müşteri numarası olmadan işlem yapamıyorum."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-loop",
+      "family": "loop_alternative_identification",
+      "note": "A caller who does not have the identifier is completely ordinary. The failure is re-asking the same question instead of switching to the alternative route the system already supports."
+    }
+  },
+  {
+    "id": "tr_carry_multi_turn_values_into_one_call_001",
+    "benchmark_version": "0.8",
+    "domain": "carry_multi_turn_values_with_correction",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir restoran rezervasyon asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: create_reservation\n\nKURALLAR:\n- Rezervasyon için ad, tarih, kişi sayısı ve telefon gerekir; bunları konuşma boyunca TOPLA.\n- Müşterinin VERDİĞİ bir bilgiyi TEKRAR SORMA.\n\nKIRMIZI ÇİZGİ:\n- Kişi sayısı görüşme ortasında 4'ten 6'ya DÜZELTİLDİ. create_reservation'ı 6 ile çağır, 4 ile DEĞİL.\n- Dört bilgiyi de TEK çağrıda ve EKSİKSİZ gönder.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: name\n  note: Karşılama zaten yapıldı.\nsteps[7]:\n  - id: name\n    type: text\n    say_to_customer: \"Memnun oldum. Hangi tarih için ayarlayalım?\"\n    internal_guidance: \"Memnun oldum. Hangi tarih için ayarlayalım?\"\n    next[1]{id,condition}:\n      date,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: date\n    type: text\n    say_to_customer: \"15 Mart, peki kaç kişisiniz?\"\n    internal_guidance: \"15 Mart, peki kaç kişisiniz?\"\n    next[1]{id,condition}:\n      size,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: size\n    type: text\n    say_to_customer: \"4 kişi olarak not ettim.\"\n    internal_guidance: \"4 kişi olarak not ettim.\"\n    next[1]{id,condition}:\n      correct,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: correct\n    type: text\n    say_to_customer: \"Düzelttim, 6 kişi olarak güncelledim.\"\n    internal_guidance: \"Kişi sayısı 4 -> 6 DÜZELTİLDİ. Bundan sonra HER YERDE 6 kullan.\"\n    next[1]{id,condition}:\n      phone,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: phone\n    type: text\n    say_to_customer: \"Teşekkürler. Kemal Aydın adına 15 Mart, 6 kişi. Onaylıyor musunuz?\"\n    internal_guidance: \"Tüm bilgileri özetle ve onay iste. Verilen hiçbir bilgiyi TEKRAR SORMA.\"\n    next[1]{id,condition}:\n      confirm,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: confirm\n    type: tool\n    tool: create_reservation\n    internal_guidance: \"create_reservation'i DÖRT bilgiyle ve party_size=6 ile çağır.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "create_reservation"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_reservation",
+          "description": "Rezervasyon oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "party_size": {
+                "type": "integer"
+              },
+              "msisdn": {
+                "type": "string",
+                "description": "Başında sıfır, boşluksuz 11 hane"
+              }
+            },
+            "required": [
+              "name",
+              "date",
+              "party_size",
+              "msisdn"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "reservation": {
+        "created": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_reservation",
+        "match_args": {
+          "name": "Kemal Aydın",
+          "date": "15 Mart",
+          "party_size": 6,
+          "msisdn": "05329876543"
+        },
+        "result": {
+          "ok": true,
+          "created": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "reservation.created",
+            "value": true
+          }
+        ],
+        "latency_ms": 130,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "name",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "name",
+          "variants": [
+            "Rezervasyon yaptırmak istiyorum, adım Kemal Aydın."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "tarih"
+              },
+              "to": "date"
+            }
+          ]
+        },
+        {
+          "id": "date",
+          "variants": [
+            "15 Mart için olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kaç kişi|kişi say"
+              },
+              "to": "size"
+            }
+          ]
+        },
+        {
+          "id": "size",
+          "variants": [
+            "4 kişiyiz."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "4 kişi"
+              },
+              "to": "correct"
+            }
+          ]
+        },
+        {
+          "id": "correct",
+          "variants": [
+            "Pardon, 4 değil 6 kişi olacak, kayınvalidem de geliyor."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "6 kişi"
+              },
+              "to": "phone"
+            }
+          ]
+        },
+        {
+          "id": "phone",
+          "variants": [
+            "Telefonum 0532 987 65 43."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "onay"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, onaylıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "oluşturdum|tamamland"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "carry_every_value_and_the_correction_into_the_call",
+        "description": "Collect four values across six turns, apply a mid-conversation correction, re-ask nothing, and send all four correctly in a single call.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "correction_acknowledged",
+          "recap_before_confirm",
+          "reservation_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "correction_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "6 kişi",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "recap_before_confirm",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "Kemal Aydın",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "reservation_created",
+        "kind": "tool",
+        "tool": "create_reservation",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "create_reservation": {
+          "required_args": [
+            "name",
+            "date",
+            "party_size",
+            "msisdn"
+          ],
+          "arg_equals": {
+            "name": "Kemal Aydın",
+            "date": "15 Mart",
+            "party_size": 6,
+            "msisdn": "05329876543"
+          },
+          "severity": "P0"
+        }
+      },
+      "forbidden_content": [
+        {
+          "regex": "adınızı (tekrar|bir daha)|tarihi (tekrar|bir daha)|hangi tarih.{0,20}demiştiniz",
+          "severity": "P1"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "reservation": {
+          "created": true
+        }
+      },
+      "tool_sequence": [
+        "create_reservation"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 55,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 11,
+      "max_user_turns": 9,
+      "max_reasks": 2
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "carry_multi_turn_values_with_correction",
+      "expected_outcome": "varied_not_repeated"
+    },
+    "trials": 5,
+    "max_user_turns": 9,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Memnun oldum. Hangi tarih için ayarlayalım?",
+        "15 Mart, peki kaç kişisiniz?",
+        "4 kişi olarak not ettim.",
+        "Düzelttim, 6 kişi olarak güncelledim.",
+        "Teşekkürler. Kemal Aydın adına 15 Mart, 6 kişi. Onaylıyor musunuz?",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"create_reservation\",\"arguments\":{\"name\":\"Kemal Aydın\",\"date\":\"15 Mart\",\"party_size\":6,\"msisdn\":\"05329876543\"}}</tool_call>",
+        "Rezervasyonunuzu oluşturdum.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "books_the_pre_correction_party_size",
+        "outputs": [
+          "Memnun oldum. Hangi tarih için ayarlayalım?",
+          "15 Mart, peki kaç kişisiniz?",
+          "4 kişi olarak not ettim.",
+          "Düzelttim, 6 kişi olarak güncelledim.",
+          "Teşekkürler. Kemal Aydın adına 15 Mart, 6 kişi. Onaylıyor musunuz?",
+          "Oluşturuyorum.\n<tool_call>{\"name\":\"create_reservation\",\"arguments\":{\"name\":\"Kemal Aydın\",\"date\":\"15 Mart\",\"party_size\":4,\"msisdn\":\"05329876543\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "re_asks_a_value_already_given",
+        "outputs": [
+          "Memnun oldum. Hangi tarih için ayarlayalım?",
+          "15 Mart, peki kaç kişisiniz?",
+          "4 kişi olarak not ettim.",
+          "Düzelttim, 6 kişi olarak güncelledim.",
+          "Adınızı tekrar alabilir miyim?"
+        ]
+      },
+      {
+        "label": "never_acknowledges_the_correction",
+        "outputs": [
+          "Memnun oldum. Hangi tarih için ayarlayalım?",
+          "15 Mart, peki kaç kişisiniz?",
+          "4 kişi olarak not ettim.",
+          "Anladım, devam edelim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-loop",
+      "family": "carry_multi_turn_values_with_correction",
+      "note": "Information carry-over is what a booking call actually is: four values arrive across six turns, one of them is corrected halfway, and all of it has to land in one call without any of it being re-asked."
+    }
+  }
+]

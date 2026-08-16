@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 174
+    assert len(scenarios) == 177
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 166
-    assert len({scenario.domain for scenario in scenarios}) >= 165
+    assert len(scenarios) >= 169
+    assert len({scenario.domain for scenario in scenarios}) >= 168
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -321,6 +321,32 @@ def test_off_script_pack_leaves_a_turn_the_flow_does_not_cover():
         for entry in scenario.mock_negative_runs:
             negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
             assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_loop_and_carry_pack_covers_repetition_and_information_hand_off():
+    """Repetition was the recorded cause of real calls ending early, and carrying values
+    across turns is what a booking call actually is. Both repetition fixtures must make the
+    caller hang up, which is what distinguishes a stall from a merely incomplete flow."""
+    scenarios = load_scenarios(ROOT / "cases" / "loop_and_carry_v0_8.json")
+    assert len(scenarios) == 3
+    assert {s.metadata["family"] for s in scenarios} == {
+        "loop_rephrase_not_repeat", "loop_alternative_identification",
+        "carry_multi_turn_values_with_correction",
+    }
+    for scenario in scenarios:
+        reference = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        assert not reference["customer_abandoned"], f"{scenario.id}: reference run lost the caller"
+        result = score_run(reference, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+    # a verbatim-repeating agent must actually drive the caller off the line
+    for family, label in [("loop_rephrase_not_repeat", "repeats_the_same_sentence_until_the_caller_gives_up"),
+                          ("loop_alternative_identification", "re_asks_the_same_question")]:
+        scenario = next(s for s in scenarios if s.metadata["family"] == family)
+        entry = next(e for e in scenario.mock_negative_runs if e["label"] == label)
+        assert run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)["customer_abandoned"]
 
 
 def test_phone_ux_pack_covers_number_and_code_requests_over_voice():

@@ -189,7 +189,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 174 executable scenarios and 173 distinct domains;
+- at least 177 executable scenarios and 176 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -219,6 +219,8 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - a second batch of production-transcript-derived coverage (`gorusmeler` CSV mining): an identity-verification rejection looping through an escalating medical emergency, a spontaneous alternate-persona invention that drops a live welfare crisis, a weekday-name arithmetic hallucination distinct from ID/reference fabrication, an outage report mismapped to the billing tool with fabricated cause/ETA fill, an explicit transfer veto ignored via a repeated canned line, and a fabricated operational detail (a form/page name) answering a legitimate meta-question with no grounding data.
 
 - call length matched to production reality: the transcript corpus this suite mines runs a median of 11 turns, so at least one case must run a full production-length call in which a constraint set in the first turn is probed only after eight unrelated turns of ordinary business.
+- the two everyday shapes that produce a repetition loop: a caller who does not understand and must be re-explained differently each time, and a caller who cannot supply the identifier and must be offered the alternative route instead of the same question again.
+- information hand-off across a whole call: four values arriving over six turns with one corrected midway, all of which must land in a single tool call with nothing re-asked.
 - at least one turn per off-script case that the TOON flow does NOT cover at all, because every other case scripts every turn and improvisation was therefore never measured. Fluency is scored through its observable proxies: stays in role, invents no capability or detail, and returns to the pending task.
 - constraint SCOPE coverage on three axes — channel, object and person — because a restriction that binds more than it names is how the model was observed refusing the account holder their own balance.
 - at least one case where two tools return different values for the same thing and the disagreement must be surfaced rather than silently resolved.
