@@ -32,6 +32,11 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 
 - README now documents what the simulated caller does, not just how many scenarios exist: a section on the caller reacting to dead air and hanging up on a stalling agent, and caller-reaction metrics in the list of what a report contains. The gate paragraph cites a measurement that was actually taken rather than one that predates most of the current suite, and says plainly that the figure should be expected to fall as coverage grows
 
+### Measured
+
+- Full live sweep of the 208-case suite against `callingai-qwen35-9b-v2`: **80.9% Pass@1, 85.5% Pass@k, 81.6% Pass^k** over 729 runs, against 90.0% / 87.7% on the earlier 162-case suite. The decline is the intended effect of packs aimed at known weaknesses, not a regression in the model
+- The sweep flagged 8 runs as `wording_only_suspect`. Both scenarios were reviewed against their transcripts and both are genuine model defects rather than narrow regexes: one refuses the account holder their own balance, and the other drops the "the data is not recorded" half of an explicit two-part safety instruction in all five runs, with identical wording every time
+
 ### Fixed
 
 - Regex-too-narrow case bugs found via live sweeps against `callingai-qwen35-9b-v2`, verified independently against captured transcripts before widening
