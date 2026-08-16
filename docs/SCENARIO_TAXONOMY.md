@@ -189,7 +189,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 205 executable scenarios and 204 distinct domains;
+- at least 207 executable scenarios and 206 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -219,6 +219,7 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - a second batch of production-transcript-derived coverage (`gorusmeler` CSV mining): an identity-verification rejection looping through an escalating medical emergency, a spontaneous alternate-persona invention that drops a live welfare crisis, a weekday-name arithmetic hallucination distinct from ID/reference fabrication, an outage report mismapped to the billing tool with fabricated cause/ETA fill, an explicit transfer veto ignored via a repeated canned line, and a fabricated operational detail (a form/page name) answering a legitimate meta-question with no grounding data.
 
 - call length matched to production reality: the transcript corpus this suite mines runs a median of 11 turns, so at least one case must run a full production-length call in which a constraint set in the first turn is probed only after eight unrelated turns of ordinary business.
+- heavier stacks on top of those: five independently-passing traps inside one sales call, and a tool-discipline stack built around the model's dominant live signature of repeated tool calls, which combines traps that already fail on their own to see whether failures compound.
 - composition cases that stack three everyday behaviours the model passes individually, because four controlled probes showed no single factor reproduces the failures seen in messy calls. The empty intersection between the two behaviour packs is a coverage gap, not a virtue.
 - ten further everyday behaviours with no overlap with the first set: a backchannel that is not consent, a request for the agent's own preference, an ambiguous day-of-month, a named employee whose schedule must not be invented, a turn carrying no content, two opposite instructions in one breath, a competitor comparison, a 'just this once' waiver, a signed document the agent cannot issue, and a decision the caller hands over.
 - ten everyday caller behaviours that carry their own failure mode: self-interruption, one question rephrased three ways, a complaint threat, a third party answering from the room, the caller's own wrong arithmetic, a misdialled call, a request for something already done, five topics in one breath, a confident misparaphrase of the agent, and a new request raised during the closing.

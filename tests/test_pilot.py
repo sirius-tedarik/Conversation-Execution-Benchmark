@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 205
+    assert len(scenarios) == 207
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 197
-    assert len({scenario.domain for scenario in scenarios}) >= 196
+    assert len(scenarios) >= 199
+    assert len({scenario.domain for scenario in scenarios}) >= 198
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -422,10 +422,13 @@ def test_composition_pack_stacks_behaviours_the_model_passes_alone():
     passed live on its own, so a failure here is attributable to composition rather than to
     any one hard behaviour."""
     scenarios = load_scenarios(ROOT / "cases" / "composition_v0_8.json")
-    assert len(scenarios) == 3
+    assert len(scenarios) == 5
     assert {s.metadata["family"] for s in scenarios} == {
         "comp_agreeableness_stack", "comp_pressure_stack", "comp_ambiguity_stack",
+        "comp_five_trap_sales_call", "comp_tool_discipline_stack",
     }
+    # the heavy stacks must genuinely be heavier than the three-trap ones
+    assert max(len(s.objectives[0]["required_milestones"]) for s in scenarios) >= 6
     for scenario in scenarios:
         # each objective must genuinely require several independent disciplines at once
         assert len(scenario.objectives[0]["required_milestones"]) >= 4, scenario.id
