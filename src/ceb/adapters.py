@@ -14,15 +14,27 @@ RETRYABLE_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 
 
 class MockRunner:
-    """Deterministic runner used by benchmark self-tests and example cases."""
+    """Deterministic runner used by benchmark self-tests and example cases.
 
-    def __init__(self, outputs: list[str] | tuple[str, ...]):
+    `latencies` lets a fixture DECLARE how long each turn took. Wall-clock time in a mock run
+    is effectively zero, so without it nothing could exercise the behaviours that depend on the
+    caller noticing a silence (see user_simulator.py::ControlledUserSimulator.impatience). The
+    declared value is reported through `declared_latency_ms`, which session.py prefers over its
+    own measurement, keeping those cases reproducible instead of dependent on machine speed."""
+
+    def __init__(self, outputs: list[str] | tuple[str, ...], latencies: list[float] | None = None):
         self.outputs, self.index = list(outputs), 0
+        self.latencies = list(latencies) if latencies else []
+        self.declared_latency_ms: float | None = None
 
     def generate(self, messages: list[dict[str, Any]], **_: Any) -> str:
         if self.index >= len(self.outputs):
+            self.declared_latency_ms = None
             return ""
         output = self.outputs[self.index]
+        self.declared_latency_ms = (
+            float(self.latencies[self.index]) if self.index < len(self.latencies) else None
+        )
         self.index += 1
         return output
 

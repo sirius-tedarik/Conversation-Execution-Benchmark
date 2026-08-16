@@ -54,6 +54,27 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
     max_detours = plan.get("max_detours", len(nodes))
     if not isinstance(max_detours, int) or max_detours < 0:
         raise ScenarioValidationError(f"{scenario_id}.user_plan.max_detours must be a non-negative integer")
+    impatience = plan.get("impatience", {})
+    if not isinstance(impatience, dict):
+        raise ScenarioValidationError(f"{scenario_id}.user_plan.impatience must be an object")
+    if impatience:
+        after = impatience.get("after_ms")
+        if not isinstance(after, (int, float)) or after <= 0:
+            raise ScenarioValidationError(
+                f"{scenario_id}.user_plan.impatience.after_ms must be a positive number"
+            )
+        utterances = impatience.get("utterances", [])
+        if not isinstance(utterances, list) or not all(
+            isinstance(item, str) and item.strip() for item in utterances
+        ):
+            raise ScenarioValidationError(
+                f"{scenario_id}.user_plan.impatience.utterances must be non-empty strings"
+            )
+        prompts = impatience.get("max_prompts", 1)
+        if not isinstance(prompts, int) or prompts < 1:
+            raise ScenarioValidationError(
+                f"{scenario_id}.user_plan.impatience.max_prompts must be an integer >= 1"
+            )
     abandon = plan.get("abandon_when", {})
     if not isinstance(abandon, dict):
         raise ScenarioValidationError(f"{scenario_id}.user_plan.abandon_when must be an object")
@@ -178,6 +199,7 @@ class Scenario:
     max_user_turns: int
     max_steps_per_turn: int
     mock_runs: tuple[tuple[str, ...], ...]
+    mock_latencies: tuple[float, ...]
     mock_negative_runs: tuple[dict[str, Any], ...]
     mock_audio_events: tuple[dict[str, Any], ...]
     metadata: dict[str, Any]
@@ -349,6 +371,12 @@ class Scenario:
         for key, value in positive_ints.items():
             if not isinstance(value, int) or value <= 0:
                 raise ScenarioValidationError(f"{scenario_id}.{key} must be a positive integer")
+        mock_latencies = raw.get("_mock_latencies", [])
+        if mock_latencies and (
+            not isinstance(mock_latencies, list)
+            or not all(isinstance(item, (int, float)) for item in mock_latencies)
+        ):
+            raise ScenarioValidationError(f"{scenario_id}._mock_latencies must be list[number]")
         mock_runs = raw.get("_mock_runs", [])
         if mock_runs and (
             not isinstance(mock_runs, list)
@@ -396,6 +424,7 @@ class Scenario:
             max_user_turns=positive_ints["max_user_turns"],
             max_steps_per_turn=positive_ints["max_steps_per_turn"],
             mock_runs=tuple(tuple(run) for run in mock_runs),
+            mock_latencies=tuple(float(item) for item in mock_latencies),
             mock_negative_runs=tuple(negative_runs),
             mock_audio_events=tuple(audio_events),
             metadata=values["metadata"],

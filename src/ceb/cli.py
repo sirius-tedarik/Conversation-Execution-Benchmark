@@ -106,7 +106,7 @@ def _run_one(
         if not scenario.mock_runs:
             raise ValueError(f"{scenario.id}: --mock requires _mock_runs")
         outputs = scenario.mock_runs[min(trial, len(scenario.mock_runs) - 1)]
-        runner = MockRunner(outputs)
+        runner = MockRunner(outputs, list(scenario.mock_latencies) or None)
         trajectory = run_scenario(runner, scenario, seed)
         return _with_transcript(score_run(trajectory, scenario, advisory_metrics), trajectory)
     runner = OpenAICompatibleRunner(

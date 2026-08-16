@@ -48,7 +48,10 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, An
         for agent_step in range(scenario.max_steps_per_turn):
             started = time.perf_counter()
             raw = runner.generate(messages, tools=list(scenario.tool_schemas) or None, seed=seed)
-            latency_ms = round((time.perf_counter() - started) * 1000, 3)
+            # a fixture may DECLARE its latency so silence-dependent behaviour stays reproducible
+            # instead of depending on how fast the machine running the mock happens to be
+            declared = getattr(runner, "declared_latency_ms", None)
+            latency_ms = float(declared) if declared is not None else round((time.perf_counter() - started) * 1000, 3)
             parsed = parse_assistant_output(raw)
             normalized_calls = []
             for call_position, call in enumerate(parsed["tool_calls"]):
@@ -136,6 +139,7 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, An
         "detour_count": simulator.detour_count,
         "max_turns_hit": max_turns_hit,
         "customer_abandoned": simulator.abandoned,
+        "impatience_prompts": simulator.impatience_prompts,
         "execution_error": execution_error,
         "audio_events": copy.deepcopy(list(scenario.mock_audio_events)),
         "perturbations": copy.deepcopy(scenario.perturbations),

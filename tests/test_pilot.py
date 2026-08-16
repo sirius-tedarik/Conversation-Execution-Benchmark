@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 207
+    assert len(scenarios) == 208
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 199
-    assert len({scenario.domain for scenario in scenarios}) >= 198
+    assert len(scenarios) >= 200
+    assert len({scenario.domain for scenario in scenarios}) >= 199
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -437,6 +437,28 @@ def test_composition_pack_stacks_behaviours_the_model_passes_alone():
         for entry in scenario.mock_negative_runs:
             negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
             assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_a_slow_agent_makes_the_caller_ask_whether_anyone_is_there():
+    """The simulator used to wait forever, so four seconds of phone silence cost nothing.
+    user_plan.impatience makes the caller speak up; the declared latency keeps it reproducible."""
+    scenario = load_scenarios(ROOT / "cases" / "dead_air_v0_8.json")[0]
+    reference = run_scenario(MockRunner(scenario.mock_runs[0], list(scenario.mock_latencies)), scenario, seed=17)
+    assert reference["impatience_prompts"] == 1
+    assert any(visit.get("impatience") for visit in reference["simulator_trace"])
+    result = score_run(reference, scenario)
+    assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+    for entry in scenario.mock_negative_runs:
+        negative = run_scenario(MockRunner(entry["outputs"], entry.get("latencies")), scenario, seed=17)
+        assert negative["impatience_prompts"] == 1, entry["label"]
+        assert not score_run(negative, scenario)["passed"], f"fixture {entry['label']!r} did not fail"
+
+
+def test_a_fast_agent_is_never_interrupted():
+    """Impatience must not fire on a call that answers promptly, or every case would drift."""
+    scenario = load_scenarios(ROOT / "cases" / "dead_air_v0_8.json")[0]
+    prompt = run_scenario(MockRunner(scenario.mock_runs[0], [50, 50, 50, 50]), scenario, seed=17)
+    assert prompt["impatience_prompts"] == 0
 
 
 def test_phone_ux_pack_covers_number_and_code_requests_over_voice():

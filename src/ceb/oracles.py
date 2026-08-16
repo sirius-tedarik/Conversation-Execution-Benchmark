@@ -486,6 +486,16 @@ def _conversation_checks(trajectory: dict[str, Any], scenario: Scenario) -> list
         present = any(re.search(pattern, s.get("content", ""), re.I) for s in assistants)
         checks.append(check("conversation_experience", f"required_language:{index}", present,
                             f"required pattern {'found' if present else 'missing'}: {pattern}", "P2"))
+    # The caller had to speak up because the agent left dead air (see
+    # user_simulator::ControlledUserSimulator._silence_was_noticed). A case declares how many such
+    # prompts it tolerates: 0 for a call that should never stall, 1 for a case that deliberately
+    # provokes one to check the agent bridges the silence rather than ignoring or restarting.
+    if "max_dead_air_prompts" in config:
+        limit = int(config["max_dead_air_prompts"])
+        prompts = int(trajectory.get("impatience_prompts") or 0)
+        checks.append(check("conversation_experience", "dead_air_prompts", prompts <= limit,
+                            f"caller prompted {prompts} time(s) during silence, limit={limit}", "P1"))
+
     # The caller hung up mid-call (see user_simulator::_customer_gave_up). Unlike the P2 style
     # checks above this is not a polish issue: the call ended without its business outcome
     # because the agent stalled, which is the same lost call the production transcripts record.

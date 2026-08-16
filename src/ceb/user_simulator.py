@@ -114,6 +114,14 @@ class ControlledUserSimulator:
         self.budget_exhausted = False
         self.abandon_when = plan.get("abandon_when", {})
         self.abandoned = False
+        # A real caller does not wait silently through a long pause — after a few seconds of dead
+        # air they say "alo?". The simulator was infinitely patient, so nothing ever tested how the
+        # agent recovers from its own silence. When the turn just spoken took longer than
+        # `after_ms`, the caller interjects instead of the plan advancing; the node stays put, so
+        # the conversation resumes where it was once the agent responds.
+        self.impatience = plan.get("impatience", {})
+        self.impatience_prompts = 0
+        self._pending_impatience = False
         # Timeline index at which the current node became active — the boundary a read-only
         # tool call must be at or after to count for this node's own transition (see
         # _tool_window). Updated in advance(), consumed by emit()'s trace entry so the
@@ -132,6 +140,26 @@ class ControlledUserSimulator:
     def emit(self) -> str | None:
         if self.current_id is None:
             return None
+        if self._pending_impatience:
+            self._pending_impatience = False
+            self.impatience_prompts += 1
+            utterances = self.impatience.get("utterances") or ["Alo? Orada mısınız?"]
+            index = _stable_index(
+                self.seed, self.scenario_id, "impatience", self.impatience_prompts, len(utterances)
+            )
+            utterance = utterances[index]
+            self.trace.append(
+                {
+                    "node": self.current_id,
+                    "visit": self.visits.get(self.current_id, 0),
+                    "utterance": utterance,
+                    "off_flow": False,
+                    "resume_to": None,
+                    "active_since_index": self.active_since_index,
+                    "impatience": True,
+                }
+            )
+            return utterance
         node = self.nodes[self.current_id]
         if node.get("off_flow"):
             if self.detour_count >= self.max_detours:
@@ -157,6 +185,19 @@ class ControlledUserSimulator:
         )
         return utterance
 
+    def _silence_was_noticed(self, turn_steps: list[dict[str, Any]]) -> bool:
+        """True when the turn just spoken left the caller waiting long enough to speak up."""
+        if not self.impatience:
+            return False
+        if self.impatience_prompts >= int(self.impatience.get("max_prompts", 1)):
+            return False
+        threshold = float(self.impatience["after_ms"])
+        return any(
+            float(step.get("model_latency_ms") or 0) > threshold
+            for step in turn_steps
+            if step.get("role") == "assistant"
+        )
+
     def advance(self, turn_steps: list[dict[str, Any]], full_timeline: list[dict[str, Any]] | None = None) -> str | None:
         if self.current_id is None:
             return None
@@ -168,6 +209,10 @@ class ControlledUserSimulator:
             self.abandoned = True
             self.current_id = None
             return None
+        if self._silence_was_noticed(turn_steps):
+            # hold the node: the caller is interrupting, not moving the conversation on
+            self._pending_impatience = True
+            return self.current_id
         target = None
         for transition in node.get("transitions", []):
             if _matches(transition.get("when", {}), turn_steps, full_timeline, self.read_only_tools):

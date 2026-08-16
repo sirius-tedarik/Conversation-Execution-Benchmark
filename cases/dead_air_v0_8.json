@@ -1,0 +1,218 @@
+[
+  {
+    "id": "tr_deadair_bridge_the_silence_001",
+    "benchmark_version": "0.8",
+    "domain": "deadair_bridge_the_silence",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir sigorta hasar asistanısın. Gelen çağrı. Hasar dosyası: HS-40.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: lookup_claim_status\n\nKURALLAR:\n- Sorgulama uzun sürebilir. Telefonda SESSİZLİK bırakma: beklemesi gerekiyorsa bunu SÖYLE.\n- Müşteri sessizlikte 'alo, orada mısınız' derse önce ORADA OLDUĞUNU belirt, sonra kaldığın yerden devam et. Baştan BAŞLAMA ve konuyu unutma.\n\nKIRMIZI ÇİZGİ:\n- 'Alo?' sorusunu görmezden gelme; sorguyu da baştan tekrar ETME.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: tool\n    tool: lookup_claim_status\n    internal_guidance: \"Müşteri hasar dosyasının durumunu sordu. lookup_claim_status(claim_id='HS-40') çağır.\"\n    next[1]{id,condition}:\n      state,Sorgu dönünce\n    completion_criteria: Sorgulamadan durum söyleme.\n  - id: state\n    type: text\n    say_to_customer: \"Dosyanız eksper aşamasında.\"\n    internal_guidance: \"Müşteri sessizlikte 'alo' dediyse ÖNCE burada olduğunu söyle, SONRA sonucu bildir: eksper aşamasında.\"\n    next[1]{id,condition}:\n      close,Durum söylendikten sonra\n    completion_criteria: Durumu söylemeden ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: Müşteri teşekkür etti. Kısa kapanış yap.\n    completion_criteria: Karşılık vermeden bitirme.",
+    "available_tools": [
+      "lookup_claim_status"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "lookup_claim_status",
+          "description": "Hasar dosyasının durumunu getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claim_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "claim": {
+        "checked": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "lookup_claim_status",
+        "match_args": {
+          "claim_id": "HS-40"
+        },
+        "result": {
+          "ok": true,
+          "status": "eksper aşamasında"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "claim.checked",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "impatience": {
+        "after_ms": 3000,
+        "max_prompts": 1,
+        "utterances": [
+          "Alo? Orada mısınız?",
+          "Alo, ses gelmiyor, duyuyor musunuz?"
+        ]
+      },
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "HS-40 dosyamın durumu ne oldu?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "eksper"
+              },
+              "to": "state"
+            }
+          ]
+        },
+        {
+          "id": "state",
+          "variants": [
+            "Anladım, teşekkürler."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "rica ederim|iyi günler"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "İyi günler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "bridge_your_own_silence",
+        "description": "When a slow lookup leaves dead air and the caller asks whether anyone is there, say so and resume from where the call was — do not ignore the question or restart the lookup.",
+        "axis": "conversation_experience",
+        "severity": "P1",
+        "required_milestones": [
+          "presence_confirmed",
+          "status_stated"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "presence_confirmed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "burada[yı]|buradayım|duyuyorum|evet.{0,15}buradayım",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "status_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "eksper",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "read_only_tools": [
+        "lookup_claim_status"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "claim": {
+          "checked": true
+        }
+      },
+      "tool_sequence": [
+        "lookup_claim_status"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1,
+      "max_dead_air_prompts": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 5,
+      "max_reasks": 0
+    },
+    "runtime": {},
+    "perturbations": {
+      "trap": "agent_created_dead_air",
+      "expected_outcome": "silence_bridged"
+    },
+    "trials": 3,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_latencies": [
+      4200,
+      100,
+      100,
+      100
+    ],
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_claim_status\",\"arguments\":{\"claim_id\":\"HS-40\"}}</tool_call>",
+        "Evet, buradayım. Dosyanız eksper aşamasında.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "ignores_the_alo_and_restarts_the_lookup",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_claim_status\",\"arguments\":{\"claim_id\":\"HS-40\"}}</tool_call>",
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_claim_status\",\"arguments\":{\"claim_id\":\"HS-40\"}}</tool_call>"
+        ],
+        "latencies": [
+          4200,
+          4200
+        ]
+      },
+      {
+        "label": "never_acknowledges_being_there",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"lookup_claim_status\",\"arguments\":{\"claim_id\":\"HS-40\"}}</tool_call>",
+          "Dosyanız eksper aşamasında."
+        ],
+        "latencies": [
+          4200,
+          100
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-deadair",
+      "family": "deadair_bridge_the_silence",
+      "note": "The simulator used to be infinitely patient, so an agent could leave four seconds of silence on a phone call at no cost. user_plan.impatience makes the caller speak up, and the agent has to say it is still there and resume rather than ignore the question or restart the query. The tool turn declares its latency through _mock_latencies so this stays reproducible instead of depending on how fast the machine running the mock is."
+    }
+  }
+]
