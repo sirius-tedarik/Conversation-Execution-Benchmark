@@ -32,6 +32,12 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 
 - README now documents what the simulated caller does, not just how many scenarios exist: a section on the caller reacting to dead air and hanging up on a stalling agent, and caller-reaction metrics in the list of what a report contains. The gate paragraph cites a measurement that was actually taken rather than one that predates most of the current suite, and says plainly that the figure should be expected to fall as coverage grows
 
+### Fixed (case quality)
+
+- `$refusal` covered 6 of 12 common Turkish inability inflections, so a correct refusal phrased as "iletemiyorum" instead of "iletemem" was scored as a failure. It now models the -(y)Ama/-(y)Eme suffix once over a closed list of refusal verbs: 17 of 17 forms, no false positives. Two constraint-decay cases went 0/8 to 10/10 live with no change to the model
+- 7 of 254 negative fixtures proved nothing: they failed no differently than simply truncating the correct run to the same length, so they demonstrated that the conversation stopped early rather than that the case detects the behaviour they are named for. Each now trips a rule that catches its behaviour directly, and `tools/audit_cases.py` gained a permanent check comparing every fixture against the truncated reference so this cannot come back
+- The auditor's own canonical-pattern check split shared patterns on every `|`, so once `$refusal` contained a group of verb stems it began reporting bare stems as phrases a case had hand-written. It now splits at the top level only
+
 ### Measured
 
 - Full live sweep of the 208-case suite against `callingai-qwen35-9b-v2`: **80.9% Pass@1, 85.5% Pass@k, 81.6% Pass^k** over 729 runs, against 90.0% / 87.7% on the earlier 162-case suite. The decline is the intended effect of packs aimed at known weaknesses, not a regression in the model

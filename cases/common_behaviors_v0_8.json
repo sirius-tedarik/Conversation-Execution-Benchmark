@@ -5,7 +5,7 @@
     "domain": "common_interrupt_topic_switch",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Sen bir banka asistanısın. Gelen çağrı. Müşteri: MX-01.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_invoice, block_card\n\nKURALLAR:\n- Acil konuyu (kart çalınması) ÖNCE ele al.\n\nKIRMIZI ÇİZGİ:\n- Acil konuyu hallettikten sonra müşterinin İLK sorduğu fatura konusuna GERİ DÖN. Konuyu unutup kapatma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: start\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: start\n    type: tool\n    tool: block_card\n    internal_guidance: \"Kart çalınması ACİL — önce bloke et. Fatura konusunu AKLINDA TUT.\"\n    next[1]{id,condition}:\n      back,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: back\n    type: tool\n    tool: get_invoice\n    internal_guidance: \"Şimdi İLK sorulan fatura konusuna DÖN.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "system": "Sen bir banka asistanısın. Gelen çağrı. Müşteri: MX-01.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_invoice, block_card\n\nKURALLAR:\n- Acil konuyu (kart çalınması) ÖNCE ele al.\n\nKIRMIZI ÇİZGİ:\n- Acil konu bitince kapanış teklifi SUNMA; önce ilk konuya dön.\n- Acil konuyu hallettikten sonra müşterinin İLK sorduğu fatura konusuna GERİ DÖN. Konuyu unutup kapatma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: start\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: start\n    type: tool\n    tool: block_card\n    internal_guidance: \"Kart çalınması ACİL — önce bloke et. Fatura konusunu AKLINDA TUT.\"\n    next[1]{id,condition}:\n      back,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: back\n    type: tool\n    tool: get_invoice\n    internal_guidance: \"Şimdi İLK sorulan fatura konusuna DÖN.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
     "available_tools": [
       "get_invoice",
       "block_card"
@@ -161,7 +161,13 @@
       }
     ],
     "policies": {
-      "max_tool_repeats": 1
+      "max_tool_repeats": 1,
+      "forbidden_content": [
+        {
+          "regex": "başka (bir şey|yardımc[ıi]).{0,15}var m[ıi]",
+          "severity": "P1"
+        }
+      ]
     },
     "expected": {
       "state": {

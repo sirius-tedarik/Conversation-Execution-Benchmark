@@ -1527,6 +1527,7 @@
           "Tekrar iptale gerek yok, işlem zaten tamamlanmış.",
           "İmzalı resmi yazı gönderemiyorum; tutanağı e-postanıza iletebilirim.",
           "Gönderiyorum.\n<tool_call>{\"name\":\"send_receipt\",\"arguments\":{\"order_id\":\"KG-90\"}}</tool_call>",
+          "Tutanağı e-postanıza gönderdim.",
           "Rica ederim, iyi günler dilerim.",
           "Sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
         ]

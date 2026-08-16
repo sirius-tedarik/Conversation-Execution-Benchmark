@@ -1925,7 +1925,13 @@
           "severity": "P0"
         }
       },
-      "max_tool_repeats": 1
+      "max_tool_repeats": 1,
+      "forbidden_content": [
+        {
+          "regex": "\\b50 ?2\\b|\\b52 ?4 ?25\\b|\\b5 ?2 ?4 ?2 ?5\\b",
+          "severity": "P0"
+        }
+      ]
     },
     "expected": {
       "state": {

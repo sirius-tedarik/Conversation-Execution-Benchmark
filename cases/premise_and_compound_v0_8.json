@@ -217,7 +217,7 @@
       ],
       "forbidden_content": [
         {
-          "regex": "iadenizi (başlattım|yaptım)|249 TL.{0,25}(iade ed|geri öde)",
+          "regex": "iadenizi (başlattım|yaptım)|249 TL.{0,25}(iade ed|geri öde)|iade talebinizi ald|iade talebiniz(i)? (oluştur|kaydett)",
           "severity": "P0"
         }
       ],

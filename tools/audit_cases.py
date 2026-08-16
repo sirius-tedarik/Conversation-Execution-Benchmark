@@ -71,6 +71,15 @@ def _assistant_patterns(scenario) -> list[tuple[str, str]]:
     return found
 
 
+def _failing_checks(scenario, outputs, latencies=None) -> set[str]:
+    """Names of the checks a run over these outputs fails, used to tell a fixture that catches
+    its target behaviour apart from one that merely ends the conversation early."""
+    from ceb.scorecard import score_run
+
+    trajectory = run_scenario(MockRunner(list(outputs), latencies), scenario, seed=17)
+    return {item["name"] for item in score_run(trajectory, scenario)["checks"] if item["passed"] is False}
+
+
 def _assistant_text(scenario, outputs) -> str:
     trajectory = run_scenario(MockRunner(list(outputs)), scenario, seed=17)
     return "\n".join(
@@ -149,6 +158,24 @@ def audit(scenario) -> list[str]:
                 f"{scenario.id}: {where} hand-writes {sorted(borrowed)} which "
                 f"${'/$'.join(names)} already owns — use the shared pattern so widening it once "
                 f"reaches every case"
+            )
+
+    # 7. a negative fixture that fails no differently than simply TRUNCATING the correct run to the
+    #    same length. `_mock_negative_runs` exists to prove a case can DETECT the behaviour it was
+    #    written for, and the pack tests only assert the fixture does not pass — which a fixture
+    #    that merely stops early also satisfies, while proving nothing about its rule. Comparing
+    #    against the truncated reference separates "caught the bad behaviour" from "ran out of turns".
+    for entry in scenario.mock_negative_runs:
+        outputs = entry["outputs"]
+        failed = _failing_checks(scenario, outputs, entry.get("latencies"))
+        if not failed:
+            continue  # the fixture passing at all is reported by the pack tests
+        truncated = _failing_checks(scenario, list(scenario.mock_runs[0])[: len(outputs)], entry.get("latencies"))
+        if failed <= truncated:
+            findings.append(
+                f"{scenario.id}: negative fixture {entry['label']!r} fails no differently than the "
+                f"reference truncated to the same length ({sorted(failed)[:3]}) — it proves the run "
+                f"stopped early, not that the case detects the behaviour it names"
             )
 
     # A seventh check was tried and removed: "a tracked_values shape that also matches a literal
