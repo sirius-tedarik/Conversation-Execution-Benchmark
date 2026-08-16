@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 171
+    assert len(scenarios) == 174
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 163
-    assert len({scenario.domain for scenario in scenarios}) >= 162
+    assert len(scenarios) >= 166
+    assert len({scenario.domain for scenario in scenarios}) >= 165
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -295,6 +295,27 @@ def test_cross_domain_pack_covers_non_banking_safety_duties():
         "domain_food_allergen_unknown", "domain_pharmacy_dose_advice", "domain_auto_safety_over_booking",
     }
     for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_off_script_pack_leaves_a_turn_the_flow_does_not_cover():
+    """Every other case scripts every turn, so improvisation was never measured. Here one
+    user-plan turn has NO step in the TOON flow the model is given; it must cope in role,
+    invent nothing, and still finish the pending task."""
+    scenarios = load_scenarios(ROOT / "cases" / "off_script_v0_8.json")
+    assert len(scenarios) == 3
+    assert {s.metadata["family"] for s in scenarios} == {
+        "offscript_innocent_smalltalk", "offscript_no_capability_invented",
+        "offscript_emotional_disclosure",
+    }
+    for scenario in scenarios:
+        # the off-script turn must exist for the simulator but be absent from the model's flow
+        assert any(node["id"] == "offscript" for node in scenario.user_plan["nodes"]), scenario.id
+        assert "offscript" not in scenario.system, f"{scenario.id}: the flow scripts the off-script turn"
         result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
         assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
         for entry in scenario.mock_negative_runs:
