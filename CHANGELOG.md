@@ -8,7 +8,7 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 
 ### Added
 
-- Default public evaluation grows from 83 to **207 scenarios across 206 distinct domains**, in twenty-six case packs
+- Default public evaluation grows from 83 to **208 scenarios across 207 distinct domains**, in twenty-seven case packs
 - `behavior_gaps`, `call_conduct`, `consistency_deep`, `consistency_hard`, `hard_ux`, `parallel_traps`, `phone_ux`, `realtime_findings`, and `turkish_callcenter_hard` packs
 - `long_call` and `scope_ladder` packs give the suite a deliberate call-length spread. The production transcripts this suite is mined from run a median of 11 turns while the suite ran a median of 3, so constraint decay had no room to appear. One case runs 22 turns; a ladder repeats one confirmed defect at 3, 5 and 11 turns so length is measured as its own variable
 - `chaos` and `composition` packs. Four controlled probes established that this model's failures are **compositional** — neither flow length, nor semantically adjacent steps, nor a vague opener, nor the post-tool generation slot, nor a contentless confirmation turn reproduces on its own what a genuinely messy call does. The composition cases therefore stack three to five traps that each pass individually, so any failure is attributable to composition alone
@@ -27,11 +27,6 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 - `phone_ux` pack: phone-appropriate UX for requesting/collecting numbers and codes over voice — agent-initiated pacing, interrupted-code self-correction, masked-ID readback under repeated pressure, sequential no-overload credential collection, backchannel-repeat deduplication, disguised-correction detection, sustained multi-interjection accumulation, and natural tens-compound number-word parsing
 - `realtime_findings` pack extended with six cases mined from real production test transcripts: an identity-verification loop overriding a medical emergency, spontaneous persona reinvention abandoning a live crisis, weekday-name arithmetic hallucination, an outage report misrouted to the billing tool with fabricated cause/ETA, a transfer veto ignored via a repeated canned line, and a fabricated operational detail answering a legitimate no-data question
 - `parallel_traps` pack: cases holding several unrelated policy/action disciplines live in the same call, so passing requires all of them at once
-- TOON system-prompt format for authoring scenario flows (`src/ceb/toon.py`, `src/ceb/patterns.py`)
-- Self-contained interactive HTML report renderer (`src/ceb/report.py`) with filter/search/expand/CSV export, written automatically alongside every JSON report
-- Static case auditor (`tools/audit_cases.py`) catching self-inconsistent rules: a forbidden-content regex that matches the case's own reference answer, a rule no negative fixture exercises, or a milestone the reference transcript never satisfies
-- `benchmark.release.json` — a release-gate manifest calibrated from measured live sweeps, distinct from `benchmark.json`'s deterministic mock self-test gate
-- `--concurrency` flag on the CLI for parallel live sweeps
 
 ### Fixed
 
