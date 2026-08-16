@@ -124,7 +124,7 @@
         "id": "presence_confirmed",
         "kind": "content",
         "role": "assistant",
-        "regex": "burada[yı]|buradayım|duyuyorum|evet.{0,15}buradayım",
+        "regex": "burada|duy(u|abili)yorum|dinliyorum|hattay[ıi]m",
         "axis": "conversation_experience",
         "severity": "P1"
       },

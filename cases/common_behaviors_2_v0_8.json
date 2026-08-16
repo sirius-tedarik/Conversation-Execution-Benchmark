@@ -1216,7 +1216,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "yorum yapam|bilgim yok|karşılaştırma yapam"
+                "assistant_regex": "yorum yap(a)?m|karşılaştırma yap(a)?m|bilgim yok|doğru olmaz"
               },
               "to": "close"
             }
@@ -1256,7 +1256,7 @@
         "id": "competitor_claim_declined",
         "kind": "content",
         "role": "assistant",
-        "regex": "yorum yapam|bilgim yok|karşılaştırma yapam",
+        "regex": "yorum yap(a)?m|karşılaştırma yap(a)?m|bilgim yok|doğru olmaz",
         "axis": "policy_safety",
         "severity": "P0"
       }
