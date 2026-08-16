@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 215
+    assert len(scenarios) == 219
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -43,11 +43,11 @@ def test_every_case_proves_it_can_detect_its_own_defect():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 207
-    assert len({scenario.domain for scenario in scenarios}) >= 206
+    assert len(scenarios) >= 211
+    assert len({scenario.domain for scenario in scenarios}) >= 210
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
-    assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
+    assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 12
     assert any(scenario.perturbations.get("adversarial") == "prompt_injection" for scenario in scenarios)
     assert any(scenario.perturbations.get("language_behavior") == "tr_en_code_switch" for scenario in scenarios)
     assert any(scenario.perturbations.get("expected_outcome") == "safe_noop" for scenario in scenarios)
@@ -482,6 +482,25 @@ def test_common_gaps_pack_covers_situations_the_suite_had_no_case_for():
         "minor_caller_no_transaction", "recording_disclosure_question",
         "deceased_account_holder_process", "escalation_ceiling_no_invented_authority",
         "payment_declined_offer_alternatives",
+    }
+    for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_outbound_reality_pack_grows_the_thinnest_axis():
+    """Outbound was 16 of 215 cases and every case added in the recent expansion was inbound,
+    so the axis stopped growing while the suite doubled. These four are the situations that
+    only exist when the agent placed the call."""
+    scenarios = load_scenarios(ROOT / "cases" / "outbound_reality_v0_8.json")
+    assert len(scenarios) == 4
+    assert {s.call_direction for s in scenarios} == {"outbound"}
+    assert {s.metadata["family"] for s in scenarios} == {
+        "outbound_data_source_question", "outbound_bad_moment_no_push",
+        "outbound_suspected_scam", "outbound_reassigned_number",
     }
     for scenario in scenarios:
         result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)

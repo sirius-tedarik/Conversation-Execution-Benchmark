@@ -189,7 +189,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 215 executable scenarios and 214 distinct domains;
+- at least 219 executable scenarios and 218 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -202,7 +202,8 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - call-center coverage for hold, transfer, multi-intent, silence, correction, channel change, and escalation retraction.
 - at least eight explicit termination-boundary scenarios, including forbidden and required `end_call` modes.
 - ten isolated production-critical contracts covering verification, grounding, structured state, agenda retention, voicemail, crisis handoff, capability boundaries, and post-execution irreversibility.
-- at least 16 outbound scenarios, including do-not-call registration, pre-collection disclosure, intent inversion, and calling-hours compliance.
+- outbound situations that only exist because the agent placed the call: the data-source question every Turkish consumer asks first, a person reached at a bad moment who must be offered a callback rather than pushed through, a scam suspicion that must be validated instead of answered by collecting credentials, and a reassigned number whose previous holder must not be named.
+- at least 20 outbound scenarios, including do-not-call registration, pre-collection disclosure, intent inversion, and calling-hours compliance.
 - input-robustness coverage for misspelled/abbreviated speech-to-text, mid-utterance barge-in, chunked spoken-digit assembly with mid-collection edit, fixed-length code validation, relative-date disambiguation, mid-call language switching, background crosstalk, and DTMF keypad entry.
 - at least one detour nested inside another detour, rejoined in reverse order, plus a barge-in race against the closing sequence, plus a genuine three-link chained detour (not two siblings converging on one return node).
 - self-consistency coverage for late-turn value restatement, sycophancy under evidence denial, formality register, bot disclosure and persona stability, and constraint decay across a long horizon.
