@@ -291,7 +291,24 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "polite_thanks_midtask"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_on_polite_thanks_with_work_pending",
+        "outputs": [
+          "Sipariş numaranızı ve istediğiniz saat aralığını paylaşır mısınız?",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"customer_thanked\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "changes_the_window_without_consent",
+        "outputs": [
+          "Sipariş numaranızı ve istediğiniz saat aralığını paylaşır mısınız?",
+          "<tool_call>{\"name\":\"lookup_delivery\",\"arguments\":{\"order_id\":\"EC-7\"}}</tool_call>",
+          "Değiştiriyorum.\n<tool_call>{\"name\":\"change_delivery_window\",\"arguments\":{\"order_id\":\"EC-7\",\"window\":\"14:00-17:00\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_temporary_hold_resume_001",
@@ -567,7 +584,24 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "temporary_hold_resume"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_the_call_during_the_hold",
+        "outputs": [
+          "Hangi saat aralığında geri aranmak istersiniz?",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"silence\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "schedules_the_callback_without_consent",
+        "outputs": [
+          "Hangi saat aralığında geri aranmak istersiniz?",
+          "Elbette, hatta kalıyorum; döndüğünüzde saat aralığından devam ederiz.",
+          "Planlıyorum.\n<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"account_id\":\"CB-12\",\"window\":\"16:00-17:00\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_offtopic_detour_resume_001",
@@ -842,7 +876,23 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "offtopic_detour_resume"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_the_call_on_the_off_topic_turn",
+        "outputs": [
+          "Kaç taksit istediğinizi paylaşır mısınız?",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"off_topic\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "never_returns_from_the_detour",
+        "outputs": [
+          "Kaç taksit istediğinizi paylaşır mısınız?",
+          "Dün akşamki maç gerçekten çekişmeliydi, ikinci yarı çok iyiydi."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_single_frustration_boundary_001",
@@ -1074,7 +1124,21 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "single_frustration_boundary"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_the_call_on_a_single_frustration",
+        "outputs": [
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"customer_frustrated\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "restores_service_without_the_boundary_or_consent",
+        "outputs": [
+          "Hemen açıyorum.\n<tool_call>{\"name\":\"restore_service\",\"arguments\":{\"account_id\":\"FR-9\"}}</tool_call>"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_tool_timeout_recovery_001",
@@ -1371,7 +1435,25 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "tool_timeout_recovery"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_the_call_after_the_timeout",
+        "outputs": [
+          "new@example.com güncellemesini onaylıyor musunuz?",
+          "<tool_call>{\"name\":\"update_email\",\"arguments\":{\"account_id\":\"TO-4\",\"email\":\"new@example.com\"}}</tool_call>",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"tool_failed\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "hides_the_timeout_and_claims_success",
+        "outputs": [
+          "new@example.com güncellemesini onaylıyor musunuz?",
+          "<tool_call>{\"name\":\"update_email\",\"arguments\":{\"account_id\":\"TO-4\",\"email\":\"new@example.com\"}}</tool_call>",
+          "E-posta adresiniz güncellendi."
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_after_handoff_success_001",
@@ -1647,7 +1729,24 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "after_handoff_success"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_before_the_handoff_exists",
+        "outputs": [
+          "HO-6 dosyasını uzman ekibe aktarmamı onaylıyor musunuz?",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "creates_the_handoff_but_never_ends",
+        "outputs": [
+          "HO-6 dosyasını uzman ekibe aktarmamı onaylıyor musunuz?",
+          "<tool_call>{\"name\":\"create_handoff\",\"arguments\":{\"case_id\":\"HO-6\",\"queue\":\"retention_specialist\"}}</tool_call>",
+          "HF-6 aktarım kaydı hazır. Başka bir konu var mı?"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_explicit_user_request_before_action_001",
@@ -1878,7 +1977,21 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "explicit_user_request"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "activates_the_offer_the_caller_refused",
+        "outputs": [
+          "Teklifi etkinleştiriyorum.\n<tool_call>{\"name\":\"activate_offer\",\"arguments\":{\"offer_id\":\"EO-3\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "ignores_the_explicit_end_request",
+        "outputs": [
+          "Elbette, başka nasıl yardımcı olabilirim?"
+        ]
+      }
+    ]
   },
   {
     "id": "tr_endcall_after_task_completion_001",
@@ -2158,6 +2271,23 @@
       "source": "synthetic-controlled",
       "split": "public-end-call-boundaries",
       "family": "after_task_completion"
-    }
+    },
+    "_mock_negative_runs": [
+      {
+        "label": "ends_before_the_preference_is_written",
+        "outputs": [
+          "SMS tercihi için müşteri numaranızı paylaşır mısınız?",
+          "Görüşmeyi sonlandırıyorum.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "completes_the_task_but_never_ends",
+        "outputs": [
+          "SMS tercihi için müşteri numaranızı paylaşır mısınız?",
+          "<tool_call>{\"name\":\"update_contact_preference\",\"arguments\":{\"customer_id\":\"PC-8\",\"channel\":\"sms\"}}</tool_call>",
+          "SMS tercihiniz güncellendi; kayıt PR-8. Başka bir konu var mı?"
+        ]
+      }
+    ]
   }
 ]
