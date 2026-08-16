@@ -81,12 +81,20 @@ def _failing_checks(scenario, outputs, latencies=None) -> set[str]:
 
 
 def _assistant_text(scenario, outputs) -> str:
+    """What a forbidden-content rule actually sees. oracles.py scans tool ARGUMENTS as well as
+    spoken text — a forbidden phrase smuggled into a tool call is as much a violation as one said
+    aloud — so this has to include them, or the audit reports a rule as unexercised when the
+    fixture does trip it."""
+    import json as _json
+
     trajectory = run_scenario(MockRunner(list(outputs)), scenario, seed=17)
-    return "\n".join(
-        str(step.get("content", ""))
-        for step in trajectory.get("timeline", [])
-        if step.get("role") == "assistant"
-    )
+    parts: list[str] = []
+    for step in trajectory.get("timeline", []):
+        if step.get("role") == "assistant":
+            parts.append(str(step.get("content", "")))
+        elif step.get("role") == "tool":
+            parts.append(_json.dumps(step.get("arguments", {}), ensure_ascii=False))
+    return "\n".join(parts)
 
 
 def audit(scenario) -> list[str]:
