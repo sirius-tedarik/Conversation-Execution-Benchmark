@@ -259,7 +259,7 @@
       "required_assistant_regex": [
         "hesap.*posta kod",
         "bekliyorum|hatta kalıyorum",
-        "onaylıyor musunuz|adresinizi not aldım"
+        "$consent_question|adresinizi not aldım"
       ]
     },
     "flow": {

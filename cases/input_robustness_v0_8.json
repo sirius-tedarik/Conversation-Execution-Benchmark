@@ -1590,7 +1590,7 @@
         "id": "consent_requested",
         "kind": "content",
         "role": "assistant",
-        "regex": "onaylıyor musunuz",
+        "regex": "$consent_question",
         "axis": "flow_control",
         "severity": "P1"
       },
@@ -1598,7 +1598,7 @@
         "id": "crosstalk_ignored_resume",
         "kind": "content",
         "role": "assistant",
-        "regex": "onayınızı|onay verirseniz|onaylarsanız|onayınız gerek",
+        "regex": "onayınızı|$consent_question|onaylarsanız|onayınız gerek",
         "axis": "flow_control",
         "severity": "P0"
       },

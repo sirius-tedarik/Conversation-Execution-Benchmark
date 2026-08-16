@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 160
+    assert len(scenarios) == 162
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 152
-    assert len({scenario.domain for scenario in scenarios}) >= 151
+    assert len(scenarios) >= 154
+    assert len({scenario.domain for scenario in scenarios}) >= 153
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -213,6 +213,38 @@ def test_parallel_traps_pack_holds_every_unrelated_family_at_once():
             negative_trajectory = run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)
             negative_result = score_run(negative_trajectory, scenario)
             assert not negative_result["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_long_call_pack_runs_at_production_length_and_can_be_abandoned():
+    scenarios = load_scenarios(ROOT / "cases" / "long_call_v0_8.json")
+    assert len(scenarios) == 2
+    assert {scenario.metadata["family"] for scenario in scenarios} == {
+        "longcall_early_constraint_retention", "longcall_stall_loop_abandonment",
+    }
+    # the retention case must actually reach production call length, not just claim to
+    retention = next(s for s in scenarios if s.metadata["family"] == "longcall_early_constraint_retention")
+    assert len(retention.user_plan["nodes"]) >= 11
+    for scenario in scenarios:
+        trajectory = run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17)
+        assert not trajectory["customer_abandoned"], f"{scenario.id}: reference run lost the caller"
+        result = score_run(trajectory, scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative_result = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative_result["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_a_stalling_agent_makes_the_caller_hang_up():
+    """abandon_when must fire on the repetition it exists for, and never on a healthy call."""
+    scenarios = load_scenarios(ROOT / "cases" / "long_call_v0_8.json")
+    stall = next(s for s in scenarios if s.metadata["family"] == "longcall_stall_loop_abandonment")
+    stalling = next(e for e in stall.mock_negative_runs
+                    if e["label"] == "stalls_with_holding_phrase_until_caller_hangs_up")
+    abandoned = run_scenario(MockRunner(stalling["outputs"]), stall, seed=17)
+    assert abandoned["customer_abandoned"]
+    assert any(item["name"] == "customer_did_not_abandon" and item["passed"] is False
+               for item in score_run(abandoned, stall)["checks"])
+    assert not run_scenario(MockRunner(stall.mock_runs[0]), stall, seed=17)["customer_abandoned"]
 
 
 def test_phone_ux_pack_covers_number_and_code_requests_over_voice():

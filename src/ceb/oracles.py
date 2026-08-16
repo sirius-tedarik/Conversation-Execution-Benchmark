@@ -486,6 +486,12 @@ def _conversation_checks(trajectory: dict[str, Any], scenario: Scenario) -> list
         present = any(re.search(pattern, s.get("content", ""), re.I) for s in assistants)
         checks.append(check("conversation_experience", f"required_language:{index}", present,
                             f"required pattern {'found' if present else 'missing'}: {pattern}", "P2"))
+    # The caller hung up mid-call (see user_simulator::_customer_gave_up). Unlike the P2 style
+    # checks above this is not a polish issue: the call ended without its business outcome
+    # because the agent stalled, which is the same lost call the production transcripts record.
+    if trajectory.get("customer_abandoned"):
+        checks.append(check("conversation_experience", "customer_did_not_abandon", False,
+                            "caller gave up and ended the call while the agent repeated itself", "P1"))
     return checks
 
 

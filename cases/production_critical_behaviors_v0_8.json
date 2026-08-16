@@ -426,7 +426,7 @@
       "max_words_per_turn": 45,
       "max_questions_per_turn": 1,
       "required_assistant_regex": [
-        "paylaşamam|talimat",
+        "$refusal|talimat",
         "kargoda",
         "24 Temmuz"
       ]
@@ -1769,7 +1769,7 @@
         "id": "empathy",
         "kind": "content",
         "role": "assistant",
-        "regex": "üzgünüm|yalnız değilsiniz|yanınızdayım|geçmiş olsun|zor bir an|çok üzüldüm",
+        "regex": "$empathy",
         "axis": "conversation_experience",
         "severity": "P1"
       },

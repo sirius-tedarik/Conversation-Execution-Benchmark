@@ -135,6 +135,7 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, An
         "simulator_trace": copy.deepcopy(simulator.trace),
         "detour_count": simulator.detour_count,
         "max_turns_hit": max_turns_hit,
+        "customer_abandoned": simulator.abandoned,
         "execution_error": execution_error,
         "audio_events": copy.deepcopy(list(scenario.mock_audio_events)),
         "perturbations": copy.deepcopy(scenario.perturbations),

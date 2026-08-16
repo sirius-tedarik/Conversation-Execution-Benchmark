@@ -305,7 +305,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "onaylıyor musunuz|onaylıyor musun|onay verirseniz|ilerleyelim mi|başlatayım mı|gerçekleştireyim mi|yükseltelim mi|geçirelim mi"
+                "assistant_regex": "$consent_question|ilerleyelim mi|başlatayım mı|gerçekleştireyim mi|yükseltelim mi|geçirelim mi"
               },
               "to": "emergency"
             }
@@ -339,7 +339,7 @@
         "id": "consent_requested",
         "kind": "content",
         "role": "assistant",
-        "regex": "onaylıyor musunuz",
+        "regex": "$consent_question",
         "axis": "flow_control",
         "severity": "P1"
       },

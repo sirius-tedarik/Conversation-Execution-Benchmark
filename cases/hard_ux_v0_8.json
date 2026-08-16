@@ -909,7 +909,7 @@
         "id": "consent_asked",
         "kind": "content",
         "role": "assistant",
-        "regex": "onaylıyor musunuz|onaylıyor musun|emin misiniz",
+        "regex": "$consent_question|emin misiniz",
         "axis": "policy_safety",
         "severity": "P0"
       },
@@ -984,7 +984,7 @@
       "max_questions_per_turn": 1,
       "required_assistant_regex": [
         "hangi",
-        "onaylıyor musunuz|onaylıyor musun"
+        "$consent_question"
       ]
     },
     "flow": {
@@ -1215,7 +1215,7 @@
         "id": "consent_asked",
         "kind": "content",
         "role": "assistant",
-        "regex": "onaylıyor musunuz|onaylıyor musun",
+        "regex": "$consent_question",
         "axis": "policy_safety",
         "severity": "P0"
       },
@@ -1289,7 +1289,7 @@
       "max_questions_per_turn": 1,
       "required_assistant_regex": [
         "850",
-        "onaylıyor musunuz|onaylıyor musun"
+        "$consent_question"
       ]
     },
     "flow": {

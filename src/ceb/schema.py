@@ -54,6 +54,20 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
     max_detours = plan.get("max_detours", len(nodes))
     if not isinstance(max_detours, int) or max_detours < 0:
         raise ScenarioValidationError(f"{scenario_id}.user_plan.max_detours must be a non-negative integer")
+    abandon = plan.get("abandon_when", {})
+    if not isinstance(abandon, dict):
+        raise ScenarioValidationError(f"{scenario_id}.user_plan.abandon_when must be an object")
+    if abandon:
+        repeats = abandon.get("repeated_assistant_turns")
+        if not isinstance(repeats, int) or repeats < 2:
+            raise ScenarioValidationError(
+                f"{scenario_id}.user_plan.abandon_when.repeated_assistant_turns must be an integer >= 2"
+            )
+        similarity = abandon.get("similarity", 0.92)
+        if not isinstance(similarity, (int, float)) or not 0 < float(similarity) <= 1:
+            raise ScenarioValidationError(
+                f"{scenario_id}.user_plan.abandon_when.similarity must be a ratio in (0, 1]"
+            )
     for node in nodes:
         if "off_flow" in node and not isinstance(node["off_flow"], bool):
             raise ScenarioValidationError(

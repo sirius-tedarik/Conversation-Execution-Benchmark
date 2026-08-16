@@ -3,9 +3,36 @@ from __future__ import annotations
 
 import hashlib
 import re
+from difflib import SequenceMatcher
 from typing import Any
 
 from .patterns import resolve_pattern
+
+
+def _customer_gave_up(rule: dict[str, Any], full_timeline: list[dict[str, Any]] | None) -> bool:
+    """A real caller does not wait politely forever. In the production transcripts this suite is
+    built from, the single most common way a call died early was the agent emitting the SAME
+    sentence again instead of moving the conversation on — the caller hung up. Scripted plans
+    cannot express that: the simulator would keep feeding turns to an agent that is visibly stuck.
+    `abandon_when.repeated_assistant_turns: N` ends the call once the last N assistant turns are
+    near-identical, so a stuck agent is scored as the lost call it really is instead of being
+    carried to a clean finish by an infinitely patient script."""
+    limit = int(rule.get("repeated_assistant_turns", 0))
+    if limit < 2 or full_timeline is None:
+        return False
+    spoken = [
+        str(step.get("content", "")).strip()
+        for step in full_timeline
+        if step.get("role") == "assistant" and str(step.get("content", "")).strip()
+    ]
+    if len(spoken) < limit:
+        return False
+    threshold = float(rule.get("similarity", 0.92))
+    recent = spoken[-limit:]
+    return all(
+        SequenceMatcher(None, recent[index], recent[index + 1]).ratio() > threshold
+        for index in range(len(recent) - 1)
+    )
 
 
 def _stable_index(seed: int, scenario_id: str, node_id: str, visit: int, size: int) -> int:
@@ -85,6 +112,8 @@ class ControlledUserSimulator:
         self.max_detours = int(plan.get("max_detours", len(self.nodes)))
         self.detour_count = 0
         self.budget_exhausted = False
+        self.abandon_when = plan.get("abandon_when", {})
+        self.abandoned = False
         # Timeline index at which the current node became active — the boundary a read-only
         # tool call must be at or after to count for this node's own transition (see
         # _tool_window). Updated in advance(), consumed by emit()'s trace entry so the
@@ -133,6 +162,10 @@ class ControlledUserSimulator:
             return None
         node = self.nodes[self.current_id]
         if node.get("terminal"):
+            self.current_id = None
+            return None
+        if self.abandon_when and _customer_gave_up(self.abandon_when, full_timeline):
+            self.abandoned = True
             self.current_id = None
             return None
         target = None

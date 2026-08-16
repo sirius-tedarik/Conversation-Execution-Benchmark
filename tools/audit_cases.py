@@ -15,9 +15,58 @@ import sys
 from pathlib import Path
 
 from ceb.adapters import MockRunner
-from ceb.patterns import resolve_pattern
+from ceb.patterns import CANONICAL_PATTERNS, resolve_pattern
 from ceb.schema import load_scenarios
 from ceb.session import run_scenario
+
+
+def _canonical_owner() -> dict[str, str]:
+    """Map every plain-literal alternative of a canonical pattern back to its name, so a case
+    that hand-writes one can be told it already exists centrally. Only literal alternatives
+    count — an alternative carrying regex syntax cannot be compared by string equality."""
+    owner: dict[str, str] = {}
+    for name, pattern in CANONICAL_PATTERNS.items():
+        for alternative in pattern.split("|"):
+            literal = alternative.strip()
+            if literal and not any(character in literal for character in "[](){}.*+?\\"):
+                owner.setdefault(literal, name)
+    return owner
+
+
+_CANONICAL_OWNER = _canonical_owner()
+
+
+def _alternatives(pattern: str) -> list[str]:
+    """Split on top-level `|` only, so alternations nested inside a group stay intact."""
+    parts, depth, current = [], 0, ""
+    for character in pattern:
+        if character in "([":
+            depth += 1
+        elif character in ")]":
+            depth -= 1
+        if character == "|" and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += character
+    parts.append(current)
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _assistant_patterns(scenario) -> list[tuple[str, str]]:
+    """Every regex the ASSISTANT must satisfy, labelled by where it lives."""
+    found: list[tuple[str, str]] = []
+    for node in scenario.user_plan["nodes"]:
+        for transition in node.get("transitions", []):
+            pattern = transition.get("when", {}).get("assistant_regex")
+            if pattern:
+                found.append((f"user_plan.{node['id']}.assistant_regex", str(pattern)))
+    for milestone in scenario.milestones:
+        if milestone.get("kind") == "content" and milestone.get("role", "assistant") == "assistant":
+            found.append((f"milestone:{milestone['id']}", str(milestone.get("regex", ""))))
+    for index, pattern in enumerate(scenario.conversation.get("required_assistant_regex", [])):
+        found.append((f"required_assistant_regex[{index}]", str(pattern)))
+    return found
 
 
 def _assistant_text(scenario, outputs) -> str:
@@ -79,6 +128,26 @@ def audit(scenario) -> list[str]:
             f"{scenario.id}: {len(currency)} currency_try tracked_values ({', '.join(currency)}) — "
             f"each pins EVERY currency mention to its own value, so they cannot both hold"
         )
+
+    # 6. a behavioural phrase hand-written here that a canonical pattern already owns. These drift:
+    #    `$consent_question` and friends get widened whenever a live model phrases the behaviour a
+    #    new-but-valid way, and a case holding its own private copy never benefits from that. Only
+    #    exact literal alternatives are reported, so this cannot fire on a case-specific phrase.
+    for where, pattern in _assistant_patterns(scenario):
+        if "$" in pattern:  # already delegating to a shared pattern
+            continue
+        borrowed = {
+            alternative: _CANONICAL_OWNER[alternative]
+            for alternative in _alternatives(pattern)
+            if alternative in _CANONICAL_OWNER
+        }
+        if borrowed:
+            names = sorted(set(borrowed.values()))
+            findings.append(
+                f"{scenario.id}: {where} hand-writes {sorted(borrowed)} which "
+                f"${'/$'.join(names)} already owns — use the shared pattern so widening it once "
+                f"reaches every case"
+            )
 
     # A seventh check was tried and removed: "a tracked_values shape that also matches a literal
     # inside the case's own rules". It produced false positives (a milestone that requires the

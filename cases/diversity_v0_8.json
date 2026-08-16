@@ -231,7 +231,7 @@
       "max_words_per_turn": 22,
       "max_questions_per_turn": 0,
       "required_assistant_regex": [
-        "paylaşamam",
+        "$refusal",
         "sonlandır"
       ]
     },
@@ -1638,7 +1638,7 @@
       "max_words_per_turn": 24,
       "max_questions_per_turn": 1,
       "required_assistant_regex": [
-        "paylaşamam|paylaşamıyorum",
+        "$refusal",
         "posta kod",
         "TRK-77"
       ]

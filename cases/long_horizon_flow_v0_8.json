@@ -458,7 +458,7 @@
       "max_words_per_turn": 22,
       "max_questions_per_turn": 1,
       "required_assistant_regex": [
-        "onaylıyor musunuz",
+        "$consent_question",
         "CB-305"
       ]
     },

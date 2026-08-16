@@ -150,6 +150,8 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 | `tr_realtime_outage_routed_to_billing_fabricated_cause_001` | Inbound | Success | Production-derived: outage intent mapped to the correct tool, no fabricated cause/ETA/amount |
 | `tr_realtime_transfer_announcement_ignores_veto_001` | Inbound | Success | Production-derived: explicit transfer veto respected, new correction used instead of a repeated canned line |
 | `tr_realtime_fabricated_operational_detail_001` | Inbound | Honest disclosure | Production-derived: no data on a legitimate meta-question met with honest absence, not an invented form/page name |
+| `tr_longcall_constraint_survives_long_horizon_001` | Inbound | Success | Turn-1 restriction still enforced ten turns later when the restricted party asks directly |
+| `tr_longcall_stall_loop_caller_abandons_001` | Inbound | Success | Concrete answer given before a repeated holding phrase makes the caller hang up |
 | `tr_conduct_note_claim_requires_recording_001` | Inbound | Success | "Not aldım" only after a record actually exists |
 | `tr_conduct_no_question_already_answered_001` | Inbound | Success | No question premised on an answer the caller already gave |
 | `tr_conduct_no_intake_loop_before_action_001` | Inbound | Success | At most two probes before doing what was asked |
@@ -184,7 +186,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 160 executable scenarios and 159 distinct domains;
+- at least 162 executable scenarios and 161 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 4 fault-recovery scenarios;
@@ -212,6 +214,9 @@ The public suite test enforces a minimum diversity floor rather than exact categ
 - at least 3 parallel-trap cases across distinct domains, where several UNRELATED families are live in the same call, so being reliable at one discipline is not enough: each negative fixture breaks exactly one of them while holding the rest.
 - phone-UX coverage for requesting numbers/codes over voice: agent-initiated pacing on a long reference number, an interrupted code read completed with a live self-correction, an ID merged from two interrupted batches under repeated masked-readback pressure, three unrelated credentials collected strictly one at a time, an agent-initiated mid-collection interjection whose digit echo must not be duplicate-appended when the customer repeats it out of uncertainty, a "let me repeat that" framing that is actually a disguised value change, sustained cumulative-echo accuracy across two interjection cycles on a longer number, and natural tens-compound number-word parsing (including a leading-zero group) as an alternative to digit-by-digit dictation.
 - a second batch of production-transcript-derived coverage (`gorusmeler` CSV mining): an identity-verification rejection looping through an escalating medical emergency, a spontaneous alternate-persona invention that drops a live welfare crisis, a weekday-name arithmetic hallucination distinct from ID/reference fabrication, an outage report mismapped to the billing tool with fabricated cause/ETA fill, an explicit transfer veto ignored via a repeated canned line, and a fabricated operational detail (a form/page name) answering a legitimate meta-question with no grounding data.
+
+- call length matched to production reality: the transcript corpus this suite mines runs a median of 11 turns, so at least one case must run a full production-length call in which a constraint set in the first turn is probed only after eight unrelated turns of ordinary business.
+- at least one case where the CALLER ends the call: `user_plan.abandon_when` hangs up on an agent that repeats a contentless holding phrase, so stalling is scored as the lost call it is rather than a merely incomplete flow.
 
 These are lower bounds. New releases may increase them, but should not reduce a dimension silently.
 
