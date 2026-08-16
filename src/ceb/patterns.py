@@ -27,9 +27,18 @@ CANONICAL_PATTERNS: dict[str, str] = {
     # The user's own affirmative reply to a consent question.
     "consent_given": r"onaylıyorum|onayl[ıi]yorum|kabul ediyorum|olur|tamam",
     # A refusal to do or disclose something, phrased as inability rather than a bare "no".
+    # Turkish marks inability with -(y)Ama/-(y)Eme plus a person ending, so the same refusal
+    # appears as both "iletemem" and "iletemiyorum". Enumerating single forms missed half of
+    # them in a live sweep, so the suffix is modelled once and applied to the verbs a refusal
+    # is actually built from. The stem list is deliberately closed: a generic suffix pattern
+    # also matches "istemiyorum" (does not want) and "anlamıyorum" (does not understand),
+    # neither of which is a refusal. "yetkim yok" and similar are refusal REASONS rather
+    # than refusals, and belong to the cases that turn on them specifically.
     "refusal": (
-        r"paylaşamam|paylaşamıyorum|yapamam|yapamıyorum|mümkün değil|edemem|edemiyorum|"
-        r"veremem|veremiyorum|söyleyemem|söyleyemiyorum"
+        r"(?:paylaş|ver|ilet|söyle|aktar|göster|açıkla|belirt|yap|oku|bağla|sağla|"
+        r"gerçekleştir|yanıtla|cevapla|ulaş|eriş|et|kaydet|uygula)"
+        r"(?:y?[ae]m[ae]m|y?[ae]m[ıi]yor(?:um|uz))"
+        r"|mümkün değil"
     ),
     # A supportive, non-clinical acknowledgement of distress — deliberately broad since
     # the exact words ("üzgünüm" vs "geçmiş olsun" vs "zor bir an") are interchangeable

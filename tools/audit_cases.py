@@ -26,14 +26,13 @@ def _canonical_owner() -> dict[str, str]:
     count — an alternative carrying regex syntax cannot be compared by string equality."""
     owner: dict[str, str] = {}
     for name, pattern in CANONICAL_PATTERNS.items():
-        for alternative in pattern.split("|"):
+        # top-level split only: a canonical pattern may contain a group of verb stems, and the
+        # stems inside it are not themselves phrases a case could be said to have hand-written
+        for alternative in _alternatives(pattern):
             literal = alternative.strip()
             if literal and not any(character in literal for character in "[](){}.*+?\\"):
                 owner.setdefault(literal, name)
     return owner
-
-
-_CANONICAL_OWNER = _canonical_owner()
 
 
 def _alternatives(pattern: str) -> list[str]:
@@ -51,6 +50,9 @@ def _alternatives(pattern: str) -> list[str]:
             current += character
     parts.append(current)
     return [part.strip() for part in parts if part.strip()]
+
+
+_CANONICAL_OWNER = _canonical_owner()
 
 
 def _assistant_patterns(scenario) -> list[tuple[str, str]]:
