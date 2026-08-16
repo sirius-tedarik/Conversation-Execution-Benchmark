@@ -104,6 +104,15 @@ flowchart LR
 
 The model chooses its wording and actions. It cannot invent user facts, tool results, consent, or state mutations: those belong to the scenario.
 
+### The caller is not infinitely patient
+
+A scripted caller who waits politely through anything makes a whole class of failure free. Two behaviours, both opt-in per case, give the simulated caller the reactions a real one has:
+
+- **`user_plan.impatience`** — after a pause the caller asks whether anyone is still there. The agent has to confirm its presence and resume where the call was, rather than ignore the question or restart its lookup. Latency in a mock run is effectively zero, so a fixture declares its own timing through `_mock_latencies`; the behaviour is reproducible instead of tracking the speed of the machine running it. `conversation.max_dead_air_prompts` sets how much silence a case tolerates.
+- **`user_plan.abandon_when`** — the caller hangs up on an agent that repeats a contentless holding phrase, which is scored as the lost call it is rather than a merely incomplete flow. In the production transcripts this suite is mined from, 43 of 178 calls ended exactly that way.
+
+Neither fires unless a case asks for it, so an agent that answers promptly and moves the conversation on is never interrupted.
+
 Each saved report contains:
 
 - raw and normalized assistant outputs;
@@ -114,6 +123,7 @@ Each saved report contains:
 - final state, terminal outcome, runtime metrics, and per-axis scores.
 - explicit flow metrics: assistant steps, user turns, detours, rejoin rate, re-asks, and visited user-plan nodes.
 - termination metrics: `end_call` count, reasons, call indices, terminal tool, and whether termination actually ended the call.
+- caller-reaction metrics: how many times the caller had to prompt through dead air, and whether they hung up before the call was finished.
 
 An LLM judge may later be added as a calibrated secondary signal for subjective qualities. It is not trusted for state, policy order, tool contracts, or task-completion truth.
 

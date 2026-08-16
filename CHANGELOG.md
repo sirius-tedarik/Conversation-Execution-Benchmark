@@ -28,6 +28,10 @@ The project follows semantic versioning for software interfaces. Benchmark compa
 - `realtime_findings` pack extended with six cases mined from real production test transcripts: an identity-verification loop overriding a medical emergency, spontaneous persona reinvention abandoning a live crisis, weekday-name arithmetic hallucination, an outage report misrouted to the billing tool with fabricated cause/ETA, a transfer veto ignored via a repeated canned line, and a fabricated operational detail answering a legitimate no-data question
 - `parallel_traps` pack: cases holding several unrelated policy/action disciplines live in the same call, so passing requires all of them at once
 
+### Changed
+
+- README now documents what the simulated caller does, not just how many scenarios exist: a section on the caller reacting to dead air and hanging up on a stalling agent, and caller-reaction metrics in the list of what a report contains. The gate paragraph cites a measurement that was actually taken rather than one that predates most of the current suite, and says plainly that the figure should be expected to fall as coverage grows
+
 ### Fixed
 
 - Regex-too-narrow case bugs found via live sweeps against `callingai-qwen35-9b-v2`, verified independently against captured transcripts before widening
