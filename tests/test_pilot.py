@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 177
+    assert len(scenarios) == 182
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 169
-    assert len({scenario.domain for scenario in scenarios}) >= 168
+    assert len(scenarios) >= 174
+    assert len({scenario.domain for scenario in scenarios}) >= 173
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -347,6 +347,38 @@ def test_loop_and_carry_pack_covers_repetition_and_information_hand_off():
         scenario = next(s for s in scenarios if s.metadata["family"] == family)
         entry = next(e for e in scenario.mock_negative_runs if e["label"] == label)
         assert run_scenario(MockRunner(entry["outputs"]), scenario, seed=17)["customer_abandoned"]
+
+
+def test_premise_and_compound_pack_covers_agreeable_failures():
+    """Two failures that come from being agreeable rather than from being wrong: accepting a
+    premise the records contradict, and resolving a two-part request by doing both, refusing
+    both, or quietly dropping one."""
+    scenarios = load_scenarios(ROOT / "cases" / "premise_and_compound_v0_8.json")
+    assert len(scenarios) == 2
+    assert {s.metadata["family"] for s in scenarios} == {
+        "premise_false_background_claim", "compound_request_split_permission",
+    }
+    for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_scope_ladder_holds_the_same_trap_at_three_call_lengths():
+    """One confirmed defect at 3, 5 and 11 turns so distance from the instruction is the only
+    variable. It also gives the suite a deliberate short/medium/long spread instead of the
+    3-turn cluster the corpus comparison exposed."""
+    scenarios = load_scenarios(ROOT / "cases" / "scope_ladder_v0_8.json")
+    assert len(scenarios) == 3
+    assert sorted(len(s.user_plan["nodes"]) for s in scenarios) == [3, 5, 11]
+    for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
 
 
 def test_phone_ux_pack_covers_number_and_code_requests_over_voice():

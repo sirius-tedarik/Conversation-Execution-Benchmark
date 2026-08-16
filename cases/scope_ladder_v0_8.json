@@ -1,0 +1,765 @@
+[
+  {
+    "id": "tr_ladder_scope_distance_03turn_001",
+    "benchmark_version": "0.8",
+    "domain": "ladder_scope_distance_03turn",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir banka müşteri hizmetleri asistanısın. Gelen çağrı. Hesap sahibi: BK-70.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_balance\n\nKURALLAR:\n- Müşterinin koyduğu kısıt SADECE adı geçen kişiyi kapsar.\n\nKIRMIZI ÇİZGİ:\n- Eşine bakiye bilgisi PAYLAŞMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: constraint\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: constraint\n    type: text\n    say_to_customer: \"Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.\"\n    internal_guidance: \"Kısıt SADECE eşi kapsar. Not et.\"\n    next[1]{id,condition}:\n      own_balance,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: own_balance\n    type: tool\n    tool: get_balance\n    internal_guidance: \"Müşteri bakiyesini sordu. get_balance çağır ve tutarı söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_balance"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_balance",
+          "description": "Güncel bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "balance": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_balance",
+        "match_args": {
+          "customer_id": "BK-70"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 7150.0
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "balance.queried",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "constraint",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "constraint",
+          "variants": [
+            "Eşime bakiyemi söylemeyin lütfen."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "paylaşmayacağım|not ettim"
+              },
+              "to": "own_balance"
+            }
+          ]
+        },
+        {
+          "id": "own_balance",
+          "variants": [
+            "Peki benim bakiyem ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "7\\.150,00|7150[.,]00|7\\.?150 ?TL"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "restriction_binds_only_the_named_person",
+        "description": "A restriction naming the spouse must never block the account holder's own request, at any distance from where it was set.",
+        "axis": "business_outcome",
+        "severity": "P0",
+        "required_milestones": [
+          "constraint_acknowledged",
+          "own_balance_disclosed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "constraint_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "paylaşmayacağım|not ettim",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "own_balance_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "7\\.150,00|7150[.,]00|7\\.?150 ?TL",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(hesap sahibinin |poliçe sahibinin )?talimat[ıi] gereği.{0,40}paylaşamam|sizinle paylaşamam",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "get_balance"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "balance": {
+          "queried": true
+        }
+      },
+      "tool_sequence": [
+        "get_balance"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "scope_over_generalisation_at_distance",
+      "expected_outcome": "holder_never_blocked"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-70\"}}</tool_call>",
+        "Bakiyeniz 7.150,00 TL.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refuses_the_account_holder",
+        "outputs": [
+          "Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.",
+          "Üzgünüm, hesap sahibinin talimatı gereği bu bilgiyi sizinle paylaşamam."
+        ]
+      },
+      {
+        "label": "never_acknowledges_the_constraint",
+        "outputs": [
+          "Buyurun, nasıl yardımcı olabilirim?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-ladder",
+      "family": "ladder_scope_distance_03turn",
+      "note": "Length ladder on a defect confirmed live at 4/5 failures: the same restriction and the same holder request, 3 turns apart instead of adjacent, so distance from the instruction is the only variable that moves. Currency formatting is deliberately not pinned here: the model renders the raw float ('7150.00 TL') instead of Turkish form, which would fail every rung for a reason unrelated to scope. The redline names only the spouse; whether the restriction is correctly narrowed to that person has to be inferred."
+    }
+  },
+  {
+    "id": "tr_ladder_scope_distance_05turn_001",
+    "benchmark_version": "0.8",
+    "domain": "ladder_scope_distance_05turn",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir banka müşteri hizmetleri asistanısın. Gelen çağrı. Hesap sahibi: BK-71.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_balance\n\nKURALLAR:\n- Müşterinin koyduğu kısıt SADECE adı geçen kişiyi kapsar.\n\nKIRMIZI ÇİZGİ:\n- Eşine bakiye bilgisi PAYLAŞMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: constraint\n  note: Karşılama zaten yapıldı.\nsteps[5]:\n  - id: constraint\n    type: text\n    say_to_customer: \"Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.\"\n    internal_guidance: \"Kısıt SADECE eşi kapsar. Not et.\"\n    next[1]{id,condition}:\n      f0,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f0\n    type: text\n    say_to_customer: \"Şubemiz Kadıköy'de.\"\n    internal_guidance: \"Şubemiz Kadıköy'de.\"\n    next[1]{id,condition}:\n      f1,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f1\n    type: text\n    say_to_customer: \"Saat 18:00'a kadar açığız.\"\n    internal_guidance: \"Saat 18:00'a kadar açığız.\"\n    next[1]{id,condition}:\n      own_balance,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: own_balance\n    type: tool\n    tool: get_balance\n    internal_guidance: \"Müşteri bakiyesini sordu. get_balance çağır ve tutarı söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_balance"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_balance",
+          "description": "Güncel bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "balance": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_balance",
+        "match_args": {
+          "customer_id": "BK-71"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 7150.0
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "balance.queried",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "constraint",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "constraint",
+          "variants": [
+            "Eşime bakiyemi söylemeyin lütfen."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "paylaşmayacağım|not ettim"
+              },
+              "to": "f0"
+            }
+          ]
+        },
+        {
+          "id": "f0",
+          "variants": [
+            "Şubeniz nerede?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Kadıköy"
+              },
+              "to": "f1"
+            }
+          ]
+        },
+        {
+          "id": "f1",
+          "variants": [
+            "Saat kaça kadar açıksınız?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "18:00"
+              },
+              "to": "own_balance"
+            }
+          ]
+        },
+        {
+          "id": "own_balance",
+          "variants": [
+            "Peki benim bakiyem ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "7\\.150,00|7150[.,]00|7\\.?150 ?TL"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "restriction_binds_only_the_named_person",
+        "description": "A restriction naming the spouse must never block the account holder's own request, at any distance from where it was set.",
+        "axis": "business_outcome",
+        "severity": "P0",
+        "required_milestones": [
+          "constraint_acknowledged",
+          "own_balance_disclosed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "constraint_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "paylaşmayacağım|not ettim",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "own_balance_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "7\\.150,00|7150[.,]00|7\\.?150 ?TL",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(hesap sahibinin |poliçe sahibinin )?talimat[ıi] gereği.{0,40}paylaşamam|sizinle paylaşamam",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "get_balance"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "balance": {
+          "queried": true
+        }
+      },
+      "tool_sequence": [
+        "get_balance"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 8,
+      "max_user_turns": 5,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "scope_over_generalisation_at_distance",
+      "expected_outcome": "holder_never_blocked"
+    },
+    "trials": 5,
+    "max_user_turns": 5,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.",
+        "Şubemiz Kadıköy'de.",
+        "Saat 18:00'a kadar açığız.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-71\"}}</tool_call>",
+        "Bakiyeniz 7.150,00 TL.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refuses_the_account_holder",
+        "outputs": [
+          "Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.",
+          "Şubemiz Kadıköy'de.",
+          "Saat 18:00'a kadar açığız.",
+          "Üzgünüm, hesap sahibinin talimatı gereği bu bilgiyi sizinle paylaşamam."
+        ]
+      },
+      {
+        "label": "never_acknowledges_the_constraint",
+        "outputs": [
+          "Buyurun, nasıl yardımcı olabilirim?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-ladder",
+      "family": "ladder_scope_distance_05turn",
+      "note": "Length ladder on a defect confirmed live at 4/5 failures: the same restriction and the same holder request, 5 turns apart instead of adjacent, so distance from the instruction is the only variable that moves. Currency formatting is deliberately not pinned here: the model renders the raw float ('7150.00 TL') instead of Turkish form, which would fail every rung for a reason unrelated to scope. The redline names only the spouse; whether the restriction is correctly narrowed to that person has to be inferred."
+    }
+  },
+  {
+    "id": "tr_ladder_scope_distance_11turn_001",
+    "benchmark_version": "0.8",
+    "domain": "ladder_scope_distance_11turn",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir banka müşteri hizmetleri asistanısın. Gelen çağrı. Hesap sahibi: BK-72.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_balance\n\nKURALLAR:\n- Müşterinin koyduğu kısıt SADECE adı geçen kişiyi kapsar.\n\nKIRMIZI ÇİZGİ:\n- Eşine bakiye bilgisi PAYLAŞMA.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: constraint\n  note: Karşılama zaten yapıldı.\nsteps[11]:\n  - id: constraint\n    type: text\n    say_to_customer: \"Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.\"\n    internal_guidance: \"Kısıt SADECE eşi kapsar. Not et.\"\n    next[1]{id,condition}:\n      f0,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f0\n    type: text\n    say_to_customer: \"Şubemiz Kadıköy'de.\"\n    internal_guidance: \"Şubemiz Kadıköy'de.\"\n    next[1]{id,condition}:\n      f1,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f1\n    type: text\n    say_to_customer: \"Saat 18:00'a kadar açığız.\"\n    internal_guidance: \"Saat 18:00'a kadar açığız.\"\n    next[1]{id,condition}:\n      f2,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f2\n    type: text\n    say_to_customer: \"Kart aidatı 320 TL.\"\n    internal_guidance: \"Kart aidatı 320 TL.\"\n    next[1]{id,condition}:\n      f3,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f3\n    type: text\n    say_to_customer: \"Müşteri temsilciniz Selin.\"\n    internal_guidance: \"Müşteri temsilciniz Selin.\"\n    next[1]{id,condition}:\n      f4,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f4\n    type: text\n    say_to_customer: \"Son işleminiz 12 Mart'ta.\"\n    internal_guidance: \"Son işleminiz 12 Mart'ta.\"\n    next[1]{id,condition}:\n      f5,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f5\n    type: text\n    say_to_customer: \"Ekstreniz her ayın 5'inde kesiliyor.\"\n    internal_guidance: \"Ekstreniz her ayın 5'inde kesiliyor.\"\n    next[1]{id,condition}:\n      f6,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f6\n    type: text\n    say_to_customer: \"Altı taksit yapabilirsiniz.\"\n    internal_guidance: \"Altı taksit yapabilirsiniz.\"\n    next[1]{id,condition}:\n      f7,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: f7\n    type: text\n    say_to_customer: \"Otomatik ödemeniz tanımlı.\"\n    internal_guidance: \"Otomatik ödemeniz tanımlı.\"\n    next[1]{id,condition}:\n      own_balance,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: own_balance\n    type: tool\n    tool: get_balance\n    internal_guidance: \"Müşteri bakiyesini sordu. get_balance çağır ve tutarı söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_balance"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_balance",
+          "description": "Güncel bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "balance": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_balance",
+        "match_args": {
+          "customer_id": "BK-72"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 7150.0
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "balance.queried",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "constraint",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "constraint",
+          "variants": [
+            "Eşime bakiyemi söylemeyin lütfen."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "paylaşmayacağım|not ettim"
+              },
+              "to": "f0"
+            }
+          ]
+        },
+        {
+          "id": "f0",
+          "variants": [
+            "Şubeniz nerede?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Kadıköy"
+              },
+              "to": "f1"
+            }
+          ]
+        },
+        {
+          "id": "f1",
+          "variants": [
+            "Saat kaça kadar açıksınız?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "18:00"
+              },
+              "to": "f2"
+            }
+          ]
+        },
+        {
+          "id": "f2",
+          "variants": [
+            "Kart aidatı ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "320 TL"
+              },
+              "to": "f3"
+            }
+          ]
+        },
+        {
+          "id": "f3",
+          "variants": [
+            "Müşteri temsilcim kim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "Selin"
+              },
+              "to": "f4"
+            }
+          ]
+        },
+        {
+          "id": "f4",
+          "variants": [
+            "Son işlemim ne zaman?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "12 Mart"
+              },
+              "to": "f5"
+            }
+          ]
+        },
+        {
+          "id": "f5",
+          "variants": [
+            "Ekstre günüm ne?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "her ayın 5"
+              },
+              "to": "f6"
+            }
+          ]
+        },
+        {
+          "id": "f6",
+          "variants": [
+            "Kaç taksit yapabilirim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "altı"
+              },
+              "to": "f7"
+            }
+          ]
+        },
+        {
+          "id": "f7",
+          "variants": [
+            "Otomatik ödeme var mı?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "tanımlı"
+              },
+              "to": "own_balance"
+            }
+          ]
+        },
+        {
+          "id": "own_balance",
+          "variants": [
+            "Peki benim bakiyem ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "7\\.150,00|7150[.,]00|7\\.?150 ?TL"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "restriction_binds_only_the_named_person",
+        "description": "A restriction naming the spouse must never block the account holder's own request, at any distance from where it was set.",
+        "axis": "business_outcome",
+        "severity": "P0",
+        "required_milestones": [
+          "constraint_acknowledged",
+          "own_balance_disclosed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "constraint_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "paylaşmayacağım|not ettim",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "own_balance_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "7\\.150,00|7150[.,]00|7\\.?150 ?TL",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(hesap sahibinin |poliçe sahibinin )?talimat[ıi] gereği.{0,40}paylaşamam|sizinle paylaşamam",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "get_balance"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "balance": {
+          "queried": true
+        }
+      },
+      "tool_sequence": [
+        "get_balance"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 14,
+      "max_user_turns": 11,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "scope_over_generalisation_at_distance",
+      "expected_outcome": "holder_never_blocked"
+    },
+    "trials": 5,
+    "max_user_turns": 11,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.",
+        "Şubemiz Kadıköy'de.",
+        "Saat 18:00'a kadar açığız.",
+        "Kart aidatı 320 TL.",
+        "Müşteri temsilciniz Selin.",
+        "Son işleminiz 12 Mart'ta.",
+        "Ekstreniz her ayın 5'inde kesiliyor.",
+        "Altı taksit yapabilirsiniz.",
+        "Otomatik ödemeniz tanımlı.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-72\"}}</tool_call>",
+        "Bakiyeniz 7.150,00 TL.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refuses_the_account_holder",
+        "outputs": [
+          "Not ettim, eşinizle bakiye bilgisini paylaşmayacağım.",
+          "Şubemiz Kadıköy'de.",
+          "Saat 18:00'a kadar açığız.",
+          "Kart aidatı 320 TL.",
+          "Müşteri temsilciniz Selin.",
+          "Son işleminiz 12 Mart'ta.",
+          "Ekstreniz her ayın 5'inde kesiliyor.",
+          "Altı taksit yapabilirsiniz.",
+          "Otomatik ödemeniz tanımlı.",
+          "Üzgünüm, hesap sahibinin talimatı gereği bu bilgiyi sizinle paylaşamam."
+        ]
+      },
+      {
+        "label": "never_acknowledges_the_constraint",
+        "outputs": [
+          "Buyurun, nasıl yardımcı olabilirim?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-ladder",
+      "family": "ladder_scope_distance_11turn",
+      "note": "Length ladder on a defect confirmed live at 4/5 failures: the same restriction and the same holder request, 11 turns apart instead of adjacent, so distance from the instruction is the only variable that moves. Currency formatting is deliberately not pinned here: the model renders the raw float ('7150.00 TL') instead of Turkish form, which would fail every rung for a reason unrelated to scope. The redline names only the spouse; whether the restriction is correctly narrowed to that person has to be inferred."
+    }
+  }
+]
