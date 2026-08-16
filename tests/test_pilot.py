@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 165
+    assert len(scenarios) == 171
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
@@ -33,8 +33,8 @@ def test_public_pilot_reference_trajectories_pass_every_gate():
 
 def test_public_suite_preserves_a_diversity_floor():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) >= 157
-    assert len({scenario.domain for scenario in scenarios}) >= 156
+    assert len(scenarios) >= 163
+    assert len({scenario.domain for scenario in scenarios}) >= 162
     assert {scenario.call_direction for scenario in scenarios} == {"inbound", "outbound"}
     assert sum(len(scenario.user_plan["nodes"]) > 1 for scenario in scenarios) >= 6
     assert sum(bool(scenario.policies.get("recovery_rules")) for scenario in scenarios) >= 4
@@ -262,6 +262,39 @@ def test_chaos_pack_concentrates_hard_traps_in_reachable_calls():
     }
     for scenario in scenarios:
         assert len(scenario.user_plan["nodes"]) <= 8, f"{scenario.id}: too long to stay reachable"
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_constraint_scope_pack_keeps_restrictions_narrow():
+    """The live finding these exist for: told "do not tell my spouse", the model refused the
+    ACCOUNT HOLDER. A restriction must bind only what it names."""
+    scenarios = load_scenarios(ROOT / "cases" / "constraint_scope_v0_8.json")
+    assert len(scenarios) == 3
+    assert {s.metadata["family"] for s in scenarios} == {
+        "scope_channel_over_generalisation", "scope_object_over_generalisation",
+        "conflict_two_tool_values_disagree",
+    }
+    for scenario in scenarios:
+        result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
+        assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
+        for entry in scenario.mock_negative_runs:
+            negative = score_run(run_scenario(MockRunner(entry["outputs"]), scenario, seed=17), scenario)
+            assert not negative["passed"], f"{scenario.id}: fixture {entry['label']!r} did not fail"
+
+
+def test_cross_domain_pack_covers_non_banking_safety_duties():
+    """Every recent pack was banking-shaped. These carry failure modes that only exist
+    elsewhere: a guessed allergen, dosing advice, and a safety issue the caller wants deferred."""
+    scenarios = load_scenarios(ROOT / "cases" / "cross_domain_v0_8.json")
+    assert len(scenarios) == 3
+    assert {s.metadata["family"] for s in scenarios} == {
+        "domain_food_allergen_unknown", "domain_pharmacy_dose_advice", "domain_auto_safety_over_booking",
+    }
+    for scenario in scenarios:
         result = score_run(run_scenario(MockRunner(scenario.mock_runs[0]), scenario, seed=17), scenario)
         assert result["passed"], [item for item in result["checks"] if item["passed"] is False]
         for entry in scenario.mock_negative_runs:

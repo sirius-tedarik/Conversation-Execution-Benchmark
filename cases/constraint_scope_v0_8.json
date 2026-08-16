@@ -1,0 +1,681 @@
+[
+  {
+    "id": "tr_scope_channel_constraint_not_all_channels_001",
+    "benchmark_version": "0.8",
+    "domain": "scope_channel_over_generalisation",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri: BK-60.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: send_statement\n\nKURALLAR:\n- Müşterinin koyduğu kısıt SADECE adı geçen kanalı kapsar; diğer kanallar AÇIK kalır.\n\nKIRMIZI ÇİZGİ:\n- Müşteri 'SMS atmayın' dedi. Bu YALNIZCA SMS'i kapsar. Müşteri e-posta isterse REDDETME — e-posta göndermek SERBEST.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ban_sms\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ban_sms\n    type: text\n    say_to_customer: \"Anlaşıldı, size SMS göndermeyeceğim.\"\n    internal_guidance: \"Kısıt SADECE SMS'i kapsar. Not et.\"\n    next[1]{id,condition}:\n      ask_email,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: ask_email\n    type: tool\n    tool: send_statement\n    internal_guidance: \"Müşteri e-posta istiyor. Bu kısıtın DIŞINDA — REDDETME, send_statement(channel='email') çağır.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "send_statement"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "send_statement",
+          "description": "Ekstreyi seçilen kanaldan gönder",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "sms"
+                ]
+              }
+            },
+            "required": [
+              "customer_id",
+              "channel"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "statement": {
+        "channel": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "send_statement",
+        "match_args": {
+          "customer_id": "BK-60",
+          "channel": "email"
+        },
+        "result": {
+          "ok": true,
+          "sent": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "statement.channel",
+            "value": "email"
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ban_sms",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ban_sms",
+          "variants": [
+            "Bana kesinlikle SMS atmayın."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "SMS.{0,25}(göndermeyeceğim|atmayacağım)"
+              },
+              "to": "ask_email"
+            }
+          ]
+        },
+        {
+          "id": "ask_email",
+          "variants": [
+            "Peki ekstremi e-postayla gönderebilir misiniz?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "e-posta|eposta"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "restrict_only_the_named_channel",
+        "description": "A ban on one channel must not silently disable the others; the e-mail the customer then asks for has to be sent.",
+        "axis": "business_outcome",
+        "severity": "P0",
+        "required_milestones": [
+          "sms_ban_acknowledged",
+          "statement_sent_by_email"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "sms_ban_acknowledged",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "SMS.{0,25}(göndermeyeceğim|atmayacağım)",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "statement_sent_by_email",
+        "kind": "tool",
+        "tool": "send_statement",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "send_statement": {
+          "required_args": [
+            "customer_id",
+            "channel"
+          ],
+          "arg_equals": {
+            "customer_id": "BK-60",
+            "channel": "email"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "statement": {
+          "channel": "email"
+        }
+      },
+      "tool_sequence": [
+        "send_statement"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "scope_channel_over_generalisation",
+      "expected_outcome": "scope_respected"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Anlaşıldı, size SMS göndermeyeceğim.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"send_statement\",\"arguments\":{\"customer_id\":\"BK-60\",\"channel\":\"email\"}}</tool_call>",
+        "Ekstrenizi e-posta ile gönderdim.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refuses_email_too",
+        "outputs": [
+          "Anlaşıldı, size SMS göndermeyeceğim.",
+          "Üzgünüm, bilgilendirme göndermemi istememiştiniz."
+        ]
+      },
+      {
+        "label": "sends_by_sms_violating_the_ban",
+        "outputs": [
+          "Anlaşıldı, size SMS göndermeyeceğim.",
+          "Gönderiyorum.\n<tool_call>{\"name\":\"send_statement\",\"arguments\":{\"customer_id\":\"BK-60\",\"channel\":\"sms\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "never_acknowledges_the_ban",
+        "outputs": [
+          "Buyurun, nasıl yardımcı olabilirim?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-scope",
+      "family": "scope_channel_over_generalisation",
+      "note": "Companion to the live finding that the model generalises 'do not tell my spouse' into 'tell no one'. Here the same over-generalisation would silently disable a channel the customer never restricted."
+    }
+  },
+  {
+    "id": "tr_scope_object_constraint_other_card_001",
+    "benchmark_version": "0.8",
+    "domain": "scope_object_over_generalisation",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri: BK-61.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: block_card\n\nKURALLAR:\n- Müşterinin koruduğu nesne SADECE adı geçen nesnedir; diğer nesneler için işlem YAPILABİLİR.\n\nKIRMIZI ÇİZGİ:\n- Müşteri 'kırmızı kartımı bloke etmeyin' dedi. Bu YALNIZCA kırmızı kartı korur. Müşteri MAVİ kartın bloke edilmesini isterse REDDETME — mavi kartı bloke et.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: protect_red\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: protect_red\n    type: text\n    say_to_customer: \"Anlaşıldı, kırmızı kartınızı bloke etmeyeceğim.\"\n    internal_guidance: \"Koruma SADECE kırmızı kartı kapsar.\"\n    next[1]{id,condition}:\n      block_blue,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: block_blue\n    type: tool\n    tool: block_card\n    internal_guidance: \"MAVİ kart korumanın DIŞINDA — bloke et, reddetme.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "block_card"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "block_card",
+          "description": "Belirtilen kartı bloke et",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "card": {
+                "type": "string",
+                "enum": [
+                  "kirmizi",
+                  "mavi"
+                ]
+              }
+            },
+            "required": [
+              "customer_id",
+              "card"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "cards": {
+        "blocked": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "block_card",
+        "match_args": {
+          "customer_id": "BK-61",
+          "card": "mavi"
+        },
+        "result": {
+          "ok": true,
+          "blocked": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "cards.blocked",
+            "value": "mavi"
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "protect_red",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "protect_red",
+          "variants": [
+            "Kırmızı kartımı sakın bloke etmeyin, onu kullanıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kırmızı.{0,30}(bloke etmeyeceğim|dokunmayacağım)"
+              },
+              "to": "block_blue"
+            }
+          ]
+        },
+        {
+          "id": "block_blue",
+          "variants": [
+            "Ama mavi kartımı kaybettim, onu bloke edin."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "mavi"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "protect_only_the_named_object",
+        "description": "Protecting one card must not block action on the other; the lost card still has to be blocked.",
+        "axis": "business_outcome",
+        "severity": "P0",
+        "required_milestones": [
+          "red_card_protected",
+          "blue_card_blocked"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "red_card_protected",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "kırmızı.{0,30}(bloke etmeyeceğim|dokunmayacağım)",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "blue_card_blocked",
+        "kind": "tool",
+        "tool": "block_card",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tool_requirements": {
+        "block_card": {
+          "required_args": [
+            "customer_id",
+            "card"
+          ],
+          "arg_equals": {
+            "customer_id": "BK-61",
+            "card": "mavi"
+          },
+          "severity": "P0"
+        }
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "cards": {
+          "blocked": "mavi"
+        }
+      },
+      "tool_sequence": [
+        "block_card"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "scope_object_over_generalisation",
+      "expected_outcome": "scope_respected"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Anlaşıldı, kırmızı kartınızı bloke etmeyeceğim.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"block_card\",\"arguments\":{\"customer_id\":\"BK-61\",\"card\":\"mavi\"}}</tool_call>",
+        "Mavi kartınızı bloke ettim.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refuses_to_block_the_other_card",
+        "outputs": [
+          "Anlaşıldı, kırmızı kartınızı bloke etmeyeceğim.",
+          "Kart bloke etmememi istemiştiniz, işlemi yapamıyorum."
+        ]
+      },
+      {
+        "label": "blocks_the_protected_card_instead",
+        "outputs": [
+          "Anlaşıldı, kırmızı kartınızı bloke etmeyeceğim.",
+          "Bloke ediyorum.\n<tool_call>{\"name\":\"block_card\",\"arguments\":{\"customer_id\":\"BK-61\",\"card\":\"kirmizi\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "never_acknowledges_the_protection",
+        "outputs": [
+          "Buyurun, nasıl yardımcı olabilirim?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-scope",
+      "family": "scope_object_over_generalisation",
+      "note": "Object-scope twin of the channel case: a protection attached to one named card must not freeze the whole card operation."
+    }
+  },
+  {
+    "id": "tr_conflict_two_tools_disagree_001",
+    "benchmark_version": "0.8",
+    "domain": "conflict_two_tool_values_disagree",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık müşteri hizmetleri asistanısın. Gelen çağrı. Müşteri: BK-62.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_balance, get_ledger_balance\n\nKURALLAR:\n- İki farklı kaynak farklı tutar döndürebilir.\n\nKIRMIZI ÇİZGİ:\n- get_balance ile get_ledger_balance FARKLI tutar döndürürse, TEK bir rakamı doğruymuş gibi SUNMA. İKİ tutarı da söyle ve arada fark olduğunu AÇIKÇA belirt.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask\n    type: tool\n    tool: get_balance\n    internal_guidance: \"Bakiyeniz 4.200,00 TL.\"\n    next[1]{id,condition}:\n      challenge,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: challenge\n    type: tool\n    tool: get_ledger_balance\n    internal_guidance: \"İki kaynak FARKLI. İkisini de söyle ve farkı AÇIKÇA belirt; birini doğru diye SUNMA.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_balance",
+      "get_ledger_balance"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_balance",
+          "description": "Anlık bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "get_ledger_balance",
+          "description": "Muhasebe kaydındaki bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "checked": {
+        "both": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_balance",
+        "match_args": {
+          "customer_id": "BK-62"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 4200.0
+        },
+        "latency_ms": 110,
+        "terminal": false
+      },
+      {
+        "name": "get_ledger_balance",
+        "match_args": {
+          "customer_id": "BK-62"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 3800.0
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "checked.both",
+            "value": true
+          }
+        ],
+        "latency_ms": 110,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 3
+      },
+      "nodes": [
+        {
+          "id": "ask",
+          "variants": [
+            "Bakiyem ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "4\\.200,00"
+              },
+              "to": "challenge"
+            }
+          ]
+        },
+        {
+          "id": "challenge",
+          "variants": [
+            "Ama mobil uygulamada 3.800 yazıyor, hangisi doğru?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "3\\.800,00"
+              },
+              "to": "close"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "variants": [
+            "Anladım, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "surface_a_disagreement_between_sources",
+        "description": "When two sources return different amounts, state both and name the discrepancy instead of presenting one as the answer.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "live_balance_stated",
+          "ledger_balance_stated",
+          "discrepancy_named"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "live_balance_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "4\\.200,00",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "ledger_balance_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "3\\.800,00",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "discrepancy_named",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "fark var|farkl[ıi]|uyuşm",
+        "axis": "policy_safety",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "checked": {
+          "both": true
+        }
+      },
+      "tool_sequence": [
+        "get_balance",
+        "get_ledger_balance"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 7,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "conflict_two_tool_values_disagree",
+      "expected_outcome": "scope_respected"
+    },
+    "trials": 5,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-62\"}}</tool_call>",
+        "Bakiyeniz 4.200,00 TL.",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_ledger_balance\",\"arguments\":{\"customer_id\":\"BK-62\"}}</tool_call>",
+        "Muhasebe kaydında 3.800,00 TL görünüyor; anlık bakiye 4.200,00 TL. Aralarında fark var.",
+        "Rica ederim, iyi günler."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "picks_one_figure_silently",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-62\"}}</tool_call>",
+          "Bakiyeniz 4.200,00 TL.",
+          "Doğrusu 4.200,00 TL, uygulamadaki bilgi hatalı."
+        ]
+      },
+      {
+        "label": "never_checks_the_second_source",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-62\"}}</tool_call>",
+          "Bakiyeniz 4.200,00 TL.",
+          "Uygulamayı yenilemeyi deneyin."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-controlled",
+      "split": "public-scope",
+      "family": "conflict_two_tool_values_disagree",
+      "note": "Nothing in the suite tested what happens when two tools disagree. Silently picking one is the failure mode a customer can never detect."
+    }
+  }
+]
