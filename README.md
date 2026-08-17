@@ -87,6 +87,14 @@ Every run writes a report — `reports/<model>-<UTC timestamp>.json` plus a self
 
 The endpoint must expose `/v1/chat/completions`. Native tool calls are normalized into CEB's provider-neutral trajectory format. Use `ceb --help` for all options.
 
+To measure how much of a score survives a realistic transcript rather than a clean one, add `--stt`:
+
+```bash
+ceb --base-url http://localhost:8000 --model your-model --stt moderate
+```
+
+Run the suite clean first. The difference between the two scores is the robustness number, and it is the only honest way to read it — an absolute score under noise says nothing on its own.
+
 ## How CEB works
 
 ```mermaid
@@ -112,6 +120,17 @@ A scripted caller who waits politely through anything makes a whole class of fai
 - **`user_plan.abandon_when`** — the caller hangs up on an agent that repeats a contentless holding phrase, which is scored as the lost call it is rather than a merely incomplete flow. In the production transcripts this suite is mined from, 43 of 178 calls ended exactly that way.
 
 Neither fires unless a case asks for it, so an agent that answers promptly and moves the conversation on is never interrupted.
+
+### The caller is transcribed, not typed
+
+A phone agent never reads what the caller said. It reads what a recogniser produced from it, over a line where both parties can talk at once and the handset can change hands. Four mechanisms model that, all opt-in:
+
+- **`--stt light|moderate|heavy`** applies Turkish speech-to-text noise to every caller turn: fillers survive, word-final syllables are eaten, punctuation disappears, a digit run is re-spaced, the question particle drifts across a word boundary, the first phoneme is clipped because the recogniser opened late, and room speech lands at the end of the turn. Every decision is a hash of the seed, so a failure found under noise replays from the seed alone. A node may pin its own profile, or `null` to stay clean while the rest of the sweep is noisy. One operator, `drop_negation`, inverts the caller's meaning and is deliberately absent from every graded profile: no agent can recover it from the text, so grading an ordinary case under it would measure luck.
+- **`user_plan.fragments`** delivers one caller utterance as several consecutive `user` messages with a model invocation after each — which is how speech-to-text reaches the chat template in production, incomplete messages included. A response to a non-final fragment is scored separately: calling a tool there is a P0, and a reply longer than `conversation.max_interim_words` is a P1. A short backchannel while the caller is still speaking is good service; acting on half a sentence is not. "Aboneliğimi iptal edin" is a complete, unambiguous instruction, and "...meyin, sadece dondurun" is the next message.
+- **`user_plan.barge_in`** cuts what the caller *heard* of the agent's last sentence, leaving the model's own history whole — because on a full-duplex line nothing tells the model where it was cut. A content milestone may score `against: "heard"`, which turns "the caller was told the reference number" into a claim about the caller rather than about what was emitted. No case asks the model to know it was interrupted; they ask what it does next.
+- **`user_plan.speaker`** marks who is holding the handset, and `policies.holder_only_content` stops account-specific disclosure the moment it changes — without restarting the call.
+
+The suite is deliberately not run end-to-end in a "fragment everything" mode. Noise can be applied suite-wide because it does not change meaning; splitting a sentence at an arbitrary point can produce a fragment that is complete and wrong, and would fail cases whose flows were never written for it.
 
 Each saved report contains:
 
@@ -330,6 +349,7 @@ Scores from changed cases or oracle semantics are not assumed comparable. See [`
 | [`docs/SCENARIO_TAXONOMY.md`](docs/SCENARIO_TAXONOMY.md) | Diversity dimensions, public coverage matrix, regression floor |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, case acceptance checklist, pull-request expectations |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history and comparability-impacting changes |
+| [`docs/superpowers/specs/`](docs/superpowers/specs/) | Design documents for harness changes, with the constraints each one accepted |
 
 ## Project layout
 
@@ -338,6 +358,7 @@ cases/              public scenario packs
 docs/               methodology and schema reference
 src/ceb/            runner, environment, simulator, oracles, scorecard, CLI
 tests/              core and end-to-end pilot regression tests
+tools/              case auditor and the trajectory-shape snapshot
 benchmark.json      versioned release gate
 reports/            local run output (ignored except .gitkeep)
 ```
