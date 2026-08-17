@@ -60,6 +60,8 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
             raise ScenarioValidationError(f"{where}.transitions must be list[object]")
         if "stt" in node and not isinstance(node["stt"], (str, dict, type(None))):
             raise ScenarioValidationError(f"{where}.stt must be a profile name, an operator map, or null")
+        if node.get("speaker") not in (None, "holder", "third_party"):
+            raise ScenarioValidationError(f"{where}.speaker must be holder or third_party")
         if "barge_in" in node:
             # Full-duplex: this caller turn cuts the agent off mid-sentence.
             barge = node["barge_in"]
@@ -321,6 +323,9 @@ class Scenario:
         for tool, required in prerequisites.items():
             if tool not in tools_raw or not isinstance(required, list) or not set(required) <= set(milestone_ids):
                 raise ScenarioValidationError(f"{scenario_id}: invalid prerequisites for {tool}")
+        holder_only = policies.get("holder_only_content", [])
+        if not isinstance(holder_only, list) or not all(isinstance(item, str) for item in holder_only):
+            raise ScenarioValidationError(f"{scenario_id}.policies.holder_only_content must be list[str]")
         read_only_tools = policies.get("read_only_tools", [])
         if not isinstance(read_only_tools, list) or not all(isinstance(item, str) for item in read_only_tools):
             raise ScenarioValidationError(f"{scenario_id}.policies.read_only_tools must be a list[str]")

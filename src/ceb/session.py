@@ -171,6 +171,9 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0, stt: Any = None
                     "user_turn": user_turn,
                     "fragment_index": fragment_index,
                     "is_final_fragment": is_final,
+                    # Who is holding the handset for this turn. Disclosure scoped to the account
+                    # holder has to stop when it changes, without restarting the call.
+                    "speaker": (simulator.current_node or {}).get("speaker", "holder"),
                     "simulator_node": simulator.current_id,
                     "simulator_off_flow": simulator.is_off_flow,
                 },
