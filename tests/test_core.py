@@ -694,3 +694,28 @@ def test_schema_rejects_a_node_declaring_both_variants_and_fragments():
            "max_user_turns": 1, "max_steps_per_turn": 1}
     with pytest.raises(ScenarioValidationError):
         Scenario.from_dict(raw)
+
+
+def test_three_fragments_invoke_the_model_three_times_and_flag_the_first_two():
+    """Production invokes the model on every fragment, including the unfinished ones. Responses
+    to those are interim: the model is answering a caller who is still talking."""
+    raw = {"id": "frag", "benchmark_version": "0.8", "domain": "d", "language": "tr-TR",
+           "call_direction": "inbound", "system": "s", "available_tools": [], "tool_schemas": [],
+           "user_plan": {"start": "n", "nodes": [
+               {"id": "n", "fragments": ["sıfır beş üç iki", "bir iki üç", "kırk beş"], "terminal": True}]},
+           "objectives": [{"id": "o", "description": "d", "axis": "policy_safety", "severity": "P0",
+                           "required_milestones": ["m"]}],
+           "milestones": [{"id": "m", "kind": "content", "role": "user", "regex": "sıfır",
+                           "axis": "policy_safety", "severity": "P0"}],
+           "max_user_turns": 1, "max_steps_per_turn": 1}
+    scenario = Scenario.from_dict(raw)
+    trajectory = run_scenario(MockRunner(["hı hı", "hı hı", "Teşekkürler, numaranızı aldım."]), scenario, seed=17)
+    users = [s for s in trajectory["timeline"] if s["role"] == "user"]
+    assistants = [s for s in trajectory["timeline"] if s["role"] == "assistant"]
+    assert [u["content"] for u in users] == ["sıfır beş üç iki", "bir iki üç", "kırk beş"]
+    assert [u["fragment_index"] for u in users] == [0, 1, 2]
+    assert [u["is_final_fragment"] for u in users] == [False, False, True]
+    assert len(assistants) == 3
+    assert [a.get("interim", False) for a in assistants] == [True, True, False]
+    # the interim calls must not be mistaken for the turn running out of steps
+    assert trajectory["execution_error"] is None

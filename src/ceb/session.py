@@ -140,25 +140,42 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0, stt: Any = None
         # sees `content`; `spoken` exists so a user-role milestone can assert a fact the SCRIPT
         # established rather than a word the recogniser happened to preserve.
         spoken = (simulator.trace[-1].get("spoken") if simulator.trace else None) or utterance
-        messages.append({"role": "user", "content": utterance})
-        _append(
-            timeline,
-            {
-                "role": "user",
-                "content": utterance,
-                "spoken": spoken,
-                "user_turn": user_turn,
-                "simulator_node": simulator.current_id,
-                "simulator_off_flow": simulator.is_off_flow,
-            },
-        )
-        outcome = _agent_turn(
-            runner, scenario, seed, messages, timeline, environment,
-            user_turn, scenario.max_steps_per_turn,
-        )
-        turn_steps = outcome["turn_steps"]
-        terminal_tool = outcome["terminal_tool"] or terminal_tool
-        execution_error = execution_error or outcome["execution_error"]
+        # Speech-to-text delivers one utterance as several consecutive user messages and the
+        # model is invoked on every one of them, so a caller can be answered mid-sentence.
+        fragments = simulator.pending_fragments or [utterance]
+        turn_steps: list[dict[str, Any]] = []
+        for fragment_index, fragment in enumerate(fragments):
+            is_final = fragment_index == len(fragments) - 1
+            messages.append({"role": "user", "content": fragment})
+            _append(
+                timeline,
+                {
+                    "role": "user",
+                    "content": fragment,
+                    # `spoken` carries the WHOLE utterance on every fragment: a user-role
+                    # milestone asserts what the caller established, which no single fragment
+                    # holds on its own.
+                    "spoken": spoken,
+                    "user_turn": user_turn,
+                    "fragment_index": fragment_index,
+                    "is_final_fragment": is_final,
+                    "simulator_node": simulator.current_id,
+                    "simulator_off_flow": simulator.is_off_flow,
+                },
+            )
+            outcome = _agent_turn(
+                runner, scenario, seed, messages, timeline, environment, user_turn,
+                scenario.max_steps_per_turn if is_final else 1,
+                interim=not is_final,
+            )
+            turn_steps.extend(outcome["turn_steps"])
+            terminal_tool = outcome["terminal_tool"] or terminal_tool
+            # A non-final fragment runs with max_steps=1 and would otherwise always report
+            # "max_steps_per_turn exceeded"; only the real turn can exhaust its budget.
+            if is_final:
+                execution_error = execution_error or outcome["execution_error"]
+            if terminal_tool:
+                break
         if terminal_tool or simulator.advance(turn_steps, timeline) is None:
             break
     else:
