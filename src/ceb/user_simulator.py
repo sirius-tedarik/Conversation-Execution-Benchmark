@@ -112,6 +112,9 @@ class ControlledUserSimulator:
         # Simulated speech-to-text noise on the caller's side; None leaves every
         # utterance exactly as the case wrote it (see stt.py).
         self.stt = stt
+        # The pieces the session must send as separate user messages for the utterance just
+        # emitted. A node without `fragments` yields exactly one, which is today's behaviour.
+        self.pending_fragments: list[str] = []
         self.visits: dict[str, int] = {}
         self.trace: list[dict[str, Any]] = []
         self.max_detours = int(plan.get("max_detours", len(self.nodes)))
@@ -156,6 +159,7 @@ class ControlledUserSimulator:
             utterance, stt_applied = transcribe(
                 utterance, self.stt, self.seed, self.scenario_id, "impatience", self.impatience_prompts
             )
+            self.pending_fragments = [utterance]
             self.trace.append(
                 {
                     "node": self.current_id,
@@ -180,8 +184,15 @@ class ControlledUserSimulator:
             self.detour_count += 1
         visit = self.visits.get(self.current_id, 0)
         self.visits[self.current_id] = visit + 1
-        variants = node["variants"]
-        utterance = variants[_stable_index(self.seed, self.scenario_id, self.current_id, visit, len(variants))]
+        declared_fragments = node.get("fragments")
+        if declared_fragments:
+            fragments = list(declared_fragments)
+            utterance = " ".join(fragments)
+        else:
+            variants = node["variants"]
+            utterance = variants[_stable_index(self.seed, self.scenario_id, self.current_id, visit, len(variants))]
+            fragments = [utterance]
+        self.pending_fragments = fragments
         spoken = utterance
         # A node may pin its own transcription noise. Absent means inherit the sweep-wide
         # setting; an explicit null means keep this turn clean even under --stt, which is what

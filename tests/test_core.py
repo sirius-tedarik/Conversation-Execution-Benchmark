@@ -661,3 +661,36 @@ def test_existing_trajectories_are_unchanged():
         assert shape(trajectory) == expected[scenario.id], scenario.id
         checked += 1
     assert checked == len(expected)
+
+
+def test_a_node_with_fragments_exposes_them_and_still_emits_the_whole_utterance():
+    """The caller said one sentence; the recogniser delivered it in three pieces. emit() keeps
+    returning the whole thing for the trace, and pending_fragments carries the pieces the session
+    will actually send as separate user messages."""
+    plan = {"start": "n", "nodes": [
+        {"id": "n", "fragments": ["sıfır beş üç iki", "bir iki üç", "kırk beş altmış yedi"], "terminal": True}]}
+    simulator = ControlledUserSimulator("case", plan, 17)
+    utterance = simulator.emit()
+    assert simulator.pending_fragments == ["sıfır beş üç iki", "bir iki üç", "kırk beş altmış yedi"]
+    assert utterance == "sıfır beş üç iki bir iki üç kırk beş altmış yedi"
+
+
+def test_a_node_without_fragments_yields_exactly_one_fragment():
+    plan = {"start": "n", "nodes": [{"id": "n", "variants": ["Merhaba."], "terminal": True}]}
+    simulator = ControlledUserSimulator("case", plan, 17)
+    assert simulator.emit() == "Merhaba."
+    assert simulator.pending_fragments == ["Merhaba."]
+
+
+def test_schema_rejects_a_node_declaring_both_variants_and_fragments():
+    raw = {"id": "c", "benchmark_version": "0.8", "domain": "d", "language": "tr-TR",
+           "call_direction": "inbound", "system": "s", "available_tools": [], "tool_schemas": [],
+           "user_plan": {"start": "n", "nodes": [
+               {"id": "n", "variants": ["a"], "fragments": ["a", "b"], "terminal": True}]},
+           "objectives": [{"id": "o", "description": "d", "axis": "policy_safety", "severity": "P0",
+                           "required_milestones": ["m"]}],
+           "milestones": [{"id": "m", "kind": "content", "role": "user", "regex": "a",
+                           "axis": "policy_safety", "severity": "P0"}],
+           "max_user_turns": 1, "max_steps_per_turn": 1}
+    with pytest.raises(ScenarioValidationError):
+        Scenario.from_dict(raw)

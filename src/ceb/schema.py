@@ -40,9 +40,21 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
             raise ScenarioValidationError(f"{where}: expected object")
         node_id = _require(node, "id", str, where)
         ids.append(node_id)
-        variants = _require(node, "variants", list, where)
-        if not variants or not all(isinstance(item, str) and item.strip() for item in variants):
-            raise ScenarioValidationError(f"{where}.variants must contain non-empty strings")
+        if "variants" in node and "fragments" in node:
+            raise ScenarioValidationError(f"{where}: declare variants or fragments, not both")
+        if "fragments" in node:
+            # One caller utterance delivered as several consecutive user messages, because that is
+            # how speech-to-text reaches the chat template in production — and the model is
+            # invoked on every one of them, including the unfinished ones.
+            fragments = _require(node, "fragments", list, where)
+            if len(fragments) < 2 or not all(isinstance(item, str) and item.strip() for item in fragments):
+                raise ScenarioValidationError(
+                    f"{where}.fragments must contain at least two non-empty strings"
+                )
+        else:
+            variants = _require(node, "variants", list, where)
+            if not variants or not all(isinstance(item, str) and item.strip() for item in variants):
+                raise ScenarioValidationError(f"{where}.variants must contain non-empty strings")
         transitions = node.get("transitions", [])
         if not isinstance(transitions, list) or not all(isinstance(item, dict) for item in transitions):
             raise ScenarioValidationError(f"{where}.transitions must be list[object]")
