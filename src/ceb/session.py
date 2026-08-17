@@ -9,6 +9,7 @@ from typing import Any
 from .environment import StatefulEnvironment, ToolExecutionError
 from .parser import parse_assistant_output
 from .schema import Scenario
+from .stt import summarise as stt_summary
 from .user_simulator import ControlledUserSimulator
 
 
@@ -19,9 +20,14 @@ def _append(timeline: list[dict[str, Any]], step: dict[str, Any]) -> dict[str, A
     return item
 
 
-def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, Any]:
+def run_scenario(runner: Any, scenario: Scenario, seed: int = 0, stt: Any = None) -> dict[str, Any]:
     read_only_tools = frozenset(scenario.policies.get("read_only_tools", []))
-    simulator = ControlledUserSimulator(scenario.id, scenario.user_plan, seed, read_only_tools)
+    # `stt` is a profile name or operator->rate mapping; None keeps every caller
+    # utterance exactly as written. A scenario may pin its own under perturbations.stt,
+    # which wins over the sweep-wide setting so a case built around a specific
+    # mis-transcription still behaves the same in an otherwise clean run.
+    stt_profile = (scenario.perturbations or {}).get("stt", stt)
+    simulator = ControlledUserSimulator(scenario.id, scenario.user_plan, seed, read_only_tools, stt_profile)
     environment = StatefulEnvironment(scenario.initial_state, scenario.tool_contracts)
     messages: list[dict[str, Any]] = []
     if scenario.system:
@@ -33,12 +39,17 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, An
         utterance = simulator.emit()
         if utterance is None:
             break
+        # What the caller actually said, before simulated transcription. The model only ever
+        # sees `content`; `spoken` exists so a user-role milestone can assert a fact the SCRIPT
+        # established rather than a word the recogniser happened to preserve.
+        spoken = (simulator.trace[-1].get("spoken") if simulator.trace else None) or utterance
         messages.append({"role": "user", "content": utterance})
         _append(
             timeline,
             {
                 "role": "user",
                 "content": utterance,
+                "spoken": spoken,
                 "user_turn": user_turn,
                 "simulator_node": simulator.current_id,
                 "simulator_off_flow": simulator.is_off_flow,
@@ -142,5 +153,6 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0) -> dict[str, An
         "impatience_prompts": simulator.impatience_prompts,
         "execution_error": execution_error,
         "audio_events": copy.deepcopy(list(scenario.mock_audio_events)),
+        "stt": stt_summary(simulator.trace),
         "perturbations": copy.deepcopy(scenario.perturbations),
     }

@@ -28,6 +28,11 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--api-key", default=os.getenv("OPENAI_API_KEY", "EMPTY"))
     parser.add_argument("--trials", type=int, help="override trial count per case")
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument(
+        "--stt",
+        help="simulate Turkish speech-to-text noise on caller turns: light|moderate|heavy. "
+             "Run the suite clean first; the score delta is the robustness number.",
+    )
     parser.add_argument("--timeout", type=int, default=180, help="per-request timeout in seconds")
     parser.add_argument("--max-retries", type=int, default=3, help="retries per transient transport fault")
     parser.add_argument(
@@ -107,14 +112,14 @@ def _run_one(
             raise ValueError(f"{scenario.id}: --mock requires _mock_runs")
         outputs = scenario.mock_runs[min(trial, len(scenario.mock_runs) - 1)]
         runner = MockRunner(outputs, list(scenario.mock_latencies) or None)
-        trajectory = run_scenario(runner, scenario, seed)
+        trajectory = run_scenario(runner, scenario, seed, getattr(args, "stt", None))
         return _with_transcript(score_run(trajectory, scenario, advisory_metrics), trajectory)
     runner = OpenAICompatibleRunner(
         args.base_url, args.model, args.api_key,
         timeout=args.timeout, max_retries=args.max_retries,
     )
     try:
-        trajectory = run_scenario(runner, scenario, seed)
+        trajectory = run_scenario(runner, scenario, seed, getattr(args, "stt", None))
         return _with_transcript(score_run(trajectory, scenario, advisory_metrics), trajectory)
     except Exception as error:  # transport, not model behaviour: keep the sweep alive
         print(f"  ! {scenario.id} seed={seed}: {type(error).__name__}: {error}")

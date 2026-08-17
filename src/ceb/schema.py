@@ -46,6 +46,8 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
         transitions = node.get("transitions", [])
         if not isinstance(transitions, list) or not all(isinstance(item, dict) for item in transitions):
             raise ScenarioValidationError(f"{where}.transitions must be list[object]")
+        if "stt" in node and not isinstance(node["stt"], (str, dict, type(None))):
+            raise ScenarioValidationError(f"{where}.stt must be a profile name, an operator map, or null")
     if len(ids) != len(set(ids)):
         raise ScenarioValidationError(f"{scenario_id}.user_plan has duplicate node ids")
     if start not in ids:

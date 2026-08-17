@@ -36,7 +36,18 @@ def _matching_steps(trajectory: dict[str, Any], milestone: dict[str, Any]) -> li
     if kind == "content":
         role = milestone.get("role", "assistant")
         pattern = resolve_pattern(str(milestone.get("regex", ".*")))
-        return [s for s in timeline if s.get("role") == role and re.search(str(pattern), str(s.get("content", "")), re.I | re.S)]
+        # A user-role milestone records what the CALLER established — "they consented", "they
+        # asked to end the call". That is a fact about the script, not about the transcript, so
+        # it reads `spoken` where simulated STT has altered the text. Without this, running any
+        # sweep with --stt silently fails ninety-odd consent checks for a reason that has
+        # nothing to do with the model. Assistant-role milestones are unaffected: the model's
+        # own words are never rewritten.
+        field = "spoken" if role == "user" else "content"
+        return [
+            s for s in timeline
+            if s.get("role") == role
+            and re.search(str(pattern), str(s.get(field) or s.get("content", "")), re.I | re.S)
+        ]
     if kind == "state":
         actual = get_path(trajectory.get("final_state", {}), str(milestone.get("path", "")), object())
         return [{"index": len(timeline), "value": actual}] if actual == milestone.get("value") else []

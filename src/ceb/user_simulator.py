@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from .patterns import resolve_pattern
+from .stt import transcribe
 
 
 def _customer_gave_up(rule: dict[str, Any], full_timeline: list[dict[str, Any]] | None) -> bool:
@@ -101,12 +102,16 @@ def _matches(
 class ControlledUserSimulator:
     """The model may vary language, but it never controls user facts or decisions."""
 
-    def __init__(self, scenario_id: str, plan: dict[str, Any], seed: int, read_only_tools: frozenset[str] = frozenset()):
+    def __init__(self, scenario_id: str, plan: dict[str, Any], seed: int,
+                 read_only_tools: frozenset[str] = frozenset(), stt: Any = None):
         self.scenario_id = scenario_id
         self.nodes = {node["id"]: node for node in plan["nodes"]}
         self.current_id: str | None = plan["start"]
         self.seed = seed
         self.read_only_tools = read_only_tools
+        # Simulated speech-to-text noise on the caller's side; None leaves every
+        # utterance exactly as the case wrote it (see stt.py).
+        self.stt = stt
         self.visits: dict[str, int] = {}
         self.trace: list[dict[str, Any]] = []
         self.max_detours = int(plan.get("max_detours", len(self.nodes)))
@@ -148,11 +153,15 @@ class ControlledUserSimulator:
                 self.seed, self.scenario_id, "impatience", self.impatience_prompts, len(utterances)
             )
             utterance = utterances[index]
+            utterance, stt_applied = transcribe(
+                utterance, self.stt, self.seed, self.scenario_id, "impatience", self.impatience_prompts
+            )
             self.trace.append(
                 {
                     "node": self.current_id,
                     "visit": self.visits.get(self.current_id, 0),
                     "utterance": utterance,
+                    "stt_applied": stt_applied,
                     "off_flow": False,
                     "resume_to": None,
                     "active_since_index": self.active_since_index,
@@ -173,11 +182,22 @@ class ControlledUserSimulator:
         self.visits[self.current_id] = visit + 1
         variants = node["variants"]
         utterance = variants[_stable_index(self.seed, self.scenario_id, self.current_id, visit, len(variants))]
+        spoken = utterance
+        # A node may pin its own transcription noise. Absent means inherit the sweep-wide
+        # setting; an explicit null means keep this turn clean even under --stt, which is what
+        # lets a case corrupt exactly the turn its trap needs and leave the turn that
+        # ESTABLISHES the constraint intact.
+        node_stt = node.get("stt", self.stt) if "stt" in node else self.stt
+        utterance, stt_applied = transcribe(
+            utterance, node_stt, self.seed, self.scenario_id, self.current_id, visit
+        )
         self.trace.append(
             {
                 "node": self.current_id,
                 "visit": visit,
                 "utterance": utterance,
+                "spoken": spoken,
+                "stt_applied": stt_applied,
                 "off_flow": bool(node.get("off_flow")),
                 "resume_to": node.get("resume_to"),
                 "active_since_index": self.active_since_index,
