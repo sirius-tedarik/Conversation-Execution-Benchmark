@@ -624,3 +624,40 @@ def test_a_user_role_milestone_survives_simulated_transcription_noise():
         trajectory = run_scenario(MockRunner(["Anladım."]), scenario, seed=17, stt=profile)
         result = score_run(trajectory, scenario)
         assert result["milestones"]["caller_consented"], profile
+
+
+def test_existing_trajectories_are_unchanged():
+    """The fragmented-turn work rewrites the turn loop. Every case that declares none of the new
+    fields must still produce exactly the timeline it produced before — same roles, same content,
+    same tool arguments, in the same order. A pass rate can stay green while the shape underneath
+    drifts, because a case can reach the same verdict by a different route; this compares the
+    shape. Regenerate with `PYTHONPATH=src python3 tools/snapshot_trajectories.py` ONLY when the
+    diff is additions."""
+    import hashlib
+    import json
+    from pathlib import Path
+
+    from ceb.schema import load_scenarios
+
+    root = Path(__file__).resolve().parents[1]
+    expected = json.loads((root / "tests" / "fixtures" / "trajectory_shapes.json").read_text(encoding="utf-8"))
+
+    def shape(trajectory):
+        parts = []
+        for step in trajectory["timeline"]:
+            parts.append("|".join([
+                str(step.get("role")),
+                str(step.get("content", "")),
+                str(step.get("name", "")),
+                json.dumps(step.get("arguments", {}), ensure_ascii=False, sort_keys=True),
+            ]))
+        return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+    checked = 0
+    for scenario in load_scenarios(root / "cases"):
+        if scenario.id not in expected:
+            continue
+        trajectory = run_scenario(MockRunner(list(scenario.mock_runs[0])), scenario, seed=17)
+        assert shape(trajectory) == expected[scenario.id], scenario.id
+        checked += 1
+    assert checked == len(expected)
