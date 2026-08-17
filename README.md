@@ -33,8 +33,8 @@ CEB evaluates the **whole execution trajectory**.
 
 | | Public pilot `v0.8` |
 |---|---|
-| Scenarios | 270 executable Turkish cases |
-| Domains | 269 operational and safety domains |
+| Scenarios | 291 executable Turkish cases |
+| Domains | 290 operational and safety domains |
 | Direction | Inbound and outbound |
 | Trials | 3 per scenario by default |
 | Evaluation axes | 7, reported separately |
@@ -62,7 +62,7 @@ Expected summary:
 
 ```text
 CEB 0.8 — mock-reference
-scenarios=270 runs=954 eligible=True
+scenarios=291 runs=1017 eligible=True
 Pass@1=100.00% Pass@k=100.00% Pass^k=100.00%
 release_gate=PASS
 ```
@@ -129,6 +129,12 @@ A phone agent never reads what the caller said. It reads what a recogniser produ
 - **`user_plan.fragments`** delivers one caller utterance as several consecutive `user` messages with a model invocation after each — which is how speech-to-text reaches the chat template in production, incomplete messages included. A response to a non-final fragment is scored separately: calling a tool there is a P0, and a reply longer than `conversation.max_interim_words` is a P1. A short backchannel while the caller is still speaking is good service; acting on half a sentence is not. "Aboneliğimi iptal edin" is a complete, unambiguous instruction, and "...meyin, sadece dondurun" is the next message.
 - **`user_plan.barge_in`** cuts what the caller *heard* of the agent's last sentence, leaving the model's own history whole — because on a full-duplex line nothing tells the model where it was cut. A content milestone may score `against: "heard"`, which turns "the caller was told the reference number" into a claim about the caller rather than about what was emitted. No case asks the model to know it was interrupted; they ask what it does next.
 - **`user_plan.speaker`** marks who is holding the handset, and `policies.holder_only_content` stops account-specific disclosure the moment it changes — without restarting the call.
+
+Three things the production transcripts show constantly, and the cases built on them:
+
+- **The caller keeps talking.** Not a split sentence but a continued thought, one complete clause at a time — "Merhaba, arabam arıza yaptı" then "ve frenlerimde de sorun var". The connective says more is coming; often there is no connective at all and nothing signals it. Where no cue exists the suite does not demand waiting, only that the end state reflects the whole turn.
+- **Every turn fragments, not just one.** Two messages in one turn, three in the next. A value given in one turn's first message has to survive into an action two messages later in the next.
+- **Hesitation arrives as its own message.** "Şey.", "Eee...", "Hı hı." reach the model as turns, and a message carrying nothing but hesitation is not an answer to the question that was asked.
 
 The suite is deliberately not run end-to-end in a "fragment everything" mode. Noise can be applied suite-wide because it does not change meaning; splitting a sentence at an arbitrary point can produce a fragment that is complete and wrong, and would fail cases whose flows were never written for it.
 

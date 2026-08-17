@@ -189,7 +189,7 @@ Language diversity in `v0.8` is limited to Turkish plus one Turkish-English code
 
 The public suite test enforces a minimum diversity floor rather than exact category counts:
 
-- at least 270 executable scenarios and 269 distinct domains;
+- at least 291 executable scenarios and 290 distinct domains;
 - both inbound and outbound calls;
 - at least 6 multi-node conversations;
 - at least 16 fault-recovery scenarios, covering failure shapes beyond a hard fault that clears on retry: a business rejection retrying cannot fix, a value that moves between the read and the write, a call that succeeds while flagging its own data as stale, and a retry budget that runs out and must escalate;
