@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_public_pilot_reference_trajectories_pass_every_gate():
     scenarios = load_scenarios(ROOT / "cases")
-    assert len(scenarios) == 247
+    assert len(scenarios) == 252
     scored = []
     for scenario in scenarios:
         for trial in range(scenario.trials):
