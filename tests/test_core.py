@@ -719,3 +719,44 @@ def test_three_fragments_invoke_the_model_three_times_and_flag_the_first_two():
     assert [a.get("interim", False) for a in assistants] == [True, True, False]
     # the interim calls must not be mistaken for the turn running out of steps
     assert trajectory["execution_error"] is None
+
+
+def test_a_tool_call_while_the_caller_is_still_talking_is_a_p0():
+    """The first fragment can be a complete, wrong instruction. Acting on it executes for real."""
+    from ceb.oracles import _interim_checks
+
+    trajectory = {"timeline": [
+        {"role": "user", "content": "Aboneliğimi iptal edin", "fragment_index": 0, "is_final_fragment": False},
+        {"role": "assistant", "content": "", "interim": True, "tool_calls": [{"name": "cancel_subscription"}]},
+        {"role": "tool", "name": "cancel_subscription", "interim": True, "arguments": {}, "result": {"ok": True}},
+    ]}
+    failed = [c for c in _interim_checks(trajectory, {"max_interim_words": 6}) if not c["passed"]]
+    assert any(c["name"] == "no_tool_on_partial_utterance" and c["severity"] == "P0" for c in failed)
+
+
+def test_a_short_backchannel_between_fragments_is_allowed():
+    from ceb.oracles import _interim_checks
+
+    trajectory = {"timeline": [
+        {"role": "user", "content": "Aboneliğimi iptal edin", "fragment_index": 0, "is_final_fragment": False},
+        {"role": "assistant", "content": "hı hı", "interim": True, "tool_calls": []},
+    ]}
+    assert all(c["passed"] for c in _interim_checks(trajectory, {"max_interim_words": 6}))
+
+
+def test_a_long_interim_response_exceeds_the_word_cap():
+    from ceb.oracles import _interim_checks
+
+    trajectory = {"timeline": [
+        {"role": "user", "content": "Aboneliğimi iptal edin", "fragment_index": 0, "is_final_fragment": False},
+        {"role": "assistant", "content": "Tabii, aboneliğinizi hemen iptal ediyorum, işlem birkaç saniye sürecek.",
+         "interim": True, "tool_calls": []},
+    ]}
+    failed = [c for c in _interim_checks(trajectory, {"max_interim_words": 6}) if not c["passed"]]
+    assert any(c["name"] == "bounded_interim_response" for c in failed)
+
+
+def test_interim_checks_are_inert_when_nothing_was_fragmented():
+    from ceb.oracles import _interim_checks
+
+    assert _interim_checks({"timeline": [{"role": "assistant", "content": "Merhaba."}]}, {}) == []
