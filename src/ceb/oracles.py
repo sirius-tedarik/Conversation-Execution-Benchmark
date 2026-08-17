@@ -538,7 +538,7 @@ def _interim_checks(trajectory: dict[str, Any], conversation: dict[str, Any]) ->
     ]
     if not interim_assistants:
         return []
-    cap = int(conversation.get("max_interim_words", 6))
+    cap = int(conversation.get("max_interim_words", 12))
     called = [
         step.get("name") for step in trajectory.get("timeline", [])
         if step.get("role") == "tool" and step.get("interim")

@@ -222,7 +222,7 @@
       "source": "synthetic-voice-transport",
       "split": "public-barge-in",
       "family": "bargein_cut_reference_is_repeated",
-      "note": "The line is full-duplex, so the caller cutting in at the second word means the reference number never reached them — while the model's own history still holds the whole sentence, because nothing tells it where it was cut. The milestone therefore scores `against: \"heard\"`: 'the caller was told the reference' is a claim about the caller, not about what was emitted. The model is never asked to know it was interrupted, only to answer the question it is then asked."
+      "note": "The line is full-duplex, so the caller cutting in at the second word means the reference number never reached them — while the model's own history still holds the whole sentence, because nothing tells it where it was cut. The milestone therefore scores `against: \"heard\"`: 'the caller was told the reference' is a claim about the caller, not about what was emitted. The model is never asked to know it was interrupted, only to answer the question it is then asked. Live 3/3."
     }
   },
   {
@@ -462,7 +462,7 @@
       "source": "synthetic-voice-transport",
       "split": "public-barge-in",
       "family": "bargein_no_reference_to_unheard_content",
-      "note": "Cut at the first word, the caller heard 'Bakiyeniz' and nothing else. Pointing back to it — 'belirttiğim gibi' — is the failure, because from the caller's side nothing was ever said. Distinct from the reference-number case in what the agent owes: there it must repeat a value, here it must not build on one."
+      "note": "Cut at the first word, the caller heard 'Bakiyeniz' and nothing else. Pointing back to it — 'belirttiğim gibi' — is the failure, because from the caller's side nothing was ever said. Distinct from the reference-number case in what the agent owes: there it must repeat a value, here it must not build on one. Live 3/3."
     }
   }
 ]
