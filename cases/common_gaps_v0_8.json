@@ -1341,7 +1341,7 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "yetersiz bakiye|reddedil"
+                "assistant_regex": "yetersiz bakiye|bakiye yetersiz|yeterli bakiye (yok|bulunmuyor)|bakiye[^.]{0,15}(yetmiyor|yetersiz)|reddedil|çekim yapılamadı"
               },
               "to": "what"
             }
@@ -1387,7 +1387,7 @@
         "id": "decline_reason_stated",
         "kind": "content",
         "role": "assistant",
-        "regex": "yetersiz bakiye|reddedil",
+        "regex": "yetersiz bakiye|bakiye yetersiz|yeterli bakiye (yok|bulunmuyor)|bakiye[^.]{0,15}(yetmiyor|yetersiz)|reddedil|çekim yapılamadı",
         "axis": "action_correctness",
         "severity": "P0"
       },

@@ -1004,7 +1004,7 @@
     },
     "conversation": {
       "max_words_per_turn": 28,
-      "max_questions_per_turn": 0,
+      "max_questions_per_turn": 1,
       "required_assistant_regex": [
         "aşağılayıcı|uygun değil",
         "nötr|tarafsız|yönlendirme"

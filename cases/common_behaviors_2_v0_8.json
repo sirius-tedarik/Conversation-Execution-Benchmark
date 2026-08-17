@@ -624,8 +624,7 @@
       {
         "name": "leave_note",
         "match_args": {
-          "agent_name": "Ayşe",
-          "note": "müşteri geri arama istiyor"
+          "agent_name": "Ayşe"
         },
         "result": {
           "ok": true

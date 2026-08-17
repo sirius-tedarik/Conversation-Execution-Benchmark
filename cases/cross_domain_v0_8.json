@@ -449,7 +449,12 @@
                 "type": "string"
               },
               "slot": {
-                "type": "string"
+                "type": "string",
+                "description": "Randevu slotu",
+                "enum": [
+                  "acil",
+                  "normal"
+                ]
               }
             },
             "required": [

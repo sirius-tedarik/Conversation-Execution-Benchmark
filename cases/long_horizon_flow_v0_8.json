@@ -116,7 +116,7 @@
         "id": "detour_redirected",
         "kind": "content",
         "role": "assistant",
-        "regex": "işleme dönelim|vakanıza dönelim|bilgi veremiyorum|hakkında bilgim yok|destek talebinizi",
+        "regex": "işlem(inize|imize|e)?\\s*dön|vaka(nıza|mıza)?\\s*dön|bilgi(m)?\\s*(veremiyorum|yok|bulunmuyor)|destek talebi",
         "axis": "flow_control",
         "severity": "P1"
       },

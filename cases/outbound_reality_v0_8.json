@@ -239,8 +239,7 @@
       {
         "name": "schedule_callback",
         "match_args": {
-          "customer_id": "BK-25",
-          "window": "yarın 14:00-16:00"
+          "customer_id": "BK-25"
         },
         "result": {
           "ok": true

@@ -22,7 +22,9 @@
                 "type": "string"
               },
               "date": {
-                "type": "string"
+                "type": "string",
+                "description": "Randevu tarihi, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
               }
             },
             "required": [
@@ -43,7 +45,7 @@
         "name": "book_appointment",
         "match_args": {
           "patient_id": "RZ-1",
-          "date": "28 Şubat"
+          "date": "2026-02-28"
         },
         "result": {
           "ok": true
@@ -142,7 +144,7 @@
           ],
           "arg_equals": {
             "patient_id": "RZ-1",
-            "date": "28 Şubat"
+            "date": "2026-02-28"
           },
           "severity": "P0"
         }
@@ -186,7 +188,7 @@
     "_mock_runs": [
       [
         "Şubat 31 çekmiyor, böyle bir tarih yok; 2026 Şubat 28 gün. Hangi güne alalım?",
-        "Kontrol ediyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-1\",\"date\":\"28 Şubat\"}}</tool_call>",
+        "Kontrol ediyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-1\",\"date\":\"2026-02-28\"}}</tool_call>",
         "28 Şubat için randevunuzu oluşturdum.",
         "Rica ederim, geçmiş olsun."
       ]
@@ -195,7 +197,7 @@
       {
         "label": "snaps_the_impossible_date_silently",
         "outputs": [
-          "Oluşturuyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-1\",\"date\":\"28 Şubat\"}}</tool_call>"
+          "Oluşturuyorum.\n<tool_call>{\"name\":\"book_appointment\",\"arguments\":{\"patient_id\":\"RZ-1\",\"date\":\"2026-02-28\"}}</tool_call>"
         ]
       },
       {

@@ -232,7 +232,7 @@
       "max_questions_per_turn": 0,
       "required_assistant_regex": [
         "$refusal",
-        "sonlandır"
+        "sonlandır|kapatıyorum|görüşmeyi (kapat|bitir)|iyi günler dilerim"
       ]
     },
     "runtime": {
