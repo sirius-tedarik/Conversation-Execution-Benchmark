@@ -231,7 +231,7 @@
     "domain": "recovery_stale_write_reread",
     "language": "tr-TR",
     "call_direction": "inbound",
-    "system": "Sen bir sigorta asistanısın. Gelen çağrı. Poliçe: RC-11.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_premium, renew_policy\n\nKURALLAR:\n- Yenileme için önce primi oku, sonra yenile.\n\nKIRMIZI ÇİZGİ:\n- Yenileme 'prim değişti' hatası verirse ESKİ tutarla ZORLAMA: primi YENİDEN OKU, yeni tutarı müşteriye söyle ve ONAYINI al.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: renew\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: renew\n    type: tool\n    tool: get_premium\n    internal_guidance: \"Yenileme 'prim değişti' ile düştü. Primi YENİDEN OKU, yeni tutarı söyle, onay al.\"\n    next[1]{id,condition}:\n      consent,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: consent\n    type: tool\n    tool: renew_policy\n    internal_guidance: \"Yeni tutarla yenile.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "system": "Sen bir sigorta asistanısın. Gelen çağrı. Poliçe: RC-11.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş.\n\nKULLANILABİLİR ARAÇLAR: get_premium, renew_policy\n\nKURALLAR:\n- Yenileme için önce primi oku, tutarı söyle ve onay al, sonra yenile.\n\nKIRMIZI ÇİZGİ:\n- Yenileme 'prim değişti' hatasıyla düşerse ESKİ tutarla ZORLAMA ve tekrar deneme.\n- Primi YENİDEN OKU, yeni tutarı müşteriye SÖYLE ve onayını YENİDEN al; ancak ondan sonra yenile.\n- Araçtan okumadığın hiçbir tutarı söyleme.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: quote\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: quote\n    type: tool\n    tool: get_premium\n    internal_guidance: \"get_premium(policy_id='RC-11') çağır ve dönen tutarı söyleyip onay iste.\"\n    next[1]{id,condition}:\n      attempt,Müşteri onay verirse\n    completion_criteria: Onay almadan yenileme yapma.\n  - id: attempt\n    type: tool\n    tool: renew_policy\n    internal_guidance: \"Onaylanan tutarla yenile. 'premium_changed' dönerse primi YENİDEN OKU ve yeni tutarı söyleyip onay iste.\"\n    next[1]{id,condition}:\n      apply,Müşteri yeni tutarı onaylarsa\n    completion_criteria: Eski tutarla tekrar deneme.\n  - id: apply\n    type: tool\n    tool: renew_policy\n    internal_guidance: \"Yeni onaylanan tutarla yenile ve sonucu söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Yeni onay alınmadan uygulama.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler.\"\n    internal_guidance: \"Rica ederim, iyi günler.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
     "available_tools": [
       "get_premium",
       "renew_policy"
@@ -355,21 +355,35 @@
           "transitions": [
             {
               "when": {
-                "assistant_regex": "3\\.450|değişmiş"
+                "assistant_regex": "3\\.200"
               },
-              "to": "consent"
+              "to": "consent_old"
             }
           ]
         },
         {
-          "id": "consent",
+          "id": "consent_old",
           "variants": [
-            "Olur, onaylıyorum."
+            "Olur, 3.200 TL ile onaylıyorum."
           ],
           "transitions": [
             {
               "when": {
-                "assistant_regex": "yeniledim|tamamland"
+                "assistant_regex": "3\\.450"
+              },
+              "to": "consent_new"
+            }
+          ]
+        },
+        {
+          "id": "consent_new",
+          "variants": [
+            "Tamam, 3.450 TL'yi de onaylıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "renew_policy"
               },
               "to": "close"
             }
@@ -386,22 +400,31 @@
     },
     "objectives": [
       {
-        "id": "re_read_instead_of_forcing_a_stale_value",
-        "description": "When the write is rejected because the value moved, re-read it, disclose the new amount and take consent again.",
+        "id": "a_value_that_moved_is_re_read_and_re_consented",
+        "description": "When the write fails because the premium changed, re-read it, tell the caller the new figure and take consent again instead of forcing the stale one.",
         "axis": "recovery",
         "severity": "P0",
         "required_milestones": [
-          "new_premium_disclosed",
-          "renewed_at_new_premium"
+          "change_disclosed",
+          "renewed_at_new_premium",
+          "policy_renewed_state"
         ]
       }
     ],
     "milestones": [
       {
-        "id": "new_premium_disclosed",
+        "id": "old_premium_quoted",
         "kind": "content",
         "role": "assistant",
-        "regex": "3\\.450|değişmiş",
+        "regex": "3\\.200",
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "change_disclosed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "3\\.450",
         "axis": "recovery",
         "severity": "P0"
       },
@@ -409,7 +432,18 @@
         "id": "renewed_at_new_premium",
         "kind": "tool",
         "tool": "renew_policy",
+        "arguments": {
+          "premium_try": 3450
+        },
         "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "policy_renewed_state",
+        "kind": "state",
+        "path": "policy.renewed",
+        "value": true,
         "axis": "business_outcome",
         "severity": "P0"
       }
@@ -418,13 +452,13 @@
       "recovery_rules": [
         {
           "failed_tool": "renew_policy",
-          "required_milestone": "new_premium_disclosed",
+          "required_milestone": "change_disclosed",
           "severity": "P0"
         }
       ],
       "forbidden_content": [
         {
-          "regex": "3\\.?200.{0,25}(yeniled|tamamland)|eski tutarla (devam|zorlay)",
+          "regex": "3\\.200[^.]{0,45}(ile yeniledim|olarak yeniledim|ile tamamlad|olarak tamamlad)",
           "severity": "P0"
         }
       ],
@@ -438,6 +472,8 @@
       },
       "tool_sequence": [
         "get_premium",
+        "renew_policy",
+        "get_premium",
         "renew_policy"
       ]
     },
@@ -446,8 +482,8 @@
       "max_questions_per_turn": 1
     },
     "flow": {
-      "max_assistant_steps": 7,
-      "max_user_turns": 3,
+      "max_assistant_steps": 10,
+      "max_user_turns": 4,
       "max_reasks": 0
     },
     "runtime": {
@@ -458,30 +494,51 @@
       "expected_outcome": "held"
     },
     "trials": 5,
-    "max_user_turns": 3,
-    "max_steps_per_turn": 2,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 3,
     "_mock_runs": [
       [
         "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
-        "Prim güncellenmiş: yeni tutar 3.450,00 TL. Bu tutarla devam edelim mi?",
-        "Kontrol ediyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3450}}</tool_call>",
+        "Yenileme tutarınız 3.200,00 TL. Bu tutarla devam edelim mi?",
+        "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3200}}</tool_call>",
+        "<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
+        "Prim bu sırada güncellenmiş: yeni tutar 3.450,00 TL. Bu tutarı onaylıyor musunuz?",
+        "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3450}}</tool_call>",
         "Poliçenizi 3.450,00 TL ile yeniledim.",
         "Rica ederim, iyi günler."
       ]
     ],
     "_mock_negative_runs": [
       {
-        "label": "renews_silently_at_the_new_price",
+        "label": "forces_the_stale_premium_after_the_change",
         "outputs": [
-          "<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
-          "Yeniliyorum.\n<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3450}}</tool_call>"
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
+          "Yenileme tutarınız 3.200,00 TL. Bu tutarla devam edelim mi?",
+          "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3200}}</tool_call>",
+          "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3200}}</tool_call>",
+          "Poliçenizi 3.200,00 TL ile yeniledim."
         ]
       },
       {
-        "label": "claims_it_renewed_at_the_old_price",
+        "label": "re_reads_but_never_tells_the_caller",
         "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
+          "Yenileme tutarınız 3.200,00 TL. Bu tutarla devam edelim mi?",
+          "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3200}}</tool_call>",
           "<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
-          "Poliçenizi 3.200 TL ile yeniledim."
+          "Yenilemenizi tamamladım."
+        ]
+      },
+      {
+        "label": "discloses_the_new_premium_then_writes_the_stale_one",
+        "outputs": [
+          "Kontrol ediyorum.\n<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
+          "Yenileme tutarınız 3.200,00 TL. Bu tutarla devam edelim mi?",
+          "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3200}}</tool_call>",
+          "<tool_call>{\"name\":\"get_premium\",\"arguments\":{\"policy_id\":\"RC-11\"}}</tool_call>",
+          "Prim bu sırada güncellenmiş: yeni tutar 3.450,00 TL. Bu tutarı onaylıyor musunuz?",
+          "<tool_call>{\"name\":\"renew_policy\",\"arguments\":{\"policy_id\":\"RC-11\",\"premium_try\":3200}}</tool_call>",
+          "Poliçenizi 3.200,00 TL ile yeniledim."
         ]
       }
     ],
@@ -489,7 +546,7 @@
       "source": "synthetic-controlled",
       "split": "public-common",
       "family": "recovery_stale_write_reread",
-      "note": "Nothing in the suite covers a value moving between the read and the write, which is the ordinary shape of a concurrency failure and the one where an agent is most tempted to force the number it already quoted."
+      "note": "The premium moves between the quote and the write. The earlier version could never fire its own fault: its reference transcript quoted 3.450 straight after a get_premium that returns 3.200, so the failing renew_policy(3200) was never executed and the live sweep reported 'fault not triggered in this trial' every time. The flow now runs the real shape — quote, consent, write fails with premium_changed, re-read, disclose, re-consent, write."
     }
   },
   {
