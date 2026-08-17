@@ -730,7 +730,7 @@ def test_a_tool_call_while_the_caller_is_still_talking_is_a_p0():
         {"role": "assistant", "content": "", "interim": True, "tool_calls": [{"name": "cancel_subscription"}]},
         {"role": "tool", "name": "cancel_subscription", "interim": True, "arguments": {}, "result": {"ok": True}},
     ]}
-    failed = [c for c in _interim_checks(trajectory, {"max_interim_words": 6}) if not c["passed"]]
+    failed = [c for c in _interim_checks(trajectory, {"max_interim_words": 6}, frozenset()) if not c["passed"]]
     assert any(c["name"] == "no_tool_on_partial_utterance" and c["severity"] == "P0" for c in failed)
 
 
@@ -741,7 +741,7 @@ def test_a_short_backchannel_between_fragments_is_allowed():
         {"role": "user", "content": "Aboneliğimi iptal edin", "fragment_index": 0, "is_final_fragment": False},
         {"role": "assistant", "content": "hı hı", "interim": True, "tool_calls": []},
     ]}
-    assert all(c["passed"] for c in _interim_checks(trajectory, {"max_interim_words": 6}))
+    assert all(c["passed"] for c in _interim_checks(trajectory, {"max_interim_words": 6}, frozenset()))
 
 
 def test_a_long_interim_response_exceeds_the_word_cap():
@@ -752,14 +752,14 @@ def test_a_long_interim_response_exceeds_the_word_cap():
         {"role": "assistant", "content": "Tabii, aboneliğinizi hemen iptal ediyorum, işlem birkaç saniye sürecek.",
          "interim": True, "tool_calls": []},
     ]}
-    failed = [c for c in _interim_checks(trajectory, {"max_interim_words": 6}) if not c["passed"]]
+    failed = [c for c in _interim_checks(trajectory, {"max_interim_words": 6}, frozenset()) if not c["passed"]]
     assert any(c["name"] == "bounded_interim_response" for c in failed)
 
 
 def test_interim_checks_are_inert_when_nothing_was_fragmented():
     from ceb.oracles import _interim_checks
 
-    assert _interim_checks({"timeline": [{"role": "assistant", "content": "Merhaba."}]}, {}) == []
+    assert _interim_checks({"timeline": [{"role": "assistant", "content": "Merhaba."}]}, {}, frozenset()) == []
 
 
 def test_barge_in_truncates_only_what_the_caller_heard():
@@ -850,3 +850,33 @@ def test_agent_overlap_does_nothing_on_the_first_turn():
     from ceb.stt import transcribe
 
     assert transcribe("merhaba", {"agent_overlap": 1.0}, 17, "c", "n", 0, context=None) == ("merhaba", [])
+
+
+def test_a_read_only_lookup_mid_utterance_is_not_a_violation():
+    """Reading is not acting. A lookup fired before the sentence ends changes nothing the caller
+    can be hurt by, and it is what lets the agent answer promptly once they finish."""
+    from ceb.oracles import _interim_checks
+
+    trajectory = {"timeline": [
+        {"role": "user", "content": "Faturam", "fragment_index": 0, "is_final_fragment": False},
+        {"role": "assistant", "content": "", "interim": True, "tool_calls": [{"name": "lookup_bill"}]},
+        {"role": "tool", "name": "lookup_bill", "interim": True, "arguments": {}, "result": {"ok": True}},
+    ]}
+    assert all(c["passed"] for c in _interim_checks(trajectory, {}, frozenset({"lookup_bill"})))
+    failed = [c for c in _interim_checks(trajectory, {}, frozenset()) if not c["passed"]]
+    assert any(c["name"] == "no_tool_on_partial_utterance" for c in failed)
+
+
+def test_the_interim_word_cap_is_opt_in():
+    """It was a proxy for "delivered the answer early" and three live sweeps caught it punishing
+    correct behaviour, so a case has to ask for it."""
+    from ceb.oracles import _interim_checks
+
+    trajectory = {"timeline": [
+        {"role": "user", "content": "Faturam", "fragment_index": 0, "is_final_fragment": False},
+        {"role": "assistant", "content": "Tabii efendim, faturanızı hemen kontrol ediyorum, bir saniye lütfen.",
+         "interim": True, "tool_calls": []},
+    ]}
+    assert [c["name"] for c in _interim_checks(trajectory, {}, frozenset())] == ["no_tool_on_partial_utterance"]
+    names = [c["name"] for c in _interim_checks(trajectory, {"max_interim_words": 4}, frozenset())]
+    assert "bounded_interim_response" in names

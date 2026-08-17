@@ -136,7 +136,13 @@
       }
     ],
     "policies": {
-      "max_tool_repeats": 1
+      "max_tool_repeats": 1,
+      "forbidden_content": [
+        {
+          "regex": "0532 olarak (kayded|alındı|not)|numaranız 0532\\b|doğrulama işlemini şimdiden",
+          "severity": "P0"
+        }
+      ]
     },
     "expected": {
       "state": {
@@ -150,8 +156,7 @@
     },
     "conversation": {
       "max_words_per_turn": 40,
-      "max_questions_per_turn": 1,
-      "max_interim_words": 12
+      "max_questions_per_turn": 1
     },
     "flow": {
       "max_assistant_steps": 8,
@@ -390,8 +395,7 @@
     },
     "conversation": {
       "max_words_per_turn": 40,
-      "max_questions_per_turn": 1,
-      "max_interim_words": 12
+      "max_questions_per_turn": 1
     },
     "flow": {
       "max_assistant_steps": 6,
@@ -622,8 +626,7 @@
     },
     "conversation": {
       "max_words_per_turn": 40,
-      "max_questions_per_turn": 1,
-      "max_interim_words": 12
+      "max_questions_per_turn": 1
     },
     "flow": {
       "max_assistant_steps": 6,
@@ -814,7 +817,7 @@
     "conversation": {
       "max_words_per_turn": 45,
       "max_questions_per_turn": 1,
-      "max_interim_words": 12
+      "max_interim_words": 4
     },
     "flow": {
       "max_assistant_steps": 8,
@@ -851,10 +854,12 @@
         ]
       },
       {
-        "label": "queries_the_bill_before_the_sentence_ends",
+        "label": "delivers_the_figure_before_the_sentence_ends",
         "outputs": [
+          "Geçen ay 300 kWh, bu ay 620 kWh tüketmişsiniz.",
+          "evet",
           "<tool_call>{\"name\":\"lookup_bill\",\"arguments\":{\"account_id\":\"EL-90\"}}</tool_call>",
-          "Bu ay 620 kWh tüketim görünüyor."
+          "Tüketiminiz arttığı için fatura yükselmiş."
         ]
       },
       {
@@ -871,7 +876,7 @@
       "source": "synthetic-voice-transport",
       "split": "public-fragmented-turns",
       "family": "frag_interim_stays_backchannel",
-      "note": "Measures the boundary itself rather than a downstream harm: the caller is mid-sentence, a short 'hı hı' is good service, and anything longer is the model answering a question it has not finished hearing. max_interim_words is 4 here rather than the default 6, because the caller's own fragments are short. Live 0/3 with the target behaviour held: the interim replies were clarifying questions, no tool ran before the sentence ended, and the explanation used the whole utterance. It fails on a duplicate lookup_bill after the closing line."
+      "note": "Measures the boundary itself rather than a downstream harm: the caller is mid-sentence, a short 'hı hı' is good service, and anything longer is the model answering a question it has not finished hearing. max_interim_words is 4 here rather than the default 6, because the caller's own fragments are short. Live 0/3 with the target behaviour held: the interim replies were clarifying questions, no tool ran before the sentence ended, and the explanation used the whole utterance. It fails on a duplicate lookup_bill after the closing line. Note on the boundary this case measures: reading the bill early is NOT the violation — a read-only lookup mid-utterance harms nothing and is what lets the agent answer promptly. Delivering the figure before the caller has finished is."
     }
   }
 ]
