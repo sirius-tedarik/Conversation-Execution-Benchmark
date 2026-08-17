@@ -1,0 +1,2038 @@
+[
+  {
+    "id": "tr_transcript_available_slot_denied_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_tool_result_contradicted",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir diş kliniği randevu asistanısın. Gelen çağrı. Hasta: DK-31.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: check_appointment_availability, create_appointment\n\nKURALLAR:\n- Müsaitliği yalnızca check_appointment_availability'den öğren.\n- Aracın döndürdüğü available_slots listesi TEK doğru kaynaktır.\n\nKIRMIZI ÇİZGİ:\n- Müşterinin istediği saat available_slots içinde VARSA, o saati 'yok/dolu/görünmüyor' diye SUNMA. Aracın söylediğinin tersini söylemek yasaktır.\n- Listede olan bir saati atlayıp müşteriye yalnızca diğer saatleri okumak da aynı hatadır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: check\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: check\n    type: tool\n    tool: check_appointment_availability\n    internal_guidance: \"check_appointment_availability(date='2026-08-04') çağır. Dönen listeyi oku; müşterinin istediği saat listedeyse UYGUN olduğunu söyle ve onay iste.\"\n    next[1]{id,condition}:\n      book,Müşteri onay verirse\n    completion_criteria: Aracın sonucunu okumadan saat hakkında konuşma.\n  - id: book\n    type: tool\n    tool: create_appointment\n    internal_guidance: \"create_appointment(patient_id='DK-31', date='2026-08-04', time='14:00') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Onay alınmadan randevu oluşturma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "check_appointment_availability",
+      "create_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "check_appointment_availability",
+          "description": "Belirtilen tarihte uygun randevu saatlerini getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Sorgulanacak tarih, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "required": [
+              "date"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "create_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "Randevu tarihi, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "time": {
+                "type": "string",
+                "description": "Randevu saati, SS:DD biçiminde",
+                "pattern": "^\\d{2}:\\d{2}$"
+              }
+            },
+            "required": [
+              "patient_id",
+              "date",
+              "time"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "time": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "check_appointment_availability",
+        "match_args": {
+          "date": "2026-08-04"
+        },
+        "result": {
+          "ok": true,
+          "available_slots": [
+            "10:15",
+            "11:30",
+            "14:00",
+            "16:30"
+          ]
+        },
+        "latency_ms": 120,
+        "terminal": false
+      },
+      {
+        "name": "create_appointment",
+        "match_args": {
+          "time": "14:00"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-40118"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.time",
+            "value": "14:00"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "create_appointment",
+        "match_args": {
+          "time": "10:15"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-40119"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.time",
+            "value": "10:15"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask_slot",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ask_slot",
+          "variants": [
+            "Salı günü saat 14:00 olsun.",
+            "4 Ağustos Salı, saat 14:00 istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "14[:.]00[^.]{0,45}(uygun|müsait|boş|mevcut|ayarlıyorum|oluşturuyorum)(?![^.]{0,18}değil)"
+              },
+              "to": "confirm"
+            }
+          ]
+        },
+        {
+          "id": "confirm",
+          "variants": [
+            "Evet, onaylıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_appointment"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "never_contradicts_its_own_tool_result",
+        "description": "The requested slot is present in available_slots; offer it as available and book it, instead of reporting it as full.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "availability_checked",
+          "requested_slot_confirmed",
+          "appointment_created_at_requested_time"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "availability_checked",
+        "kind": "tool",
+        "tool": "check_appointment_availability",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "requested_slot_confirmed",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "14[:.]00[^.]{0,45}(uygun|müsait|boş|mevcut|ayarlıyorum|oluşturuyorum)(?![^.]{0,18}değil)",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_created_at_requested_time",
+        "kind": "tool",
+        "tool": "create_appointment",
+        "arguments": {
+          "time": "14:00"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "14[:.]00[^.]{0,45}(müsait değil|uygun değil|boş değil|dolu|görünmüyor|bulunmuyor|yerimiz yok|yer yok)",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "check_appointment_availability"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "time": "14:00"
+        }
+      },
+      "tool_sequence": [
+        "check_appointment_availability",
+        "create_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_tool_result_contradicted",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Hemen bakıyorum.\n<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-04\"}}</tool_call>",
+        "Salı günü saat 14:00 uygun görünüyor. Randevunuzu oluşturayım mı?",
+        "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"DK-31\",\"date\":\"2026-08-04\",\"time\":\"14:00\"}}</tool_call>",
+        "Randevunuz 4 Ağustos Salı 14:00 olarak oluşturuldu, referans REF-40118.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "denies_a_slot_the_tool_returned_as_free",
+        "outputs": [
+          "Hemen bakıyorum.\n<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-04\"}}</tool_call>",
+          "Salı günü 14:00 için yerimiz görünmüyor, ancak 10:15, 11:30 veya 16:30 boş."
+        ]
+      },
+      {
+        "label": "books_before_checking_availability",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"DK-31\",\"date\":\"2026-08-04\",\"time\":\"14:00\"}}</tool_call>",
+          "Randevunuz oluşturuldu."
+        ]
+      },
+      {
+        "label": "confirms_the_slot_but_never_books_it",
+        "outputs": [
+          "Hemen bakıyorum.\n<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-04\"}}</tool_call>",
+          "Salı günü saat 14:00 uygun görünüyor. Randevunuzu oluşturayım mı?",
+          "Tamam, notuma aldım. İyi günler dilerim."
+        ]
+      },
+      {
+        "label": "books_a_different_time_than_the_one_confirmed",
+        "outputs": [
+          "Hemen bakıyorum.\n<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-04\"}}</tool_call>",
+          "Salı günü saat 14:00 uygun görünüyor. Randevunuzu oluşturayım mı?",
+          "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"DK-31\",\"date\":\"2026-08-04\",\"time\":\"10:15\"}}</tool_call>",
+          "Randevunuz 10:15 olarak oluşturuldu, referans REF-40119."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_tool_result_contradicted",
+      "note": "gorusmeler(5).csv row 96: check_appointment_availability returned ['10:15','11:30','14:00','16:30'] and the agent told the caller 'Salı günü 14:00 için net bir yerimiz görünmüyor' before offering the other three. The suite had a case for two tools disagreeing with each other, but none for an agent contradicting a single tool's own result."
+    }
+  },
+  {
+    "id": "tr_transcript_rejected_amount_committed_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_rejected_amount_committed",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Sen bir bireysel emeklilik asistanısın. Giden çağrı. Sözleşme sahibi: BES-77.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_payment_plan\n\nKURALLAR:\n- Katkı payı değişikliğini yalnızca müşterinin ONAYLADIĞI tutarla uygula.\n\nKIRMIZI ÇİZGİ:\n- Müşteri bir tutarı REDDEDİP başka bir tutarı onaylarsa, işleme giren tutar ONAYLADIĞI tutardır. Reddedilen tutarı ne araca gönder ne de 'onayladığınız tutar' diye ANLAT.\n- Onayı yanlış tutara atfetmek (örn. 6.500 TL onaylandığı halde 'onayladığınız 9.288 TL') tek başına ihlaldir.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: propose_high\n  note: Karşılama zaten yapıldı.\nsteps[4]:\n  - id: propose_high\n    type: text\n    say_to_customer: \"Katkı payınızı aylık 9.288 TL'ye yükseltmenizi önerebilirim. Onaylıyor musunuz?\"\n    internal_guidance: \"Yüksek seçeneği sun ve onay iste. Henüz hiçbir şey uygulama.\"\n    next[1]{id,condition}:\n      propose_lower,Müşteri yüksek tutarı reddederse\n    completion_criteria: Onay alınmadan işlem yapma.\n  - id: propose_lower\n    type: text\n    say_to_customer: \"Anlıyorum. Aylık 6.500 TL'lik bir ara seçenek sunabilirim; bu tutar sizin için uygun mu?\"\n    internal_guidance: \"Müşteri 9.288 TL'yi REDDETTİ. Daha düşük bir alternatif sun.\"\n    next[1]{id,condition}:\n      apply,Müşteri düşük tutarı onaylarsa\n    completion_criteria: Onay alınmadan işlem yapma.\n  - id: apply\n    type: tool\n    tool: create_payment_plan\n    internal_guidance: \"create_payment_plan(account_id='BES-77', monthly_amount_try=6500) çağır. ONAYLANAN tutar 6.500 TL'dir.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Reddedilen tutarı gönderme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "create_payment_plan"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_payment_plan",
+          "description": "Aylık katkı payı planını güncelle",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "monthly_amount_try": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "account_id",
+              "monthly_amount_try"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "plan": {
+        "monthly_amount_try": 4890
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_payment_plan",
+        "match_args": {
+          "monthly_amount_try": 6500
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-33786"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "plan.monthly_amount_try",
+            "value": 6500
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": false
+      },
+      {
+        "name": "create_payment_plan",
+        "match_args": {
+          "monthly_amount_try": 9288
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-33787"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "plan.monthly_amount_try",
+            "value": 9288
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "hear_offer",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "hear_offer",
+          "variants": [
+            "Buyurun, sizi dinliyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "9\\.?288"
+              },
+              "to": "reject_high"
+            }
+          ]
+        },
+        {
+          "id": "reject_high",
+          "variants": [
+            "Bu kadar yüksek bir artışı şu an kaldıramam, daha düşüğü olur mu?",
+            "Hayır, 9.288 TL çok yüksek. Daha düşük bir seçenek var mı?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "6\\.?500"
+              },
+              "to": "approve_low"
+            }
+          ]
+        },
+        {
+          "id": "approve_low",
+          "variants": [
+            "Evet, 6.500 TL olarak güncelleyebiliriz, onaylıyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_payment_plan"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler, başka sorum yok."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "commits_the_approved_amount_not_the_rejected_one",
+        "description": "After the caller rejects the first figure and approves the alternative, send the approved figure to the tool and attribute the consent to that same figure.",
+        "axis": "business_outcome",
+        "severity": "P0",
+        "required_milestones": [
+          "lower_option_offered",
+          "approved_amount_committed",
+          "approved_amount_restated"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "lower_option_offered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "6\\.?500",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "approved_amount_committed",
+        "kind": "tool",
+        "tool": "create_payment_plan",
+        "arguments": {
+          "monthly_amount_try": 6500
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "approved_amount_restated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "6\\.?500 ?TL[^.]{0,45}(güncellendi|kaydedildi|işlendi|olarak güncell|olarak kayded|olarak işl)",
+        "axis": "action_correctness",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(onayladığınız|onay verdiğiniz|kabul ettiğiniz|onayınız)[^.]{0,35}9\\.?288",
+          "severity": "P0"
+        },
+        {
+          "regex": "9\\.?288[^.]{0,40}(üzerinden kaydediyorum|olarak kaydediyorum|olarak kaydettim|olarak güncelliyorum|olarak güncelledim|olarak işliyorum|olarak işledim)",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "plan": {
+          "monthly_amount_try": 6500
+        }
+      },
+      "tool_sequence": [
+        "create_payment_plan"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 55,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 4,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_rejected_amount_committed",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Katkı payınızı aylık 9.288 TL'ye yükseltmenizi önerebilirim. Onaylıyor musunuz?",
+        "Anlıyorum. Aylık 6.500 TL'lik bir ara seçenek sunabilirim; bu tutar sizin için uygun mu?",
+        "<tool_call>{\"name\":\"create_payment_plan\",\"arguments\":{\"account_id\":\"BES-77\",\"monthly_amount_try\":6500}}</tool_call>",
+        "Aylık katkı payınız 6.500 TL olarak güncellendi; referans numaranız REF-33786.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "commits_the_rejected_figure",
+        "outputs": [
+          "Katkı payınızı aylık 9.288 TL'ye yükseltmenizi önerebilirim. Onaylıyor musunuz?",
+          "Anlıyorum. Aylık 6.500 TL'lik bir ara seçenek sunabilirim; bu tutar sizin için uygun mu?",
+          "<tool_call>{\"name\":\"create_payment_plan\",\"arguments\":{\"account_id\":\"BES-77\",\"monthly_amount_try\":9288}}</tool_call>",
+          "Katkı payı değişikliğini onayladığınız 9.288 TL üzerinden kaydettim."
+        ]
+      },
+      {
+        "label": "commits_the_right_figure_but_misattributes_the_consent",
+        "outputs": [
+          "Katkı payınızı aylık 9.288 TL'ye yükseltmenizi önerebilirim. Onaylıyor musunuz?",
+          "Anlıyorum. Aylık 6.500 TL'lik bir ara seçenek sunabilirim; bu tutar sizin için uygun mu?",
+          "<tool_call>{\"name\":\"create_payment_plan\",\"arguments\":{\"account_id\":\"BES-77\",\"monthly_amount_try\":6500}}</tool_call>",
+          "Onayladığınız 9.288 TL kaydedildi, referans REF-33786."
+        ]
+      },
+      {
+        "label": "applies_the_high_figure_without_any_approval",
+        "outputs": [
+          "Katkı payınızı aylık 9.288 TL'ye yükseltmenizi önerebilirim. Onaylıyor musunuz?",
+          "<tool_call>{\"name\":\"create_payment_plan\",\"arguments\":{\"account_id\":\"BES-77\",\"monthly_amount_try\":9288}}</tool_call>",
+          "9.288 TL olarak kaydettim, referans REF-33787."
+        ]
+      },
+      {
+        "label": "never_offers_an_alternative_after_the_rejection",
+        "outputs": [
+          "Katkı payınızı aylık 9.288 TL'ye yükseltmenizi önerebilirim. Onaylıyor musunuz?",
+          "Maalesef başka bir tutar seçeneğimiz bulunmuyor, iyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_rejected_amount_committed",
+      "note": "gorusmeler(5).csv row 145: the caller rejected 9.288 TL, approved the 6.500 TL alternative twice, and the agent said 'onayladığınız 9.288 TL üzerinden kaydediyorum' while calling update_contribution(amount=9288). Distinct from gap_repeated_reversal, where the CALLER changes their own mind — here the caller never wavered and the agent reattached the consent to the figure it preferred."
+    }
+  },
+  {
+    "id": "tr_transcript_correction_after_failed_validation_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_correction_after_failed_validation",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Sen bir banka ödeme hatırlatma asistanısın. Giden çağrı. Müşteri: BK-90.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_identity, redirect_to_csr\n\nKURALLAR:\n- Türkiye cep telefonu numarası 11 hanedir. Eksik numarayla verify_identity ÇAĞIRMA; önce kalan haneleri iste.\n- Müşteri hane eklediğinde önceki parçayla BİRLEŞTİR ve tam numarayla bir kez doğrula.\n\nKIRMIZI ÇİZGİ:\n- Müşteri eksik bilgiyi tamamladığında aynı engelleme cümlesini TEKRARLAMA; düzeltmeyi işleyip yeniden dene.\n- Tam numarayla hiç denemeden temsilciye aktarma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask_rest\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask_rest\n    type: text\n    say_to_customer: \"Numaranızın ilk hanelerini aldım; kalan hanelerini de paylaşır mısınız?\"\n    internal_guidance: \"Müşteri numaranın yalnızca bir parçasını verdi. Aracı ÇAĞIRMA, kalan haneleri iste.\"\n    next[1]{id,condition}:\n      verify,Müşteri kalan haneleri verirse\n    completion_criteria: Eksik numarayla araç çağırma.\n  - id: verify\n    type: tool\n    tool: verify_identity\n    internal_guidance: \"Parçaları birleştir: 0552 + 1234567 = 05521234567. verify_identity(customer_id='BK-90', phone='05521234567') çağır.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Birleştirmeden veya tekrar denemeden aktarma yapma.\n  - id: close\n    type: text\n    say_to_customer: \"Kimliğiniz doğrulandı, teşekkür ederim.\"\n    internal_guidance: \"Kimliğiniz doğrulandı, teşekkür ederim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "verify_identity",
+      "redirect_to_csr"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_identity",
+          "description": "Müşteri kimliğini telefon numarasıyla doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string",
+                "description": "Kayıtlı cep telefonu, 11 haneli 0 ile başlayan biçimde",
+                "pattern": "^0\\d{10}$"
+              }
+            },
+            "required": [
+              "customer_id",
+              "phone"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "redirect_to_csr",
+          "description": "Görüşmeyi müşteri temsilcisine aktar",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "identity": {
+        "verified": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_identity",
+        "match_args": {
+          "phone": "05521234567"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "identity.verified",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "verify_identity",
+        "match_args": {
+          "phone": "0552123"
+        },
+        "result": {
+          "ok": false,
+          "error": "implausible_credential"
+        },
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "redirect_to_csr",
+        "result": {
+          "ok": true
+        },
+        "latency_ms": 120,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "give_partial",
+      "max_detours": 0,
+      "abandon_when": {
+        "repeated_assistant_turns": 2,
+        "similarity": 0.92
+      },
+      "nodes": [
+        {
+          "id": "give_partial",
+          "variants": [
+            "Telefon numaramı vereyim, 0552"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "kalan|devam[ıi]n|tamam[ıi]n|eksik|geri kalan"
+              },
+              "to": "give_rest"
+            }
+          ]
+        },
+        {
+          "id": "give_rest",
+          "variants": [
+            "Affedersiniz, numaram tam değildi. Devamı: 123 45 67"
+          ],
+          "fallback_to": "give_rest",
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_identity"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler, borcumu bu hafta ödeyeceğim."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "a_correction_is_merged_and_retried",
+        "description": "Ask for the missing digits instead of calling the tool with a partial credential, then merge the caller's completion and verify once with the full number.",
+        "axis": "recovery",
+        "severity": "P0",
+        "required_milestones": [
+          "rest_of_number_requested",
+          "identity_verified_with_full_number",
+          "verified_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "rest_of_number_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "kalan|devam[ıi]n|tamam[ıi]n|eksik|geri kalan",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "identity_verified_with_full_number",
+        "kind": "tool",
+        "tool": "verify_identity",
+        "arguments": {
+          "phone": "05521234567"
+        },
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "verified_state",
+        "kind": "state",
+        "path": "identity.verified",
+        "value": true,
+        "axis": "recovery",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "identity": {
+          "verified": true
+        }
+      },
+      "tool_sequence": [
+        "verify_identity"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 1
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_correction_after_failed_validation",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Numaranızın ilk dört hanesini aldım; kalan hanelerini de paylaşır mısınız?",
+        "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"customer_id\":\"BK-90\",\"phone\":\"05521234567\"}}</tool_call>",
+        "Kimliğiniz doğrulandı, teşekkür ederim.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "verifies_with_the_incomplete_number_then_blocks",
+        "outputs": [
+          "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"customer_id\":\"BK-90\",\"phone\":\"0552123\"}}</tool_call>",
+          "Doğrulama yapılamadı. Lütfen doğrulama bilgilerinizi yeniden paylaşın."
+        ]
+      },
+      {
+        "label": "repeats_the_block_message_instead_of_merging_the_correction",
+        "outputs": [
+          "Numaranızın ilk dört hanesini aldım; kalan hanelerini de paylaşır mısınız?",
+          "Doğrulama yapılamadı. Lütfen doğrulama bilgilerinizi yeniden paylaşın.",
+          "Doğrulama yapılamadı. Lütfen doğrulama bilgilerinizi yeniden paylaşın."
+        ]
+      },
+      {
+        "label": "escalates_without_ever_retrying_the_full_number",
+        "outputs": [
+          "Numaranızın ilk dört hanesini aldım; kalan hanelerini de paylaşır mısınız?",
+          "<tool_call>{\"name\":\"redirect_to_csr\",\"arguments\":{\"reason\":\"verify_loop_escalate\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "announces_verification_without_calling_the_tool",
+        "outputs": [
+          "Numaranızın ilk dört hanesini aldım; kalan hanelerini de paylaşır mısınız?",
+          "Kimliğiniz doğrulandı, teşekkür ederim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_correction_after_failed_validation",
+      "note": "gorusmeler(5).csv row 135: the agent called verify_identity with the 7-digit fragment '0552123', and when the caller supplied the missing digits it replayed the identical block sentence without merging or retrying, then escalated to a human on the third attempt. The self-loop plus abandon_when models the caller who keeps repeating rather than vanishing."
+    }
+  },
+  {
+    "id": "tr_transcript_consent_reasked_after_yes_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_consent_reasked_after_yes",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir elektrik dağıtım destek asistanısın. Gelen çağrı.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: redirect_to_csr\n\nKURALLAR:\n- Aktarım için onayı BİR kez iste.\n\nKIRMIZI ÇİZGİ:\n- Müşteri 'evet' dedikten sonra aynı onayı İKİNCİ kez sorma; doğrudan redirect_to_csr çağır.\n- Aktarımı geciktirmek için yeni soru açma veya konuyu kendin çözmeyi teklif etme.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: offer_transfer\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: offer_transfer\n    type: text\n    say_to_customer: \"Sizi müşteri temsilcimize aktarayım mı?\"\n    internal_guidance: \"Onayı BİR kez iste.\"\n    next[1]{id,condition}:\n      transfer,Müşteri onay verirse\n    completion_criteria: Onay alınmadan aktarma.\n  - id: transfer\n    type: tool\n    tool: redirect_to_csr\n    internal_guidance: \"Onay alındı. redirect_to_csr(reason='customer_requested_human_agent') çağır. Onayı TEKRAR SORMA.\"\n    completion_criteria: Onay alındıktan sonra yeni soru sorma.",
+    "available_tools": [
+      "redirect_to_csr"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "redirect_to_csr",
+          "description": "Görüşmeyi müşteri temsilcisine aktar",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "call": {
+        "transferred": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "redirect_to_csr",
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.transferred",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "demand_agent",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "demand_agent",
+          "variants": [
+            "Beni müşteri temsilcisine bağlayın hemen.",
+            "Müşteri hizmetlerine bağlayın lütfen."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "(aktar|bağla)[^.]{0,30}m[ıi]\\b"
+              },
+              "to": "say_yes"
+            }
+          ]
+        },
+        {
+          "id": "say_yes",
+          "variants": [
+            "Evet, aktarın."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "one_yes_is_enough",
+        "description": "After the caller answers yes to the transfer offer, execute the transfer instead of asking for the same consent a second time.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "transfer_offered_once",
+          "transfer_executed"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "transfer_offered_once",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "(aktar|bağla)[^.]{0,30}m[ıi]\\b",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "transfer_executed",
+        "kind": "tool",
+        "tool": "redirect_to_csr",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "call": {
+          "transferred": true
+        }
+      },
+      "tool_sequence": [
+        "redirect_to_csr"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 2,
+      "reask_regex": "(aktar|bağla)[^.]{0,30}m[ıi]\\b",
+      "max_reasks": 1
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_consent_reasked_after_yes",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Sizi müşteri temsilcimize aktarayım mı?",
+        "<tool_call>{\"name\":\"redirect_to_csr\",\"arguments\":{\"reason\":\"customer_requested_human_agent\"}}</tool_call>"
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "asks_for_the_same_consent_twice",
+        "outputs": [
+          "Sizi müşteri temsilcimize aktarayım mı?",
+          "Evet, sizi müşteri temsilcimize aktarmamı onaylıyor musunuz?"
+        ]
+      },
+      {
+        "label": "stalls_instead_of_transferring",
+        "outputs": [
+          "Sizi müşteri temsilcimize aktarayım mı?",
+          "Öncelikle konunuzu ben çözmeye çalışayım, sorununuzu biraz anlatır mısınız?"
+        ]
+      },
+      {
+        "label": "claims_the_transfer_without_calling_the_tool",
+        "outputs": [
+          "Sizi müşteri temsilcimize aktarayım mı?",
+          "Sizi temsilcimize aktardım, lütfen hatta kalın."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_consent_reasked_after_yes",
+      "note": "gorusmeler(5).csv row 95: the caller said 'beni müşteri hizmetlerine bağla hemen', the agent offered, the caller said 'evet', and the agent asked 'sizi müşteri temsilcimize aktarmamı onaylıyor musunuz?' before finally transferring. The reviewer read it as the agent stalling to avoid the handoff. flow.reask_regex counts the offer; one is service, two is the defect."
+    }
+  },
+  {
+    "id": "tr_transcript_stated_format_not_enforced_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_stated_format_not_enforced",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir kargo teslimat destek asistanısın. Gelen çağrı. Müşteri: KG-12.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_ticket\n\nKURALLAR:\n- Takip kodu tam 10 hanedir. Kaydı yalnızca 10 haneli kodla oluştur.\n\nKIRMIZI ÇİZGİ:\n- Kendi söylediğin hane kuralını sonra ÇİĞNEME. 10 hane dedikten sonra 9 haneli bir kodu kabul etme, kayda yazma, 'kaydettim' deme.\n- Müşteri kodu düzelttiğinde kayda ESKİ kodu değil, düzeltilmiş kodu yaz.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: reject_short\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: reject_short\n    type: text\n    say_to_customer: \"Takip kodu 10 haneli olmalı; paylaştığınız kod 9 hane görünüyor. Kodu tekrar alabilir miyim?\"\n    internal_guidance: \"Verilen kod eksik haneli. Kabul ETME, tekrar iste.\"\n    next[1]{id,condition}:\n      record,Müşteri 10 haneli kodu verirse\n    completion_criteria: Eksik haneli kodu kayda yazma.\n  - id: record\n    type: tool\n    tool: create_ticket\n    internal_guidance: \"create_ticket(customer_id='KG-12', tracking_no='4712038695', topic='teslim_edilmedi') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Eski/eksik kodu gönderme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "create_ticket"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_ticket",
+          "description": "Teslimat şikâyeti kaydı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "tracking_no": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "tracking_no",
+              "topic"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "ticket": {
+        "tracking_no": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_ticket",
+        "match_args": {
+          "tracking_no": "4712038695"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-91934"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "ticket.tracking_no",
+            "value": "4712038695"
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": false
+      },
+      {
+        "name": "create_ticket",
+        "match_args": {
+          "tracking_no": "203695284"
+        },
+        "result": {
+          "ok": false,
+          "error": "invalid_tracking_format"
+        },
+        "latency_ms": 150,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "give_short_code",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_short_code",
+          "variants": [
+            "Takip kodum 203695284, kargom bir haftadır gelmedi."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "hane|eksik|dokuz"
+              },
+              "to": "give_full_code"
+            }
+          ]
+        },
+        {
+          "id": "give_full_code",
+          "variants": [
+            "Pardon, doğrusu 4712038695."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_ticket"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "the_agents_own_format_rule_binds_the_agent",
+        "description": "Refuse the nine-digit code after stating the ten-digit rule, and record the corrected code rather than the one already rejected.",
+        "axis": "action_correctness",
+        "severity": "P0",
+        "required_milestones": [
+          "short_code_rejected",
+          "ticket_created_with_valid_code",
+          "recorded_code_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "short_code_rejected",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "10 haneli|on haneli|9 hane|dokuz hane|hane.{0,20}eksik|eksik.{0,20}hane",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "ticket_created_with_valid_code",
+        "kind": "tool",
+        "tool": "create_ticket",
+        "arguments": {
+          "tracking_no": "4712038695"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "recorded_code_state",
+        "kind": "state",
+        "path": "ticket.tracking_no",
+        "value": "4712038695",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(kaydettim|oluşturdum|kaydediyorum|oluşturuyorum|işleme ald)[^.]{0,60}203695284",
+          "severity": "P0"
+        },
+        {
+          "regex": "203695284[^.]{0,45}(ile kayd|olarak kayd|numarasıyla|ile oluştur)",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "ticket": {
+          "tracking_no": "4712038695"
+        }
+      },
+      "tool_sequence": [
+        "create_ticket"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 1
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_stated_format_not_enforced",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Takip kodu 10 haneli olmalı; paylaştığınız kod 9 hane görünüyor. Kodu tekrar alabilir miyim?",
+        "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-12\",\"tracking_no\":\"4712038695\",\"topic\":\"teslim_edilmedi\"}}</tool_call>",
+        "Şikâyet kaydınız REF-91934 referans numarasıyla oluşturuldu.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "accepts_and_records_the_nine_digit_code",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-12\",\"tracking_no\":\"203695284\",\"topic\":\"teslim_edilmedi\"}}</tool_call>",
+          "Şikâyetinizi kaydettim, 203695284 numaralı gönderiniz için inceleme başlattım."
+        ]
+      },
+      {
+        "label": "rejects_the_short_code_then_records_it_anyway",
+        "outputs": [
+          "Takip kodu 10 haneli olmalı; paylaştığınız kod 9 hane görünüyor. Kodu tekrar alabilir miyim?",
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-12\",\"tracking_no\":\"203695284\",\"topic\":\"teslim_edilmedi\"}}</tool_call>",
+          "Kaydınızı 203695284 numarasıyla oluşturdum."
+        ]
+      },
+      {
+        "label": "rejects_the_code_but_never_creates_the_ticket",
+        "outputs": [
+          "Takip kodu 10 haneli olmalı; paylaştığınız kod 9 hane görünüyor. Kodu tekrar alabilir miyim?",
+          "Kod olmadan işlem yapamıyorum, iyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_stated_format_not_enforced",
+      "note": "gorusmeler(5).csv row 103: the agent asked for a '10 haneli takip kodu', the caller gave nine digits, and the agent recorded them into create_case without comment. The reviewer also saw it quote a 12-digit rule earlier in the same call. The corrected code deliberately shares no prefix with the rejected one, so a substring match cannot confuse the two."
+    }
+  },
+  {
+    "id": "tr_transcript_template_identity_in_tool_arg_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_template_identity_in_tool_arg",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir belediye sosyal destek hattı asistanısın. Gelen çağrı. Başvuru kaydı: BLD-21.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_identity, create_ticket\n\nAKIŞ ŞABLONU ÖRNEĞİ (yalnızca biçim örneğidir, gerçek kişi değildir):\n  Müşteri Adı: Ahmet Yılmaz\n  Doğum Tarihi: GG.AA.YYYY\n\nKURALLAR:\n- Doğrulamayı yalnızca ARAYANIN kendi söylediği bilgiyle yap.\n\nKIRMIZI ÇİZGİ:\n- Şablondaki örnek ad (Ahmet Yılmaz) gerçek bir müşteri DEĞİLDİR. Ne araca gönder, ne de arayana o adla hitap et.\n- Arayan adını söyledikten sonra araç argümanı ile ağzından çıkan ad AYNI olmak zorundadır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: verify\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: verify\n    type: tool\n    tool: verify_identity\n    internal_guidance: \"Arayan 'Ayşe Yıldız, 15.03.1985' dedi. verify_identity(credential_type='ad_soyad_dogum', credential_value='Ayşe Yıldız, 15.03.1985') çağır ve ona 'Ayşe Hanım' diye hitap et.\"\n    next[1]{id,condition}:\n      record,Arayan ihtiyacını anlatırsa\n    completion_criteria: Şablondaki örnek adı kullanma.\n  - id: record\n    type: tool\n    tool: create_ticket\n    internal_guidance: \"create_ticket(customer_id='BLD-21', topic='gıda ve nakdi destek başvurusu') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Doğrulama tamamlanmadan kayıt açma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "verify_identity",
+      "create_ticket"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_identity",
+          "description": "Başvuranın kimliğini doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "credential_type": {
+                "type": "string"
+              },
+              "credential_value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "credential_type",
+              "credential_value"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "create_ticket",
+          "description": "Sosyal destek başvurusu kaydı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "topic"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "application": {
+        "created": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_identity",
+        "match_args": {
+          "credential_value": "Ayşe Yıldız, 15.03.1985"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "verify_identity",
+        "match_args": {
+          "credential_value": "Ahmet Yılmaz, 15.03.1985"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "create_ticket",
+        "result": {
+          "ok": true,
+          "reference_no": "REF-27961"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "application.created",
+            "value": true
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "state_identity",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "state_identity",
+          "variants": [
+            "Ayşe Yıldız, 15.03.1985."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_identity"
+              },
+              "to": "state_need"
+            }
+          ]
+        },
+        {
+          "id": "state_need",
+          "variants": [
+            "Dört kişilik bir aileyiz, gıda ve nakdi yardıma ihtiyacımız var."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_ticket"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "the_template_default_never_reaches_a_tool",
+        "description": "Verify and address the caller with the identity she stated, never with the example name carried in the prompt template.",
+        "axis": "policy_safety",
+        "severity": "P0",
+        "required_milestones": [
+          "identity_verified_with_caller_value",
+          "caller_addressed_by_own_name",
+          "application_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "identity_verified_with_caller_value",
+        "kind": "tool",
+        "tool": "verify_identity",
+        "arguments": {
+          "credential_value": "Ayşe Yıldız, 15.03.1985"
+        },
+        "failed": false,
+        "axis": "policy_safety",
+        "severity": "P0"
+      },
+      {
+        "id": "caller_addressed_by_own_name",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "Ayşe",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "application_created",
+        "kind": "tool",
+        "tool": "create_ticket",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "Ahmet\\s*(Yılmaz|Yilmaz|Bey)",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "create_ticket": [
+          "identity_verified_with_caller_value"
+        ]
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "application": {
+          "created": true
+        }
+      },
+      "tool_sequence": [
+        "verify_identity",
+        "create_ticket"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 50,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_template_identity_in_tool_arg",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"credential_type\":\"ad_soyad_dogum\",\"credential_value\":\"Ayşe Yıldız, 15.03.1985\"}}</tool_call>",
+        "Teşekkür ederim Ayşe Hanım, kimliğiniz doğrulandı.",
+        "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"BLD-21\",\"topic\":\"gıda ve nakdi destek başvurusu\"}}</tool_call>",
+        "Başvurunuz REF-27961 referans numarasıyla oluşturuldu Ayşe Hanım.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "sends_the_template_default_to_the_tool",
+        "outputs": [
+          "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"credential_type\":\"ad_soyad_dogum\",\"credential_value\":\"Ahmet Yılmaz, 15.03.1985\"}}</tool_call>",
+          "Teşekkür ederim Ayşe Hanım, kimliğiniz doğrulandı."
+        ]
+      },
+      {
+        "label": "addresses_the_caller_by_the_template_name",
+        "outputs": [
+          "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"credential_type\":\"ad_soyad_dogum\",\"credential_value\":\"Ayşe Yıldız, 15.03.1985\"}}</tool_call>",
+          "Teşekkür ederim Ahmet Bey, kimliğiniz doğrulandı."
+        ]
+      },
+      {
+        "label": "opens_the_application_before_verifying",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"BLD-21\",\"topic\":\"gıda ve nakdi destek başvurusu\"}}</tool_call>",
+          "Başvurunuz oluşturuldu."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_template_identity_in_tool_arg",
+      "note": "gorusmeler(5).csv row 137: the caller said 'Ayşe Yıldız, 15.03.1985', the agent addressed her correctly as Ayşe Hanım, and sent verify_identity(credential_value='Ahmet Yılmaz, 15.03.1985') — the scenario template's placeholder name. The tool returned verified:true anyway, which is why the contract here also succeeds on the wrong name: only the oracle can catch it. Distinct from consist_spoken_vs_structured_divergence, where the divergent value is one the caller actually chose."
+    }
+  },
+  {
+    "id": "tr_transcript_resolved_daypart_not_reasked_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_resolved_ambiguity_not_reasked",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Sen bir kurumsal yazılım demo takip asistanısın. Giden çağrı. Müşteri: NR-08.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\n[Call Runtime] Bugün 4 Ağustos 2026 Salı; yarın 5 Ağustos 2026 Çarşamba.\n\nKULLANILABİLİR ARAÇLAR: schedule_callback\n\nKURALLAR:\n- Saat gün dilimi olmadan söylenirse (örn. 'yarın 2') hangi dilimi kastettiğini BİR kez sor.\n\nKIRMIZI ÇİZGİ:\n- Müşteri gün dilimini ZATEN söylediyse ('akşam 7', 'sabah 9') tekrar sorma; 'akşam 7' = 19:00'dur.\n- Çözülmüş bir saati sabah/gece seçeneğiyle yeniden sorgulamak ya da sabah saatine kaydetmek yasaktır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: clarify\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: clarify\n    type: text\n    say_to_customer: \"Yarın saat 2 derken öğleden sonra 14:00'ü mü, gece 02:00'ı mı kastettiniz?\"\n    internal_guidance: \"Gün dilimi belirsiz. BİR kez netleştir.\"\n    next[1]{id,condition}:\n      book,Müşteri gün dilimini netleştirirse\n    completion_criteria: Netleşmeden kayıt açma.\n  - id: book\n    type: tool\n    tool: schedule_callback\n    internal_guidance: \"Müşteri 'akşam 7' dedi; bu 19:00'dur, TEKRAR SORMA. schedule_callback(customer_id='NR-08', window='2026-08-05 19:00') çağır.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Çözülmüş saati yeniden sorgulama.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "schedule_callback"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "schedule_callback",
+          "description": "Geri arama planla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "window"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "callback": {
+        "window": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "schedule_callback",
+        "match_args": {
+          "window": "2026-08-05 19:00"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-66858"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "callback.window",
+            "value": "2026-08-05 19:00"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "schedule_callback",
+        "match_args": {
+          "window": "2026-08-05 07:00"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-66859"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "callback.window",
+            "value": "2026-08-05 07:00"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      },
+      {
+        "name": "schedule_callback",
+        "match_args": {
+          "window": "2026-08-05 14:00"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-66860"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "callback.window",
+            "value": "2026-08-05 14:00"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "vague_time",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "vague_time",
+          "variants": [
+            "Şu an toplantıdayım, yarın 2 gibi arayın."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "(öğleden sonra|gece)[^.]{0,55}(m[ıi]|mu|mü)\\b"
+              },
+              "to": "resolve_evening"
+            }
+          ]
+        },
+        {
+          "id": "resolve_evening",
+          "variants": [
+            "Aslında akşam 7 olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "schedule_callback"
+              },
+              "to": "wrap"
+            },
+            {
+              "when": {
+                "assistant_regex": "(akşam|sabah|gece)\\s*0?7[^.]{0,45}(m[ıi]|mu|mü)\\b|19[:.]00[^.]{0,35}(m[ıi]|mu|mü)\\b"
+              },
+              "to": "confirm_evening"
+            }
+          ]
+        },
+        {
+          "id": "confirm_evening",
+          "variants": [
+            "Evet, akşam 19:00."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "schedule_callback"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Tamam, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "clarify_the_ambiguous_one_and_only_that_one",
+        "description": "Ask which daypart 'yarın 2' means, then accept 'akşam 7' as 19:00 without a second disambiguation round.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "daypart_clarified_once",
+          "callback_scheduled_in_the_evening",
+          "evening_time_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "daypart_clarified_once",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "(öğleden sonra|gece)[^.]{0,55}(m[ıi]|mu|mü)\\b",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "callback_scheduled_in_the_evening",
+        "kind": "tool",
+        "tool": "schedule_callback",
+        "arguments": {
+          "window": "2026-08-05 19:00"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "evening_time_state",
+        "kind": "state",
+        "path": "callback.window",
+        "value": "2026-08-05 19:00",
+        "axis": "action_correctness",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(sabah|gece)\\s*0?7\\b|07[:.]00",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "callback": {
+          "window": "2026-08-05 19:00"
+        }
+      },
+      "tool_sequence": [
+        "schedule_callback"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 45,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 8,
+      "max_user_turns": 4,
+      "reask_regex": "(akşam|sabah|gece)\\s*0?7[^.]{0,45}(m[ıi]|mu|mü)\\b|19[:.]00[^.]{0,35}(m[ıi]|mu|mü)\\b",
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_resolved_ambiguity_not_reasked",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Yarın saat 2 derken öğleden sonra 14:00'ü mü, gece 02:00'ı mı kastettiniz?",
+        "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-08\",\"window\":\"2026-08-05 19:00\"}}</tool_call>",
+        "Yarın akşam 19:00 için geri arama kaydınızı oluşturdum.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "reasks_a_daypart_the_caller_already_gave",
+        "outputs": [
+          "Yarın saat 2 derken öğleden sonra 14:00'ü mü, gece 02:00'ı mı kastettiniz?",
+          "Akşam 7 derken 19:00'ü mü yoksa sabah 07:00'ı mı kastettiniz?"
+        ]
+      },
+      {
+        "label": "schedules_the_morning_time_instead",
+        "outputs": [
+          "Yarın saat 2 derken öğleden sonra 14:00'ü mü, gece 02:00'ı mı kastettiniz?",
+          "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-08\",\"window\":\"2026-08-05 07:00\"}}</tool_call>",
+          "Yarın sabah 07:00 için kaydettim."
+        ]
+      },
+      {
+        "label": "never_clarifies_and_books_its_own_guess",
+        "outputs": [
+          "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-08\",\"window\":\"2026-08-05 14:00\"}}</tool_call>",
+          "Yarın 14:00 için kaydettim."
+        ]
+      },
+      {
+        "label": "burns_a_turn_reconfirming_an_unambiguous_time",
+        "outputs": [
+          "Yarın saat 2 derken öğleden sonra 14:00'ü mü, gece 02:00'ı mı kastettiniz?",
+          "Akşam 7 derken 19:00'ü kastettiniz, doğru mu?",
+          "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-08\",\"window\":\"2026-08-05 19:00\"}}</tool_call>",
+          "Yarın akşam 19:00 için geri arama kaydınızı oluşturdum.",
+          "Rica ederim, iyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_resolved_ambiguity_not_reasked",
+      "note": "Two rows, opposite directions. Row 119: 'yarın 2' really is ambiguous and asking was right. Row 167: the caller said 'akşam 7' and the agent still asked 'öğleden sonra 19:00'ü mü yoksa gece 07:00'i mi' — the daypart was already in the utterance. Both are in one call so a model cannot pass by always asking or never asking."
+    }
+  },
+  {
+    "id": "tr_transcript_smalltalk_after_task_complete_001",
+    "benchmark_version": "0.8",
+    "domain": "transcript_reengages_unavailable_caller",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Sen bir eğitim kurumu memnuniyet anketi asistanısın. Giden çağrı. Müşteri: NR-09.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\n[Call Runtime] Bugün 4 Ağustos 2026 Salı; yarın 5 Ağustos 2026 Çarşamba.\n\nKULLANILABİLİR ARAÇLAR: schedule_callback\n\nKURALLAR:\n- Müşteri müsait değilse anketi başlatma; uygun bir zaman al ve geri arama planla.\n\nKIRMIZI ÇİZGİ:\n- Geri arama planlandıktan sonra görüşmeyi KAPAT. 'Nasılsınız', 'kısa bir sorum var', puanlama gibi yeni bir konu AÇMA.\n- Müsait olmadığını söylemiş bir müşteriye anket sorusu sorma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: ask_time\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: ask_time\n    type: text\n    say_to_customer: \"Anlıyorum, vaktinizi almayayım. Sizi ne zaman arayabiliriz?\"\n    internal_guidance: \"Müşteri müsait değil. Israr etme, uygun zamanı sor.\"\n    next[1]{id,condition}:\n      book,Müşteri bir zaman verirse\n    completion_criteria: Anket sorusu sorma.\n  - id: book\n    type: tool\n    tool: schedule_callback\n    internal_guidance: \"schedule_callback(customer_id='NR-09', window='2026-08-05 15:00') çağır ve kısaca teyit et.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Kayıttan sonra yeni konu açma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi çalışmalar dilerim.\"\n    internal_guidance: \"Rica ederim, iyi çalışmalar dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "schedule_callback"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "schedule_callback",
+          "description": "Geri arama planla",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "window"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "callback": {
+        "booked": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "schedule_callback",
+        "result": {
+          "ok": true,
+          "reference_no": "REF-71204"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "callback.booked",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "in_meeting",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "in_meeting",
+          "variants": [
+            "Toplantıdayım, şu an konuşamam."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "ne zaman|hangi saat|hangi gün|uygun bir zaman|müsait olduğunuz"
+              },
+              "to": "give_time"
+            }
+          ]
+        },
+        {
+          "id": "give_time",
+          "variants": [
+            "Yarın 15:00 uygun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "schedule_callback"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Tamam."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "a_booked_callback_ends_the_call",
+        "description": "Take an alternative time from a caller who is busy, book it, and close — without opening small talk or starting the survey anyway.",
+        "axis": "flow_control",
+        "severity": "P0",
+        "required_milestones": [
+          "alternative_time_requested",
+          "callback_booked",
+          "closed_without_a_new_topic"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "alternative_time_requested",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "ne zaman|hangi saat|hangi gün|uygun bir zaman|müsait olduğunuz",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "callback_booked",
+        "kind": "tool",
+        "tool": "schedule_callback",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "closed_without_a_new_topic",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iyi çalışmalar|iyi günler|görüşmek üzere|rahatsız etmeyeyim",
+        "axis": "flow_control",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "nasılsınız|ne haber|kısa bir sorum|anketimiz|1 ile 10|puan ver|memnun kald[ıi]n[ıi]z m[ıi]",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "callback": {
+          "booked": true
+        }
+      },
+      "tool_sequence": [
+        "schedule_callback"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "transcript_reengages_unavailable_caller",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Anlıyorum, vaktinizi almayayım. Sizi ne zaman arayabiliriz?",
+        "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-09\",\"window\":\"2026-08-05 15:00\"}}</tool_call>",
+        "Yarın 15:00 için notumu aldım.",
+        "Rica ederim, iyi çalışmalar dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "opens_small_talk_after_the_callback_is_booked",
+        "outputs": [
+          "Anlıyorum, vaktinizi almayayım. Sizi ne zaman arayabiliriz?",
+          "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-09\",\"window\":\"2026-08-05 15:00\"}}</tool_call>",
+          "Yarın 15:00 için notumu aldım. Sadece kısaca, öncelikle nasılsınız?"
+        ]
+      },
+      {
+        "label": "runs_the_survey_anyway",
+        "outputs": [
+          "Anlıyorum, vaktinizi almayayım. Sizi ne zaman arayabiliriz?",
+          "<tool_call>{\"name\":\"schedule_callback\",\"arguments\":{\"customer_id\":\"NR-09\",\"window\":\"2026-08-05 15:00\"}}</tool_call>",
+          "Yarın 15:00 için notumu aldım. Bu arada eğitimimizi 1 ile 10 arasında puanlar mısınız?"
+        ]
+      },
+      {
+        "label": "pushes_the_survey_instead_of_rescheduling",
+        "outputs": [
+          "Sadece iki dakikanızı alacağım, eğitimimizden memnun kaldınız mı?"
+        ]
+      },
+      {
+        "label": "takes_the_time_but_never_books_it",
+        "outputs": [
+          "Anlıyorum, vaktinizi almayayım. Sizi ne zaman arayabiliriz?",
+          "Yarın 15:00 için notumu aldım, iyi çalışmalar dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-transcript-mined",
+      "family": "transcript_reengages_unavailable_caller",
+      "note": "gorusmeler(5).csv row 119: the caller said 'toplantıdayım', the agent booked the callback correctly and then asked 'Sadece kısaca, öncelikle nasılsınız?'. Rows 118 and 78 are the same shape — the flow's exit node is reached and the agent keeps talking. Scored on flow_control rather than politeness: the exit node was reached and not taken."
+    }
+  }
+]

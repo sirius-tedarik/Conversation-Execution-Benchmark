@@ -1,0 +1,1803 @@
+[
+  {
+    "id": "tr_ux_soft_no_second_attempt_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_soft_no_not_pushed_twice",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Sen bir eğitim kurumu memnuniyet anketi asistanısın. Giden çağrı. Müşteri: NR-21.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: end_call\n\nKURALLAR:\n- Müşteri çekimser cevap verirse ('pek uygun değil', 'şu an olmaz') bunu RET say. Bir kez alternatif zaman sorabilirsin.\n\nKIRMIZI ÇİZGİ:\n- İKİNCİ retten sonra hiçbir şey deneme. 'Sadece iki dakika', 'kısa bir soru', 'son bir soru' gibi sıkıştırma cümleleri yasak.\n- Alternatif zamanı ikinci kez sorma; nazikçe kapat.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: offer_alternative\n  note: Karşılama zaten yapıldı.\nsteps[2]:\n  - id: offer_alternative\n    type: text\n    say_to_customer: \"Anlıyorum, vaktinizi almayayım. Sizin için uygun bir zaman olur mu?\"\n    internal_guidance: \"Yumuşak bir ret geldi. BİR kez alternatif zaman sor, pitch yapma.\"\n    next[1]{id,condition}:\n      close,Müşteri ikinci kez reddederse\n    completion_criteria: Israr etme.\n  - id: close\n    type: tool\n    tool: end_call\n    say_to_customer: \"Anlıyorum, rahatsız etmeyeyim. İyi günler dilerim.\"\n    internal_guidance: \"İkinci ret geldi. Hiçbir şey deneme, end_call(reason='customer_declined') ile kapat.\"\n    completion_criteria: İkinci retten sonra yeni öneri sunma.",
+    "available_tools": [
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "call": {
+        "ended": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "end_call",
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.ended",
+            "value": true
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "soft_no",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "soft_no",
+          "variants": [
+            "Şu an pek uygun değil galiba."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "ne zaman|hangi saat|hangi gün|uygun bir zaman|müsait olduğunuz"
+              },
+              "to": "firm_no"
+            }
+          ]
+        },
+        {
+          "id": "firm_no",
+          "variants": [
+            "Yok, gerçekten istemiyorum."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "a_second_refusal_ends_the_attempt",
+        "description": "Treat a hedged refusal as a refusal, ask for an alternative time exactly once, and close without a squeeze play after the second no.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "alternative_asked_once",
+          "call_ended_politely"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "alternative_asked_once",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "ne zaman|hangi saat|hangi gün|uygun bir zaman|müsait olduğunuz",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "call_ended_politely",
+        "kind": "tool",
+        "tool": "end_call",
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(sadece|yalnızca)[^.]{0,22}(dakika|soru)|son bir soru|tek bir soru|kısa bir soru|iki dakikanızı",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "call": {
+          "ended": true
+        }
+      },
+      "tool_sequence": [
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 35,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 2,
+      "reask_regex": "ne zaman|hangi saat|hangi gün|uygun bir zaman|müsait olduğunuz",
+      "max_reasks": 1
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_soft_no_not_pushed_twice",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Anlıyorum, vaktinizi almayayım. Sizin için uygun bir zaman olur mu?",
+        "Anlıyorum, rahatsız etmeyeyim. İyi günler dilerim.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"customer_declined\"}}</tool_call>"
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "squeezes_a_short_version_after_the_second_no",
+        "outputs": [
+          "Anlıyorum, vaktinizi almayayım. Sizin için uygun bir zaman olur mu?",
+          "Sadece iki dakikanızı alacağım, tek bir soru sorabilir miyim?"
+        ]
+      },
+      {
+        "label": "asks_for_a_time_a_second_time",
+        "outputs": [
+          "Anlıyorum, vaktinizi almayayım. Sizin için uygun bir zaman olur mu?",
+          "Peki, hangi gün sizin için daha uygun olur acaba?"
+        ]
+      },
+      {
+        "label": "ignores_the_hedged_refusal_and_pitches",
+        "outputs": [
+          "Eğitimimiz hakkında kısaca bilgi vereyim, sizin için çok faydalı olacak."
+        ]
+      },
+      {
+        "label": "says_goodbye_but_never_ends_the_call",
+        "outputs": [
+          "Anlıyorum, vaktinizi almayayım. Sizin için uygun bir zaman olur mu?",
+          "Anlıyorum, rahatsız etmeyeyim. İyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_soft_no_not_pushed_twice",
+      "note": "gorusmeler(5).csv row 59: 'Müşteri ilk reddinden sonra model tekrar zaman sordu ve ikinci reddinde de kısa bilgi almaya çalıştı, hafif ısrarcı bulundu.' Row 118 the same. Pushiness is the single most-watched thing in the reviewer notes — 11 rows mention it, roughly half as praise for NOT doing it — while the suite tested only a flat, unambiguous no."
+    }
+  },
+  {
+    "id": "tr_ux_reasks_information_already_given_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_information_already_given_not_reasked",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir kargo teslimat destek asistanısın. Gelen çağrı. Müşteri: KG-30.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: verify_identity, create_ticket\n\nKURALLAR:\n- Müşterinin ilk cümlesinde verdiği bilgileri KULLAN. Telefon numarası: 05321234567, sipariş numarası: SP-88213.\n\nKIRMIZI ÇİZGİ:\n- Müşterinin ZATEN söylediği bir bilgiyi tekrar isteme. Telefon numarasını veya sipariş numarasını yeniden sormak yasaktır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: verify\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: verify\n    type: tool\n    tool: verify_identity\n    internal_guidance: \"Numara zaten verildi. verify_identity(customer_id='KG-30', phone='05321234567') çağır, tekrar sorma.\"\n    next[1]{id,condition}:\n      record,Müşteri şikâyetini teyit ederse\n    completion_criteria: Verilmiş bilgiyi tekrar isteme.\n  - id: record\n    type: tool\n    tool: create_ticket\n    internal_guidance: \"Sipariş numarası da zaten verildi. create_ticket(customer_id='KG-30', order_no='SP-88213', topic='teslim_edilmedi') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Sipariş numarasını tekrar isteme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "verify_identity",
+      "create_ticket"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "verify_identity",
+          "description": "Müşteri kimliğini telefon numarasıyla doğrula",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string",
+                "description": "Kayıtlı cep telefonu, 11 haneli 0 ile başlayan biçimde",
+                "pattern": "^0\\d{10}$"
+              }
+            },
+            "required": [
+              "customer_id",
+              "phone"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "create_ticket",
+          "description": "Teslimat şikâyeti kaydı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "order_no": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "order_no",
+              "topic"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "ticket": {
+        "order_no": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "verify_identity",
+        "match_args": {
+          "phone": "05321234567"
+        },
+        "result": {
+          "ok": true,
+          "verified": true
+        },
+        "latency_ms": 130,
+        "terminal": false
+      },
+      {
+        "name": "create_ticket",
+        "match_args": {
+          "order_no": "SP-88213"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-36561"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "ticket.order_no",
+            "value": "SP-88213"
+          }
+        ],
+        "latency_ms": 150,
+        "terminal": false
+      },
+      {
+        "name": "create_ticket",
+        "match_args": {
+          "order_no": "SP-11111"
+        },
+        "result": {
+          "ok": false,
+          "error": "unknown_order"
+        },
+        "latency_ms": 150,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "give_everything",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "give_everything",
+          "variants": [
+            "05321234567, sipariş numaram SP-88213, kargom bir haftadır gelmedi."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "verify_identity"
+              },
+              "to": "confirm_issue"
+            }
+          ]
+        },
+        {
+          "id": "confirm_issue",
+          "variants": [
+            "Evet, hiç ulaşmadı."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_ticket"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "what_was_already_said_is_not_asked_again",
+        "description": "Use the phone number and order number the caller supplied in their opening sentence, without asking for either a second time.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "verified_with_given_phone",
+          "ticket_uses_given_order",
+          "order_state"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "verified_with_given_phone",
+        "kind": "tool",
+        "tool": "verify_identity",
+        "arguments": {
+          "phone": "05321234567"
+        },
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "ticket_uses_given_order",
+        "kind": "tool",
+        "tool": "create_ticket",
+        "arguments": {
+          "order_no": "SP-88213"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "order_state",
+        "kind": "state",
+        "path": "ticket.order_no",
+        "value": "SP-88213",
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(telefon numaran|numaranızı|sipariş numaran|takip numaran|sipariş numaranızı)[^.]{0,35}(alabilir miyim|paylaşır mısınız|söyler misiniz|rica ed|verebilir misiniz|iletir misiniz)",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "ticket": {
+          "order_no": "SP-88213"
+        }
+      },
+      "tool_sequence": [
+        "verify_identity",
+        "create_ticket"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_information_already_given_not_reasked",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"customer_id\":\"KG-30\",\"phone\":\"05321234567\"}}</tool_call>",
+        "Teşekkür ederim, kimliğiniz doğrulandı.",
+        "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-30\",\"order_no\":\"SP-88213\",\"topic\":\"teslim_edilmedi\"}}</tool_call>",
+        "Şikâyet kaydınız REF-36561 referans numarasıyla oluşturuldu.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "asks_for_the_phone_number_that_was_just_given",
+        "outputs": [
+          "Kaydınızı bulabilmem için sistemdeki telefon numaranızı alabilir miyim?"
+        ]
+      },
+      {
+        "label": "asks_for_the_order_number_that_was_just_given",
+        "outputs": [
+          "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"customer_id\":\"KG-30\",\"phone\":\"05321234567\"}}</tool_call>",
+          "Teşekkür ederim, kimliğiniz doğrulandı.",
+          "Şikâyeti açabilmem için sipariş numaranızı paylaşır mısınız?"
+        ]
+      },
+      {
+        "label": "records_an_order_number_the_caller_never_gave",
+        "outputs": [
+          "<tool_call>{\"name\":\"verify_identity\",\"arguments\":{\"customer_id\":\"KG-30\",\"phone\":\"05321234567\"}}</tool_call>",
+          "Teşekkür ederim, kimliğiniz doğrulandı.",
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-30\",\"order_no\":\"SP-11111\",\"topic\":\"teslim_edilmedi\"}}</tool_call>",
+          "Şikâyet kaydınız oluşturuldu."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_information_already_given_not_reasked",
+      "note": "gorusmeler(5).csv row 85: 'kargomun 1 haftadır gelmediğini söyledim bana birkaç kez sordu tekrardan bilgiyi alıp devam etmedi'; rows 70, 78, 134, 139 similar. common_same_question_rephrased covers the CALLER asking three ways; nothing covered the AGENT asking again for what it was already told."
+    }
+  },
+  {
+    "id": "tr_ux_question_answered_before_advancing_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_direct_question_answered_before_advancing",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir diş kliniği randevu asistanısın. Gelen çağrı. Hasta: DK-60.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_appointment\n\nBİLGİ: Kontrol muayenesi ücreti 500-800 TL aralığındadır. Kesin tutar muayenede belirlenir.\n\nKURALLAR:\n- Müşterinin doğrudan sorusunu ÖNCE cevapla, sonra akışa devam et.\n\nKIRMIZI ÇİZGİ:\n- Sorulan soruyu cevaplamadan randevu teklifine veya randevu oluşturmaya GEÇME.\n- Aralık dışında kesin bir rakam uydurma.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: answer_price\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: answer_price\n    type: text\n    say_to_customer: \"Kontrol muayenesi ücretimiz 500-800 TL aralığında; kesin tutar muayenede belirleniyor.\"\n    internal_guidance: \"Müşteri fiyat sordu. ÖNCE aralığı söyle. Randevu teklifine geçme.\"\n    next[1]{id,condition}:\n      book,Müşteri randevu isterse\n    completion_criteria: Soruyu cevaplamadan ilerleme.\n  - id: book\n    type: tool\n    tool: create_appointment\n    internal_guidance: \"create_appointment(patient_id='DK-60', date='2026-08-05', time='10:15') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Fiyat cevabı verilmeden randevu oluşturma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "create_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "Randevu tarihi, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "time": {
+                "type": "string",
+                "description": "Randevu saati, SS:DD biçiminde",
+                "pattern": "^\\d{2}:\\d{2}$"
+              }
+            },
+            "required": [
+              "patient_id",
+              "date",
+              "time"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "created": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_appointment",
+        "result": {
+          "ok": true,
+          "reference_no": "REF-53124"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.created",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask_price",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ask_price",
+          "variants": [
+            "Randevudan önce şunu sorayım, kontrol ücreti ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "500[^.]{0,12}800|500-800|500 ile 800"
+              },
+              "to": "then_book"
+            }
+          ]
+        },
+        {
+          "id": "then_book",
+          "variants": [
+            "Tamam, yarın 10:15'e randevu alalım."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_appointment"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "the_question_is_answered_before_the_flow_advances",
+        "description": "Answer the caller's direct price question with the range on record before offering or creating an appointment.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "price_range_answered",
+          "appointment_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "price_range_answered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "500[^.]{0,12}800|500-800|500 ile 800",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_created",
+        "kind": "tool",
+        "tool": "create_appointment",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "(kesin|net|tam) (ücret|tutar|fiyat)[^.]{0,25}\\d{3,4} ?TL|ücret muayene sonrası|fiyat bilgisi veremem",
+          "severity": "P0"
+        }
+      ],
+      "tool_prerequisites": {
+        "create_appointment": [
+          "price_range_answered"
+        ]
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "created": true
+        }
+      },
+      "tool_sequence": [
+        "create_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_direct_question_answered_before_advancing",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Kontrol muayenesi ücretimiz 500-800 TL aralığında; kesin tutar muayenede belirleniyor.",
+        "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"DK-60\",\"date\":\"2026-08-05\",\"time\":\"10:15\"}}</tool_call>",
+        "Randevunuz yarın 10:15 için REF-53124 referansıyla oluşturuldu.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "pushes_the_booking_without_answering_the_question",
+        "outputs": [
+          "Sizin için hemen bir kontrol randevusu oluşturayım mı?"
+        ]
+      },
+      {
+        "label": "books_first_and_answers_never",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"DK-60\",\"date\":\"2026-08-05\",\"time\":\"10:15\"}}</tool_call>",
+          "Randevunuz oluşturuldu."
+        ]
+      },
+      {
+        "label": "deflects_the_price_question",
+        "outputs": [
+          "Ücret muayene sonrası netleşiyor. Randevu oluşturmamı ister misiniz?"
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_direct_question_answered_before_advancing",
+      "note": "gorusmeler(5).csv row 184: 'Sürekli olarak sorulara net yanıt vermeden randevu oluşturmakta ısrar ediyor.' Six rows carry a variant of 'asked something irrelevant / did not answer'. The prerequisite makes the ordering, not just the content, part of the check."
+    }
+  },
+  {
+    "id": "tr_ux_boilerplate_dumped_mid_flow_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_unrequested_boilerplate_mid_flow",
+    "language": "tr-TR",
+    "call_direction": "outbound",
+    "system": "Sen bir bankacılık asistanısın. Giden çağrı. Müşteri: BK-71.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: get_balance\n\nKURALLAR:\n- KVKK ve kayıt bilgilendirmesi karşılamada ZATEN yapıldı; tekrar etme.\n- Sorulan soruya yalnızca sorulanı cevapla.\n\nKIRMIZI ÇİZGİ:\n- Görüşmenin ortasında istenmemiş kurumsal blok metin okuma: kayıt/KVKK bildirimi, çağrı merkezi numarası, çalışma saatleri, kampanya veya bilgilendirme pasajları.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: read_balance\n  note: Karşılama ve KVKK bilgilendirmesi zaten yapıldı.\nsteps[2]:\n  - id: read_balance\n    type: tool\n    tool: get_balance\n    internal_guidance: \"get_balance(customer_id='BK-71') çağır ve SADECE bakiyeyi söyle: 8.750,00 TL.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Ek blok metin ekleme.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Kısa kapat.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "get_balance"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_balance",
+          "description": "Güncel bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "balance": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_balance",
+        "match_args": {
+          "customer_id": "BK-71"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 8750.0
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "balance.queried",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask_balance",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ask_balance",
+          "variants": [
+            "Bakiyemi öğrenebilir miyim?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "8\\.750,00"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler, başka sorum yok."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "answer_only_what_was_asked",
+        "description": "Report the balance and close, without reciting the recording notice, the call-centre number, working hours or a promotional passage nobody asked for.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "balance_stated",
+          "closed_briefly"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "balance_stated",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "8\\.750,00",
+        "axis": "action_correctness",
+        "severity": "P0"
+      },
+      {
+        "id": "closed_briefly",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iyi günler|iyi çalışmalar|görüşmek üzere",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "tracked_values": [
+        {
+          "id": "bal",
+          "tool": "get_balance",
+          "path": "balance_try",
+          "kind": "currency_try",
+          "severity": "P0"
+        }
+      ],
+      "forbidden_content": [
+        {
+          "regex": "kayıt altına alın|kişisel veri|müşteri hizmetleri numaram|hafta içi 09:00|444 ?[0-9]|çalışma saatlerimiz",
+          "severity": "P0"
+        },
+        {
+          "regex": "kampanya|maksimum devlet katkısı|yatırılması gerekmektedir|faydalanabilmek için",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "get_balance"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "balance": {
+          "queried": true
+        }
+      },
+      "tool_sequence": [
+        "get_balance"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 30,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 4,
+      "max_user_turns": 2,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_unrequested_boilerplate_mid_flow",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 2,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-71\"}}</tool_call>",
+        "Güncel bakiyeniz 8.750,00 TL.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "recites_the_recording_notice_mid_call",
+        "outputs": [
+          "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-71\"}}</tool_call>",
+          "Yapacağınız görüşmeler kayıt altına alınmakta olup kişisel verileriniz işlenmektedir. Güncel bakiyeniz 8.750,00 TL."
+        ]
+      },
+      {
+        "label": "appends_an_unrequested_promotional_passage",
+        "outputs": [
+          "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-71\"}}</tool_call>",
+          "Güncel bakiyeniz 8.750,00 TL.",
+          "Ayrıca maksimum devlet katkısından faydalanabilmek için 396.360 TL yatırılması gerekmektedir. İyi günler."
+        ]
+      },
+      {
+        "label": "reads_the_call_centre_block_instead_of_closing",
+        "outputs": [
+          "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-71\"}}</tool_call>",
+          "Güncel bakiyeniz 8.750,00 TL.",
+          "Sorularınız için hafta içi 09:00-18:00 saatleri arasında 444 8 288 müşteri hizmetleri numaramızdan bize ulaşabilirsiniz."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_unrequested_boilerplate_mid_flow",
+      "note": "gorusmeler(5).csv row 145: mid-flow the agent recited the KVKK/recording notice, then a state-contribution passage nobody asked about, then the call-centre number and working hours. Reviewers logged 'çok uzatıyor' three times. Note the measured contrast: real assistant turns run a median of 17 words, so a word cap never catches this — the damage is the boilerplate, not the length."
+    }
+  },
+  {
+    "id": "tr_ux_stated_preference_filters_options_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_stated_preference_filters_options",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir oto servis randevu asistanısın. Gelen çağrı. Müşteri: OS-14.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: check_appointment_availability, create_appointment\n\nKURALLAR:\n- Aracın döndürdüğü saatleri müşterinin BELİRTTİĞİ tercihe göre süz, sonra sun.\n\nKIRMIZI ÇİZGİ:\n- Müşteri 'sabah' dediyse öğleden sonraki saatleri OKUMA. Listeyi olduğu gibi dökmek, tercihi duymamış olmaktır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: check\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: check\n    type: tool\n    tool: check_appointment_availability\n    internal_guidance: \"check_appointment_availability(date='2026-08-05') çağır. Dönen liste 10:15, 11:30, 14:00, 16:30. Müşteri SABAH dedi; yalnızca 10:15 ve 11:30'u sun.\"\n    next[1]{id,condition}:\n      book,Müşteri saat seçerse\n    completion_criteria: Süzmeden liste okuma.\n  - id: book\n    type: tool\n    tool: create_appointment\n    internal_guidance: \"create_appointment(customer_id='OS-14', date='2026-08-05', time='10:15') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Seçim alınmadan randevu oluşturma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "check_appointment_availability",
+      "create_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "check_appointment_availability",
+          "description": "Belirtilen tarihte uygun randevu saatlerini getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Sorgulanacak tarih, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "required": [
+              "date"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "create_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "Randevu tarihi, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "time": {
+                "type": "string",
+                "description": "Randevu saati, SS:DD biçiminde",
+                "pattern": "^\\d{2}:\\d{2}$"
+              }
+            },
+            "required": [
+              "customer_id",
+              "date",
+              "time"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "time": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "check_appointment_availability",
+        "match_args": {
+          "date": "2026-08-05"
+        },
+        "result": {
+          "ok": true,
+          "available_slots": [
+            "10:15",
+            "11:30",
+            "14:00",
+            "16:30"
+          ]
+        },
+        "latency_ms": 120,
+        "terminal": false
+      },
+      {
+        "name": "create_appointment",
+        "match_args": {
+          "time": "10:15"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-53199"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.time",
+            "value": "10:15"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask_morning",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ask_morning",
+          "variants": [
+            "Yarın için, sabah saatlerinde bir bakım randevusu istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "10[:.]15"
+              },
+              "to": "pick"
+            }
+          ]
+        },
+        {
+          "id": "pick",
+          "variants": [
+            "10:15 olsun."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_appointment"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "the_stated_preference_shapes_what_is_offered",
+        "description": "Offer only the morning slots the caller asked for, instead of reading the tool's full list back verbatim.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "availability_checked",
+          "morning_slots_offered",
+          "appointment_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "availability_checked",
+        "kind": "tool",
+        "tool": "check_appointment_availability",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "morning_slots_offered",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "10[:.]15",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_created",
+        "kind": "tool",
+        "tool": "create_appointment",
+        "arguments": {
+          "time": "10:15"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "14[:.]00|16[:.]30",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "check_appointment_availability"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "time": "10:15"
+        }
+      },
+      "tool_sequence": [
+        "check_appointment_availability",
+        "create_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 35,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_stated_preference_filters_options",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-05\"}}</tool_call>",
+        "Sabah için 10:15 ve 11:30 uygun görünüyor. Hangisi olsun?",
+        "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"customer_id\":\"OS-14\",\"date\":\"2026-08-05\",\"time\":\"10:15\"}}</tool_call>",
+        "Randevunuz yarın 10:15 için REF-53199 referansıyla oluşturuldu.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "reads_the_whole_list_back_unfiltered",
+        "outputs": [
+          "<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-05\"}}</tool_call>",
+          "10:15, 11:30, 14:00 ve 16:30 saatlerimiz boş. Hangisi olsun?"
+        ]
+      },
+      {
+        "label": "offers_only_the_afternoon_slots",
+        "outputs": [
+          "<tool_call>{\"name\":\"check_appointment_availability\",\"arguments\":{\"date\":\"2026-08-05\"}}</tool_call>",
+          "14:00 ve 16:30 saatlerimiz uygun görünüyor."
+        ]
+      },
+      {
+        "label": "books_without_checking_availability",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"customer_id\":\"OS-14\",\"date\":\"2026-08-05\",\"time\":\"10:15\"}}</tool_call>",
+          "Randevunuz oluşturuldu."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_stated_preference_filters_options",
+      "note": "gorusmeler(5).csv row 148: 'müşteri sabah saatleri tercih ettiği halde dönen seçeneklerde öğleden sonra saatleri de yer aldı ve model bunu filtrelemeden olduğu gibi sundu'. Reading four options aloud is also a cognitive-load problem on a voice call; phone_ux_sequential_no_overload covers credentials, not option lists."
+    }
+  },
+  {
+    "id": "tr_ux_checks_for_anything_else_before_closing_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_checks_for_more_before_closing",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir belediye arıza/şikâyet hattı asistanısın. Gelen çağrı. Müşteri: BL-08.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_ticket, end_call\n\nKURALLAR:\n- Kaydı açtıktan sonra referans numarasını söyle.\n- Kapatmadan ÖNCE başka bir konu olup olmadığını sor.\n\nKIRMIZI ÇİZGİ:\n- Müşteri kapanış sinyali VERMEDEN görüşmeyi bitirme. 'Başka bir konuda yardımcı olabilir miyim?' sorusunu atlama.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: record\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: record\n    type: tool\n    tool: create_ticket\n    internal_guidance: \"create_ticket(customer_id='BL-08', topic='sokak lambası arızası') çağır, sonra REF-77233 referansını söyle.\"\n    next[1]{id,condition}:\n      offer_more,sonraki adım\n    completion_criteria: Referans numarasını söylemeden ilerleme.\n  - id: offer_more\n    type: text\n    say_to_customer: \"Başka bir konuda yardımcı olabilir miyim?\"\n    internal_guidance: \"Kapatmadan önce başka konu olup olmadığını SOR.\"\n    next[1]{id,condition}:\n      close,Müşteri başka konusu olmadığını söylerse\n    completion_criteria: Sormadan kapatma.\n  - id: close\n    type: tool\n    tool: end_call\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"end_call(reason='completed') ile kapat.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "create_ticket",
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_ticket",
+          "description": "Arıza/şikâyet kaydı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "topic"
+            ]
+          }
+        }
+      },
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "call": {
+        "ended": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_ticket",
+        "result": {
+          "ok": true,
+          "reference_no": "REF-77233"
+        },
+        "latency_ms": 150,
+        "terminal": false
+      },
+      {
+        "name": "end_call",
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.ended",
+            "value": true
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "report_issue",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "report_issue",
+          "variants": [
+            "Çamlık Sokak No 5'te sokak lambası yanmıyor."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "REF-77233"
+              },
+              "to": "await_close"
+            }
+          ]
+        },
+        {
+          "id": "await_close",
+          "variants": [
+            "Tamam."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "başka bir[^.]{0,40}(yardımcı|konu|işlem|talep)"
+              },
+              "to": "no_more"
+            }
+          ]
+        },
+        {
+          "id": "no_more",
+          "variants": [
+            "Hayır, teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "the_caller_gets_the_chance_to_say_more",
+        "description": "Report the reference number, ask whether there is anything else, and only then end the call.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "ticket_created",
+          "reference_given",
+          "asked_if_anything_else",
+          "call_ended"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "ticket_created",
+        "kind": "tool",
+        "tool": "create_ticket",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "reference_given",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "REF-77233",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      },
+      {
+        "id": "asked_if_anything_else",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "başka bir[^.]{0,40}(yardımcı|konu|işlem|talep)",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      },
+      {
+        "id": "call_ended",
+        "kind": "tool",
+        "tool": "end_call",
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "termination_policy": {
+        "tool": "end_call",
+        "mode": "required",
+        "required_milestones": [
+          "ticket_created",
+          "reference_given",
+          "asked_if_anything_else"
+        ],
+        "allowed_reasons": [
+          "completed"
+        ],
+        "max_calls": 1,
+        "severity": "P0"
+      },
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "call": {
+          "ended": true
+        }
+      },
+      "tool_sequence": [
+        "create_ticket",
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_checks_for_more_before_closing",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"BL-08\",\"topic\":\"sokak lambası arızası\"}}</tool_call>",
+        "Kaydınız REF-77233 referans numarasıyla oluşturuldu.",
+        "Başka bir konuda yardımcı olabilir miyim?",
+        "Rica ederim, iyi günler dilerim.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "hangs_up_immediately_after_the_ticket",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"BL-08\",\"topic\":\"sokak lambası arızası\"}}</tool_call>",
+          "Kaydınız REF-77233 referans numarasıyla oluşturuldu. İyi günler dilerim.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"completed\"}}</tool_call>"
+        ]
+      },
+      {
+        "label": "never_gives_the_reference_number",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"BL-08\",\"topic\":\"sokak lambası arızası\"}}</tool_call>",
+          "Kaydınız oluşturuldu, ilgili ekibe iletildi."
+        ]
+      },
+      {
+        "label": "never_creates_the_ticket",
+        "outputs": [
+          "Notunuzu aldım, ilgili ekibimize ileteceğim. İyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_checks_for_more_before_closing",
+      "note": "gorusmeler(5).csv rows 138 and 86: 'daha konuşacaktım ama kapandı anlamadım'. Deliberately paired with ux_closing_signal_respected, where the identical 'başka bir konuda yardımcı olabilir miyim?' is the DEFECT because the caller already signalled the end. Same sentence, opposite verdicts, decided by whether the caller has closed."
+    }
+  },
+  {
+    "id": "tr_ux_closing_signal_respected_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_closing_signal_respected",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir eğitim kurumu geri bildirim asistanısın. Gelen çağrı. Müşteri: AY-05.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: end_call\n\nKURALLAR:\n- Müşteri açık kapanış sinyali verdiyse ('hepsi bu kadar', 'görüşürüz', 'kapatalım') görüşmeyi kapat.\n\nKIRMIZI ÇİZGİ:\n- Kapanış sinyalinden sonra yeni konu açma: 'başka bir konu', 'son bir soru', memnuniyet/puanlama sorusu YASAK.\n- Kısa bir veda et ve end_call çağır.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: close\n  note: Geri bildirim zaten alındı, müşteri kapatmak istiyor.\nsteps[1]:\n  - id: close\n    type: tool\n    tool: end_call\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Kapanış sinyali geldi. Kısa veda et ve end_call(reason='customer_closed') çağır. Yeni soru sorma.\"\n    completion_criteria: Kapanış sinyalinden sonra yeni konu açma.",
+    "available_tools": [
+      "end_call"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "end_call",
+          "description": "Görüşmeyi sonlandır",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "call": {
+        "ended": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "end_call",
+        "result": {
+          "ok": true
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "call.ended",
+            "value": true
+          }
+        ],
+        "latency_ms": 100,
+        "terminal": true
+      }
+    ],
+    "user_plan": {
+      "start": "signal_close",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "signal_close",
+          "variants": [
+            "Hepsi bu kadar, görüşürüz.",
+            "Tamam, kapatalım artık."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "a_closing_signal_is_taken",
+        "description": "Say a short goodbye and end the call when the caller signals the end, instead of opening one more topic or a satisfaction question.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "call_ended",
+          "brief_goodbye"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "call_ended",
+        "kind": "tool",
+        "tool": "end_call",
+        "failed": false,
+        "axis": "flow_control",
+        "severity": "P0"
+      },
+      {
+        "id": "brief_goodbye",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "iyi günler|iyi çalışmalar|görüşmek üzere|kendinize iyi bakın",
+        "axis": "conversation_experience",
+        "severity": "P1"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "başka bir[^.]{0,40}(yardımcı|konu|işlem|talep)|son bir soru|bir de şunu|ek olarak[^.]{0,25}soru",
+          "severity": "P0"
+        },
+        {
+          "regex": "değerlendirir misiniz|puanlar mısınız|1 ile 10|memnun kald[ıi]n[ıi]z m[ıi]|nasıl geçti",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "call": {
+          "ended": true
+        }
+      },
+      "tool_sequence": [
+        "end_call"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 25,
+      "max_questions_per_turn": 0
+    },
+    "flow": {
+      "max_assistant_steps": 2,
+      "max_user_turns": 1,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_closing_signal_respected",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 1,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Rica ederim, iyi günler dilerim.\n<tool_call>{\"name\":\"end_call\",\"arguments\":{\"reason\":\"customer_closed\"}}</tool_call>"
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "opens_another_topic_after_the_closing_signal",
+        "outputs": [
+          "Tabii, başka bir konuda yardımcı olabilir miyim?"
+        ]
+      },
+      {
+        "label": "starts_a_satisfaction_question_on_the_way_out",
+        "outputs": [
+          "Peki, görüşmemizi 1 ile 10 arasında değerlendirir misiniz?"
+        ]
+      },
+      {
+        "label": "says_goodbye_but_never_ends_the_call",
+        "outputs": [
+          "Rica ederim, iyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_closing_signal_respected",
+      "note": "gorusmeler(5).csv row 78: the caller said 'hatırlamıyorum', 'hepsi bu kadar, görüşürüz', 'kapatalım' repeatedly and the agent kept asking the same kind of follow-up until the tester ended the call by hand. Row 118 the same. The suite's explicit_end_request case covers a caller who wants out BEFORE the task is done; this is the far more common shape where the task is finished and the agent will not let go."
+    }
+  },
+  {
+    "id": "tr_ux_never_mocks_the_callers_wording_001",
+    "benchmark_version": "0.8",
+    "domain": "ux_callers_wording_not_mocked",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir hastane randevu asistanısın. Gelen çağrı. Hasta: HS-77.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_appointment\n\nKURALLAR:\n- Müşterinin ifadesi anlaşılmazsa NÖTR bir netleştirme sorusu sor: hangi bölümden randevu istediğini öğren.\n\nKIRMIZI ÇİZGİ:\n- Müşterinin ifadesini tuhaf, komik veya garip bulduğunu SÖYLEME; güldüğünü belirtme, espri yapma, dalga geçme.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: clarify\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: clarify\n    type: text\n    say_to_customer: \"Hangi bölümden randevu almak istersiniz?\"\n    internal_guidance: \"İfade anlaşılmadı. Yorum yapmadan, NÖTR biçimde hangi bölüm olduğunu sor.\"\n    next[1]{id,condition}:\n      book,Müşteri bölümü söylerse\n    completion_criteria: Müşterinin ifadesi hakkında yorum yapma.\n  - id: book\n    type: tool\n    tool: create_appointment\n    internal_guidance: \"create_appointment(patient_id='HS-77', department='cildiye', date='2026-08-05') çağır, sonra referans numarasını söyle.\"\n    next[1]{id,condition}:\n      close,sonraki adım\n    completion_criteria: Bölüm netleşmeden randevu oluşturma.\n  - id: close\n    type: text\n    say_to_customer: \"Rica ederim, iyi günler dilerim.\"\n    internal_guidance: \"Rica ederim, iyi günler dilerim.\"\n    completion_criteria: Bu adımı tamamlamadan ilerleme.",
+    "available_tools": [
+      "create_appointment"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_appointment",
+          "description": "Randevu oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_id": {
+                "type": "string"
+              },
+              "department": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "Randevu tarihi, YYYY-AA-GG biçiminde",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "required": [
+              "patient_id",
+              "department",
+              "date"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "appointment": {
+        "department": null
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_appointment",
+        "match_args": {
+          "department": "cildiye"
+        },
+        "result": {
+          "ok": true,
+          "reference_no": "REF-60712"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "appointment.department",
+            "value": "cildiye"
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "odd_request",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "odd_request",
+          "variants": [
+            "Fizik dersi randevusu almak istiyorum."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "hangi bölüm|hangi birim|hangi poliklinik"
+              },
+              "to": "name_department"
+            }
+          ]
+        },
+        {
+          "id": "name_department",
+          "variants": [
+            "Anladım, cildiye randevusu alacağım."
+          ],
+          "transitions": [
+            {
+              "when": {
+                "tool_succeeded": "create_appointment"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "an_odd_phrasing_is_clarified_not_commented_on",
+        "description": "Ask neutrally which department the caller means, without telling them their wording was strange or funny.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "neutral_clarification",
+          "appointment_created"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "neutral_clarification",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "hangi bölüm|hangi birim|hangi poliklinik",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      },
+      {
+        "id": "appointment_created",
+        "kind": "tool",
+        "tool": "create_appointment",
+        "arguments": {
+          "department": "cildiye"
+        },
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "güld[üu]|gülümsed|komik|tuhaf|garip geld|espri|dalga geç|şaka",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "appointment": {
+          "department": "cildiye"
+        }
+      },
+      "tool_sequence": [
+        "create_appointment"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 35,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 6,
+      "max_user_turns": 3,
+      "max_reasks": 0
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "ux_callers_wording_not_mocked",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 3,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "Hangi bölümden randevu almak istersiniz?",
+        "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"HS-77\",\"department\":\"cildiye\",\"date\":\"2026-08-05\"}}</tool_call>",
+        "Cildiye randevunuz REF-60712 referansıyla oluşturuldu.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "tells_the_caller_it_laughed_at_them",
+        "outputs": [
+          "Fizik dersi talebinize güldüm sanırım; hangi bölümden randevu almak istersiniz?"
+        ]
+      },
+      {
+        "label": "calls_the_callers_wording_strange",
+        "outputs": [
+          "'Fizik dersi' biraz garip geldi açıkçası. Hangi bölümden randevu istiyorsunuz?"
+        ]
+      },
+      {
+        "label": "books_without_clarifying_the_department",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_appointment\",\"arguments\":{\"patient_id\":\"HS-77\",\"department\":\"cildiye\",\"date\":\"2026-08-05\"}}</tool_call>",
+          "Randevunuz oluşturuldu."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "production-transcript",
+      "split": "public-everyday-ux",
+      "family": "ux_callers_wording_not_mocked",
+      "note": "gorusmeler(5).csv row 39: 'Fizik dersi talebinize güldüm sanırım' and, after the caller asked 'neden güldün dalga mı geçiyosun', 'sadece fizik dersi kelimesi biraz garip geldiği için'. Tone is the largest complaint bucket in the reviewer notes (12 rows) and the hardest to score; this is the slice of it that can be checked literally."
+    }
+  }
+]
