@@ -276,6 +276,8 @@ class Scenario:
                 raise ScenarioValidationError(f"{where}.kind is unsupported")
             if milestone.get("severity", "P1") not in {"P0", "P1", "P2"}:
                 raise ScenarioValidationError(f"{where}.severity must be P0|P1|P2")
+            if milestone.get("against") not in (None, "emitted", "heard"):
+                raise ScenarioValidationError(f"{where}.against must be emitted or heard")
         if len(milestone_ids) != len(set(milestone_ids)):
             raise ScenarioValidationError(f"{scenario_id}.milestones contains duplicate ids")
 

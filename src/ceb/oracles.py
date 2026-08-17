@@ -42,7 +42,14 @@ def _matching_steps(trajectory: dict[str, Any], milestone: dict[str, Any]) -> li
         # sweep with --stt silently fails ninety-odd consent checks for a reason that has
         # nothing to do with the model. Assistant-role milestones are unaffected: the model's
         # own words are never rewritten.
-        field = "spoken" if role == "user" else "content"
+        if role == "user":
+            field = "spoken"
+        else:
+            # `against: "heard"` scores what reached the caller rather than what the model
+            # emitted. "The caller was told the reference number" is a claim about the caller;
+            # if the sentence was cut before it, they were not told. Only barge-in cases opt in,
+            # so the default leaves every existing case identical.
+            field = "heard" if milestone.get("against") == "heard" else "content"
         return [
             s for s in timeline
             if s.get("role") == role

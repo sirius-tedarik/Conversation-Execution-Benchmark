@@ -799,3 +799,18 @@ def test_schema_rejects_barge_in_on_the_start_node():
            "max_user_turns": 1, "max_steps_per_turn": 1}
     with pytest.raises(ScenarioValidationError):
         Scenario.from_dict(raw)
+
+
+def test_a_milestone_against_heard_misses_content_the_caller_never_got():
+    """"The caller was told the reference number" is a claim about the caller, not about what the
+    model emitted. If the sentence was cut before the number, they were not told, and the agent
+    still owes it to them."""
+    from ceb.oracles import _matching_steps
+
+    trajectory = {"timeline": [
+        {"index": 0, "role": "assistant", "content": "Kaydınız REF-77233 oluşturuldu.", "heard": "Kaydınız"},
+    ], "final_state": {}}
+    emitted = {"kind": "content", "role": "assistant", "regex": "REF-77233"}
+    heard = {"kind": "content", "role": "assistant", "regex": "REF-77233", "against": "heard"}
+    assert _matching_steps(trajectory, emitted)
+    assert not _matching_steps(trajectory, heard)
