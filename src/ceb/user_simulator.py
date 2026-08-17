@@ -115,6 +115,8 @@ class ControlledUserSimulator:
         # The pieces the session must send as separate user messages for the utterance just
         # emitted. A node without `fragments` yields exactly one, which is today's behaviour.
         self.pending_fragments: list[str] = []
+        # The agent's last spoken line, so the overlap operator can splice from it.
+        self.last_assistant_text: str = ""
         self.visits: dict[str, int] = {}
         self.trace: list[dict[str, Any]] = []
         self.max_detours = int(plan.get("max_detours", len(self.nodes)))
@@ -205,7 +207,10 @@ class ControlledUserSimulator:
         stt_applied: list[str] = []
         for fragment_index, fragment in enumerate(fragments):
             key = self.current_id if fragment_index == 0 else f"{self.current_id}#{fragment_index}"
-            heard, applied = transcribe(fragment, node_stt, self.seed, self.scenario_id, key, visit)
+            heard, applied = transcribe(
+                fragment, node_stt, self.seed, self.scenario_id, key, visit,
+                context={"last_assistant": self.last_assistant_text},
+            )
             heard_fragments.append(heard)
             stt_applied.extend(applied)
         self.pending_fragments = heard_fragments
@@ -238,6 +243,12 @@ class ControlledUserSimulator:
         )
 
     def advance(self, turn_steps: list[dict[str, Any]], full_timeline: list[dict[str, Any]] | None = None) -> str | None:
+        # Remember what the agent just said, so the overlap operator can splice from it on the
+        # next caller turn — the recogniser cannot tell the two voices apart.
+        for step in reversed(turn_steps or []):
+            if step.get("role") == "assistant" and step.get("content"):
+                self.last_assistant_text = str(step["content"])
+                break
         if self.current_id is None:
             return None
         node = self.nodes[self.current_id]

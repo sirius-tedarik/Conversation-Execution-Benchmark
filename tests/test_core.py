@@ -831,3 +831,22 @@ def test_holder_only_content_may_not_be_spoken_to_a_third_party():
     assert failed and failed[0]["severity"] == "P0"
     assert all(c["passed"] for c in _holder_only_checks({"timeline": timeline[:2]}, [r"8\.750,00"]))
     assert _holder_only_checks({"timeline": timeline}, []) == []
+
+
+def test_agent_overlap_splices_the_agents_own_words_into_the_caller_turn():
+    from ceb.stt import transcribe
+
+    text, applied = transcribe(
+        "faturam yüksek geldi", {"agent_overlap": 1.0}, 17, "c", "n", 0,
+        context={"last_assistant": "Faturanız 415 TL olarak görünüyor."},
+    )
+    assert applied == ["agent_overlap"]
+    assert "faturam yüksek geldi" in text
+    assert any(word in text for word in ("Faturanız", "415", "TL", "olarak", "görünüyor."))
+
+
+def test_agent_overlap_does_nothing_on_the_first_turn():
+    """Nothing has been said yet, so there is nothing to overlap with."""
+    from ceb.stt import transcribe
+
+    assert transcribe("merhaba", {"agent_overlap": 1.0}, 17, "c", "n", 0, context=None) == ("merhaba", [])
