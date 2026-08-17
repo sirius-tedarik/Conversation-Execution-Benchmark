@@ -140,6 +140,18 @@ def run_scenario(runner: Any, scenario: Scenario, seed: int = 0, stt: Any = None
         # sees `content`; `spoken` exists so a user-role milestone can assert a fact the SCRIPT
         # established rather than a word the recogniser happened to preserve.
         spoken = (simulator.trace[-1].get("spoken") if simulator.trace else None) or utterance
+        # Full-duplex: this caller turn cut the agent off. Trim what the caller HEARD of the last
+        # thing the agent said, and leave `content` and the model's own history intact — nothing
+        # in production tells the model where it was cut, and that gap is the case.
+        barge_in = (simulator.current_node or {}).get("barge_in")
+        if barge_in:
+            for step in reversed(timeline):
+                if step.get("role") == "assistant":
+                    step["heard"] = " ".join(
+                        str(step.get("content", "")).split()[: int(barge_in["after_words"])]
+                    )
+                    break
+
         # Speech-to-text delivers one utterance as several consecutive user messages and the
         # model is invoked on every one of them, so a caller can be answered mid-sentence.
         fragments = simulator.pending_fragments or [utterance]

@@ -60,6 +60,16 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
             raise ScenarioValidationError(f"{where}.transitions must be list[object]")
         if "stt" in node and not isinstance(node["stt"], (str, dict, type(None))):
             raise ScenarioValidationError(f"{where}.stt must be a profile name, an operator map, or null")
+        if "barge_in" in node:
+            # Full-duplex: this caller turn cuts the agent off mid-sentence.
+            barge = node["barge_in"]
+            if not isinstance(barge, dict) or not isinstance(barge.get("after_words"), int) \
+                    or barge["after_words"] < 1:
+                raise ScenarioValidationError(f"{where}.barge_in.after_words must be a positive integer")
+            if node_id == start:
+                raise ScenarioValidationError(
+                    f"{where}.barge_in on the start node has nothing to interrupt"
+                )
     if len(ids) != len(set(ids)):
         raise ScenarioValidationError(f"{scenario_id}.user_plan has duplicate node ids")
     if start not in ids:

@@ -760,3 +760,42 @@ def test_interim_checks_are_inert_when_nothing_was_fragmented():
     from ceb.oracles import _interim_checks
 
     assert _interim_checks({"timeline": [{"role": "assistant", "content": "Merhaba."}]}, {}) == []
+
+
+def test_barge_in_truncates_only_what_the_caller_heard():
+    """Full-duplex: the caller cuts in and the rest of the sentence never reaches them. The
+    model's own history keeps the whole thing, because nothing tells it otherwise — that gap is
+    the case."""
+    raw = {"id": "bargein", "benchmark_version": "0.8", "domain": "d", "language": "tr-TR",
+           "call_direction": "inbound", "system": "s", "available_tools": [], "tool_schemas": [],
+           "user_plan": {"start": "a", "nodes": [
+               {"id": "a", "variants": ["Kaydı açın."],
+                "transitions": [{"when": {"assistant_regex": "REF"}, "to": "b"}]},
+               {"id": "b", "variants": ["Bir saniye!"], "barge_in": {"after_words": 2}, "terminal": True}]},
+           "objectives": [{"id": "o", "description": "d", "axis": "policy_safety", "severity": "P0",
+                           "required_milestones": ["m"]}],
+           "milestones": [{"id": "m", "kind": "content", "role": "assistant", "regex": "REF",
+                           "axis": "policy_safety", "severity": "P0"}],
+           "max_user_turns": 2, "max_steps_per_turn": 1}
+    scenario = Scenario.from_dict(raw)
+    trajectory = run_scenario(
+        MockRunner(["Kaydınız REF-77233 referans numarasıyla oluşturuldu.", "Buyurun."]), scenario, seed=17)
+    first = [s for s in trajectory["timeline"] if s["role"] == "assistant"][0]
+    assert first["content"] == "Kaydınız REF-77233 referans numarasıyla oluşturuldu."
+    assert first["heard"] == "Kaydınız REF-77233"
+    assert any(m.get("content") == "Kaydınız REF-77233 referans numarasıyla oluşturuldu."
+               for m in trajectory["messages"])
+
+
+def test_schema_rejects_barge_in_on_the_start_node():
+    raw = {"id": "c", "benchmark_version": "0.8", "domain": "d", "language": "tr-TR",
+           "call_direction": "inbound", "system": "s", "available_tools": [], "tool_schemas": [],
+           "user_plan": {"start": "n", "nodes": [
+               {"id": "n", "variants": ["a"], "barge_in": {"after_words": 2}, "terminal": True}]},
+           "objectives": [{"id": "o", "description": "d", "axis": "policy_safety", "severity": "P0",
+                           "required_milestones": ["m"]}],
+           "milestones": [{"id": "m", "kind": "content", "role": "user", "regex": "a",
+                           "axis": "policy_safety", "severity": "P0"}],
+           "max_user_turns": 1, "max_steps_per_turn": 1}
+    with pytest.raises(ScenarioValidationError):
+        Scenario.from_dict(raw)
