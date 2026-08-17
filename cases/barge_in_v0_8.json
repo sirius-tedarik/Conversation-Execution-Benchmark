@@ -1,0 +1,468 @@
+[
+  {
+    "id": "tr_bargein_cut_reference_is_repeated_001",
+    "benchmark_version": "0.8",
+    "domain": "bargein_cut_reference_is_repeated",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir kargo destek asistanısın. Gelen çağrı. Müşteri: KG-88.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: create_ticket\n\nKURALLAR:\n- Hat çift yönlüdür; müşteri araya girdiğinde cümlenin geri kalanı ona ULAŞMAZ.\n\nKIRMIZI ÇİZGİ:\n- Müşteri araya girdikten sonra referans numarasını yeniden sorarsa NUMARAYI TEKRAR SÖYLE.\n- 'Az önce söyledim', 'belirttiğim gibi' deme; müşteri o kısmı duymadı.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: record\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: record\n    type: tool\n    tool: create_ticket\n    internal_guidance: \"create_ticket(customer_id='KG-88', topic='hasarlı teslimat') çağır ve referans numarasını söyle.\"\n    next[1]{id,condition}:\n      resume,Müşteri araya girerse\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: resume\n    type: text\n    say_to_customer: \"Buyurun, dinliyorum.\"\n    internal_guidance: \"Müşteri araya girdi. Sözünü kesme, dinle.\"\n    next[1]{id,condition}:\n      repeat_reference,Müşteri referansı sorarsa\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: repeat_reference\n    type: text\n    say_to_customer: \"Referans numaranız REF-77233.\"\n    internal_guidance: \"Müşteri numarayı duymadı. TEKRAR söyle; 'az önce söyledim' DEME.\"\n    completion_criteria: Numarayı tekrar söylemeden kapatma.",
+    "available_tools": [
+      "create_ticket"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "create_ticket",
+          "description": "Teslimat şikâyeti kaydı oluştur",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id",
+              "topic"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "ticket": {
+        "created": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "create_ticket",
+        "result": {
+          "ok": true,
+          "reference_no": "REF-77233"
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "ticket.created",
+            "value": true
+          }
+        ],
+        "latency_ms": 140,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask_record",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ask_record",
+          "variants": [
+            "Kargom hasarlı geldi, kayıt açar mısınız?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "REF-77233"
+              },
+              "to": "interrupt"
+            }
+          ]
+        },
+        {
+          "id": "interrupt",
+          "variants": [
+            "Bir saniye, araya giriyorum."
+          ],
+          "barge_in": {
+            "after_words": 2
+          },
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "buyurun|dinliyorum|tabii"
+              },
+              "to": "ask_reference"
+            }
+          ]
+        },
+        {
+          "id": "ask_reference",
+          "variants": [
+            "Referans numarası neydi?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "REF-77233"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "what_was_cut_off_is_still_owed_to_the_caller",
+        "description": "Repeat the reference number after an interruption swallowed it, without claiming it was already given.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "ticket_created",
+          "reference_reached_the_caller"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "ticket_created",
+        "kind": "tool",
+        "tool": "create_ticket",
+        "failed": false,
+        "axis": "business_outcome",
+        "severity": "P0"
+      },
+      {
+        "id": "reference_reached_the_caller",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "REF-77233",
+        "against": "heard",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "forbidden_content": [
+        {
+          "regex": "az önce söyledim|belirttiğim gibi|demin söylediğim|daha önce ilettiğim",
+          "severity": "P0"
+        }
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "ticket": {
+          "created": true
+        }
+      },
+      "tool_sequence": [
+        "create_ticket"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 8,
+      "max_user_turns": 4,
+      "max_reasks": 1
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "bargein_cut_reference_is_repeated",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-88\",\"topic\":\"hasarlı teslimat\"}}</tool_call>",
+        "Kaydınızı oluşturdum, referans numaranız REF-77233.",
+        "Buyurun, dinliyorum.",
+        "Referans numaranız REF-77233.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "claims_it_already_said_the_number",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-88\",\"topic\":\"hasarlı teslimat\"}}</tool_call>",
+          "Kaydınızı oluşturdum, referans numaranız REF-77233.",
+          "Buyurun, dinliyorum.",
+          "Az önce söyledim, kaydınız oluşturuldu."
+        ]
+      },
+      {
+        "label": "never_repeats_the_number",
+        "outputs": [
+          "<tool_call>{\"name\":\"create_ticket\",\"arguments\":{\"customer_id\":\"KG-88\",\"topic\":\"hasarlı teslimat\"}}</tool_call>",
+          "Kaydınızı oluşturdum, referans numaranız REF-77233.",
+          "Buyurun, dinliyorum.",
+          "Kaydınız açıldı, ekibimiz sizinle iletişime geçecek."
+        ]
+      },
+      {
+        "label": "never_opens_the_ticket_at_all",
+        "outputs": [
+          "Talebinizi not aldım, iyi günler dilerim."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-voice-transport",
+      "split": "public-barge-in",
+      "family": "bargein_cut_reference_is_repeated",
+      "note": "The line is full-duplex, so the caller cutting in at the second word means the reference number never reached them — while the model's own history still holds the whole sentence, because nothing tells it where it was cut. The milestone therefore scores `against: \"heard\"`: 'the caller was told the reference' is a claim about the caller, not about what was emitted. The model is never asked to know it was interrupted, only to answer the question it is then asked."
+    }
+  },
+  {
+    "id": "tr_bargein_no_reference_to_unheard_content_001",
+    "benchmark_version": "0.8",
+    "domain": "bargein_no_reference_to_unheard_content",
+    "language": "tr-TR",
+    "call_direction": "inbound",
+    "system": "Sen bir bankacılık asistanısın. Gelen çağrı. Müşteri: BK-98.\nGörevin: aşağıdaki AKIŞ'ı takip ederek müşteriyle doğal Türkçe konuş ve görüşmeyi akış doğrultusunda yönet.\n\nKULLANILABİLİR ARAÇLAR: get_balance\n\nKURALLAR:\n- Bakiyeyi araçtan al ve her söyleyişinde BİREBİR aynı söyle.\n\nKIRMIZI ÇİZGİ:\n- Müşteri araya girip sözünü kestiyse, kesilen kısmı DUYMAMIŞTIR. O bilgiye 'belirttiğim gibi', 'söylediğim gibi' diye ATIF YAPMA.\n- Tutarı yeniden sorduğunda baştan, açıkça söyle.\n\nAKIŞ (TOON — harfiyen takip et):\nentry_after_greeting:\n  id: state_balance\n  note: Karşılama zaten yapıldı.\nsteps[3]:\n  - id: state_balance\n    type: tool\n    tool: get_balance\n    internal_guidance: \"get_balance(customer_id='BK-98') çağır ve bakiyeyi söyle: 8.750,00 TL.\"\n    next[1]{id,condition}:\n      resume,Müşteri araya girerse\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: resume\n    type: text\n    say_to_customer: \"Tabii, buyurun.\"\n    internal_guidance: \"Müşteri araya girdi. Dinle.\"\n    next[1]{id,condition}:\n      restate,Müşteri tutarı yeniden sorarsa\n    completion_criteria: Bu adımı tamamlamadan ilerleme.\n  - id: restate\n    type: text\n    say_to_customer: \"Bakiyeniz 8.750,00 TL.\"\n    internal_guidance: \"Müşteri tutarı duymadı. Baştan söyle; geriye atıf YAPMA.\"\n    completion_criteria: Tutarı yeniden söylemeden kapatma.",
+    "available_tools": [
+      "get_balance"
+    ],
+    "tool_schemas": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_balance",
+          "description": "Güncel bakiyeyi getir",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "customer_id"
+            ]
+          }
+        }
+      }
+    ],
+    "initial_state": {
+      "balance": {
+        "queried": false
+      }
+    },
+    "tool_contracts": [
+      {
+        "name": "get_balance",
+        "match_args": {
+          "customer_id": "BK-98"
+        },
+        "result": {
+          "ok": true,
+          "balance_try": 8750.0
+        },
+        "state_patch": [
+          {
+            "op": "set",
+            "path": "balance.queried",
+            "value": true
+          }
+        ],
+        "latency_ms": 120,
+        "terminal": false
+      }
+    ],
+    "user_plan": {
+      "start": "ask_balance",
+      "max_detours": 0,
+      "nodes": [
+        {
+          "id": "ask_balance",
+          "variants": [
+            "Bakiyem ne kadar?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "8\\.750,00"
+              },
+              "to": "interrupt"
+            }
+          ]
+        },
+        {
+          "id": "interrupt",
+          "variants": [
+            "Pardon, bir şey soracaktım."
+          ],
+          "barge_in": {
+            "after_words": 1
+          },
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "buyurun|tabii|dinliyorum"
+              },
+              "to": "ask_again"
+            }
+          ]
+        },
+        {
+          "id": "ask_again",
+          "variants": [
+            "Bakiyem kaçtı, duyamadım?"
+          ],
+          "transitions": [
+            {
+              "when": {
+                "assistant_regex": "8\\.750,00"
+              },
+              "to": "wrap"
+            }
+          ]
+        },
+        {
+          "id": "wrap",
+          "variants": [
+            "Teşekkürler."
+          ],
+          "terminal": true
+        }
+      ]
+    },
+    "objectives": [
+      {
+        "id": "no_referring_back_to_something_never_heard",
+        "description": "State the balance afresh after an interruption swallowed it, instead of pointing back to a sentence the caller never received.",
+        "axis": "conversation_experience",
+        "severity": "P0",
+        "required_milestones": [
+          "balance_read",
+          "amount_reached_the_caller"
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "id": "balance_read",
+        "kind": "tool",
+        "tool": "get_balance",
+        "failed": false,
+        "axis": "action_correctness",
+        "severity": "P1"
+      },
+      {
+        "id": "amount_reached_the_caller",
+        "kind": "content",
+        "role": "assistant",
+        "regex": "8\\.750,00",
+        "against": "heard",
+        "axis": "conversation_experience",
+        "severity": "P0"
+      }
+    ],
+    "policies": {
+      "tracked_values": [
+        {
+          "id": "bal",
+          "tool": "get_balance",
+          "path": "balance_try",
+          "kind": "currency_try",
+          "severity": "P0"
+        }
+      ],
+      "forbidden_content": [
+        {
+          "regex": "belirttiğim gibi|söylediğim gibi|az önce ilettiğim|demin de söylediğim",
+          "severity": "P0"
+        }
+      ],
+      "read_only_tools": [
+        "get_balance"
+      ],
+      "max_tool_repeats": 1
+    },
+    "expected": {
+      "state": {
+        "balance": {
+          "queried": true
+        }
+      },
+      "tool_sequence": [
+        "get_balance"
+      ]
+    },
+    "conversation": {
+      "max_words_per_turn": 40,
+      "max_questions_per_turn": 1
+    },
+    "flow": {
+      "max_assistant_steps": 8,
+      "max_user_turns": 4,
+      "max_reasks": 1
+    },
+    "runtime": {
+      "max_model_latency_ms": 8000
+    },
+    "perturbations": {
+      "trap": "bargein_no_reference_to_unheard_content",
+      "expected_outcome": "held"
+    },
+    "trials": 3,
+    "max_user_turns": 4,
+    "max_steps_per_turn": 2,
+    "_mock_runs": [
+      [
+        "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-98\"}}</tool_call>",
+        "Bakiyeniz 8.750,00 TL olarak görünüyor.",
+        "Tabii, buyurun.",
+        "Bakiyeniz 8.750,00 TL.",
+        "Rica ederim, iyi günler dilerim."
+      ]
+    ],
+    "_mock_negative_runs": [
+      {
+        "label": "refers_back_to_the_sentence_that_was_cut",
+        "outputs": [
+          "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-98\"}}</tool_call>",
+          "Bakiyeniz 8.750,00 TL olarak görünüyor.",
+          "Tabii, buyurun.",
+          "Belirttiğim gibi hesabınızda yeterli bakiye bulunuyor."
+        ]
+      },
+      {
+        "label": "never_restates_the_amount",
+        "outputs": [
+          "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-98\"}}</tool_call>",
+          "Bakiyeniz 8.750,00 TL olarak görünüyor.",
+          "Tabii, buyurun.",
+          "Hesabınız olumlu görünüyor, iyi günler dilerim."
+        ]
+      },
+      {
+        "label": "restates_a_different_amount",
+        "outputs": [
+          "<tool_call>{\"name\":\"get_balance\",\"arguments\":{\"customer_id\":\"BK-98\"}}</tool_call>",
+          "Bakiyeniz 8.750,00 TL olarak görünüyor.",
+          "Tabii, buyurun.",
+          "Bakiyeniz 7.850,00 TL."
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "synthetic-voice-transport",
+      "split": "public-barge-in",
+      "family": "bargein_no_reference_to_unheard_content",
+      "note": "Cut at the first word, the caller heard 'Bakiyeniz' and nothing else. Pointing back to it — 'belirttiğim gibi' — is the failure, because from the caller's side nothing was ever said. Distinct from the reference-number case in what the agent owes: there it must repeat a value, here it must not build on one."
+    }
+  }
+]
