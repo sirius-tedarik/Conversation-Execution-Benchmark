@@ -45,7 +45,14 @@ def compute_flow_metrics(trajectory: dict[str, Any], config: dict[str, Any] | No
     reasks = len(re.findall(str(reask_pattern), assistant_text, re.I)) if reask_pattern else 0
     return {
         "assistant_steps": sum(step.get("role") == "assistant" for step in timeline),
-        "user_turns": sum(step.get("role") == "user" for step in timeline),
+        # A caller TURN, not a caller message. Speech-to-text splits one utterance across
+        # several consecutive user messages, and counting those as separate turns would make
+        # every fragmented case look like a much longer call than it is.
+        "user_turns": len({
+            step.get("user_turn", index)
+            for index, step in enumerate(timeline)
+            if step.get("role") == "user"
+        }),
         "tool_calls": sum(step.get("role") == "tool" for step in timeline),
         "timeline_events": len(timeline),
         "detours": len(detour_positions),

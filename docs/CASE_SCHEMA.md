@@ -51,6 +51,47 @@ All targets must reference declared nodes. An off-flow node must have either `re
 
 Detours may nest. A detour counts as rejoined when the conversation later reaches its declared `resume_to`; deeper off-flow nodes in between are skipped, and the check fails as soon as the conversation lands on a different main-flow node first. An inner detour therefore points its `resume_to` at the outer detour's return node, which makes reverse-order rejoin observable. `max_off_flow_span` reports the longest run of consecutive off-flow turns, so a nested case is distinguishable from a sequence of independent detours.
 
+### Voice transport: fragments, barge-in, speaker, transcription noise
+
+A caller turn is not necessarily one complete sentence from one known speaker. Four optional node
+fields model what a phone line actually delivers.
+
+```json
+{
+  "id": "give_phone",
+  "fragments": ["sıfır beş üç iki", "bir iki üç", "kırk beş altmış yedi"],
+  "speaker": "holder",
+  "stt": {"drop_negation": 1.0},
+  "barge_in": {"after_words": 2}
+}
+```
+
+- **`fragments`** replaces `variants` when one utterance arrives as several consecutive `user`
+  messages. The model is invoked after each of them, as it is in production. Declaring both
+  `variants` and `fragments` is an error, and `fragments` needs at least two entries. Responses to
+  a non-final fragment are marked `interim` in the timeline and scored by two checks:
+  `no_tool_on_partial_utterance` (P0) and `bounded_interim_response` (P1, against
+  `conversation.max_interim_words`, default 6).
+- **`barge_in: {"after_words": N}`** trims the `heard` field of the last assistant entry before
+  this node to its first N words. `content` and the model's message history are untouched, because
+  a full-duplex line gives the model no signal about where it was cut. Not allowed on the start
+  node, which has nothing to interrupt.
+- **`speaker`** is `holder` (default) or `third_party`. `policies.holder_only_content` takes a list
+  of regexes that must not appear in an assistant turn while the speaker is not the holder; a
+  violation is a P0 `holder_only_disclosure`.
+- **`stt`** pins this node's transcription noise: a profile name, an operator-to-rate mapping, or
+  `null` to keep the turn clean even under a suite-wide `--stt`. Absent means inherit. Pinning
+  `null` on the turn that ESTABLISHES a constraint, and an operator on the turn that tests it, is
+  how a case corrupts exactly what it means to corrupt.
+
+Every assistant timeline entry carries `heard` alongside `content`; they differ only after a
+barge-in. A content milestone may set `"against": "heard"` to score what reached the caller rather
+than what the model emitted. The default, `"emitted"`, is the historical behaviour.
+
+User-role content milestones read what the caller *said*, not what the transcript preserved. They
+record a fact the script established — "they consented", "they asked to end the call" — which is
+not the recogniser's to erase.
+
 ## Flow profile
 
 The optional top-level `flow` object enables deterministic long-horizon checks:

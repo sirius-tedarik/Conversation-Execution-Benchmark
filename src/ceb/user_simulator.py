@@ -112,6 +112,11 @@ class ControlledUserSimulator:
         # Simulated speech-to-text noise on the caller's side; None leaves every
         # utterance exactly as the case wrote it (see stt.py).
         self.stt = stt
+        # The pieces the session must send as separate user messages for the utterance just
+        # emitted. A node without `fragments` yields exactly one, which is today's behaviour.
+        self.pending_fragments: list[str] = []
+        # The agent's last spoken line, so the overlap operator can splice from it.
+        self.last_assistant_text: str = ""
         self.visits: dict[str, int] = {}
         self.trace: list[dict[str, Any]] = []
         self.max_detours = int(plan.get("max_detours", len(self.nodes)))
@@ -156,6 +161,7 @@ class ControlledUserSimulator:
             utterance, stt_applied = transcribe(
                 utterance, self.stt, self.seed, self.scenario_id, "impatience", self.impatience_prompts
             )
+            self.pending_fragments = [utterance]
             self.trace.append(
                 {
                     "node": self.current_id,
@@ -180,17 +186,35 @@ class ControlledUserSimulator:
             self.detour_count += 1
         visit = self.visits.get(self.current_id, 0)
         self.visits[self.current_id] = visit + 1
-        variants = node["variants"]
-        utterance = variants[_stable_index(self.seed, self.scenario_id, self.current_id, visit, len(variants))]
+        declared_fragments = node.get("fragments")
+        if declared_fragments:
+            fragments = list(declared_fragments)
+            utterance = " ".join(fragments)
+        else:
+            variants = node["variants"]
+            utterance = variants[_stable_index(self.seed, self.scenario_id, self.current_id, visit, len(variants))]
+            fragments = [utterance]
         spoken = utterance
         # A node may pin its own transcription noise. Absent means inherit the sweep-wide
         # setting; an explicit null means keep this turn clean even under --stt, which is what
         # lets a case corrupt exactly the turn its trap needs and leave the turn that
         # ESTABLISHES the constraint intact.
         node_stt = node.get("stt", self.stt) if "stt" in node else self.stt
-        utterance, stt_applied = transcribe(
-            utterance, node_stt, self.seed, self.scenario_id, self.current_id, visit
-        )
+        # Each fragment is recognised separately in production, so each is transcribed
+        # separately here. Fragment 0 keys off the bare node id so a single-fragment node — every
+        # case written before fragments existed — corrupts exactly as it did before.
+        heard_fragments: list[str] = []
+        stt_applied: list[str] = []
+        for fragment_index, fragment in enumerate(fragments):
+            key = self.current_id if fragment_index == 0 else f"{self.current_id}#{fragment_index}"
+            heard, applied = transcribe(
+                fragment, node_stt, self.seed, self.scenario_id, key, visit,
+                context={"last_assistant": self.last_assistant_text},
+            )
+            heard_fragments.append(heard)
+            stt_applied.extend(applied)
+        self.pending_fragments = heard_fragments
+        utterance = " ".join(heard_fragments)
         self.trace.append(
             {
                 "node": self.current_id,
@@ -219,6 +243,12 @@ class ControlledUserSimulator:
         )
 
     def advance(self, turn_steps: list[dict[str, Any]], full_timeline: list[dict[str, Any]] | None = None) -> str | None:
+        # Remember what the agent just said, so the overlap operator can splice from it on the
+        # next caller turn — the recogniser cannot tell the two voices apart.
+        for step in reversed(turn_steps or []):
+            if step.get("role") == "assistant" and step.get("content"):
+                self.last_assistant_text = str(step["content"])
+                break
         if self.current_id is None:
             return None
         node = self.nodes[self.current_id]

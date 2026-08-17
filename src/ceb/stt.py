@@ -175,6 +175,22 @@ def _apply_drop_negation(text: str, ctx: tuple) -> str:
     return text
 
 
+def _apply_agent_overlap(text: str, ctx: tuple, context: dict[str, Any] | None = None) -> str:
+    """Both parties spoke at once, so a piece of the agent's line lands inside the caller's turn.
+
+    A recogniser has no idea which voice is which; it emits one stream. The model then has to tell
+    its own words apart from the caller's, and the damaging reading is treating its own sentence
+    as a new instruction.
+    """
+    previous = (context or {}).get("last_assistant") or ""
+    words = previous.split()
+    if len(words) < 3:
+        return text
+    start = int(_roll(*ctx, "overlap_start") * (len(words) - 2))
+    snippet = " ".join(words[start : start + 3])
+    return f"{text} {snippet}"
+
+
 _OPERATORS = {
     "filler": _apply_filler,
     "elide_final": _apply_elide_final,
@@ -186,11 +202,12 @@ _OPERATORS = {
     "crosstalk": _apply_crosstalk,
     "number_homophone": _apply_number_homophone,
     "drop_negation": _apply_drop_negation,
+    "agent_overlap": _apply_agent_overlap,
 }
 
 #: Operators listed here change what the caller asked for. Reported separately so a sweep can
 #: say how much of its damage came from noise the agent could not have seen through.
-MEANING_BEARING = frozenset({"number_homophone", "drop_negation"})
+MEANING_BEARING = frozenset({"number_homophone", "drop_negation", "agent_overlap"})
 
 
 def resolve_profile(profile: str | dict[str, float] | None) -> dict[str, float]:
@@ -214,6 +231,7 @@ def transcribe(
     scenario_id: str,
     node_id: str,
     visit: int,
+    context: dict[str, Any] | None = None,
 ) -> tuple[str, list[str]]:
     """Return the utterance as a recogniser would have produced it, plus the operators applied.
 
@@ -230,7 +248,8 @@ def transcribe(
         rate = rates.get(name, 0.0)
         if rate <= 0.0 or _roll(*ctx, name) >= rate:
             continue
-        candidate = _OPERATORS[name](text, ctx)
+        operator = _OPERATORS[name]
+        candidate = operator(text, ctx, context) if name == "agent_overlap" else operator(text, ctx)
         if candidate != text:
             text = candidate
             applied.append(name)

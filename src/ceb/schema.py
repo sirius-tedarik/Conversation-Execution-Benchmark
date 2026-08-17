@@ -40,14 +40,38 @@ def _validate_user_plan(plan: dict[str, Any], scenario_id: str) -> None:
             raise ScenarioValidationError(f"{where}: expected object")
         node_id = _require(node, "id", str, where)
         ids.append(node_id)
-        variants = _require(node, "variants", list, where)
-        if not variants or not all(isinstance(item, str) and item.strip() for item in variants):
-            raise ScenarioValidationError(f"{where}.variants must contain non-empty strings")
+        if "variants" in node and "fragments" in node:
+            raise ScenarioValidationError(f"{where}: declare variants or fragments, not both")
+        if "fragments" in node:
+            # One caller utterance delivered as several consecutive user messages, because that is
+            # how speech-to-text reaches the chat template in production — and the model is
+            # invoked on every one of them, including the unfinished ones.
+            fragments = _require(node, "fragments", list, where)
+            if len(fragments) < 2 or not all(isinstance(item, str) and item.strip() for item in fragments):
+                raise ScenarioValidationError(
+                    f"{where}.fragments must contain at least two non-empty strings"
+                )
+        else:
+            variants = _require(node, "variants", list, where)
+            if not variants or not all(isinstance(item, str) and item.strip() for item in variants):
+                raise ScenarioValidationError(f"{where}.variants must contain non-empty strings")
         transitions = node.get("transitions", [])
         if not isinstance(transitions, list) or not all(isinstance(item, dict) for item in transitions):
             raise ScenarioValidationError(f"{where}.transitions must be list[object]")
         if "stt" in node and not isinstance(node["stt"], (str, dict, type(None))):
             raise ScenarioValidationError(f"{where}.stt must be a profile name, an operator map, or null")
+        if node.get("speaker") not in (None, "holder", "third_party"):
+            raise ScenarioValidationError(f"{where}.speaker must be holder or third_party")
+        if "barge_in" in node:
+            # Full-duplex: this caller turn cuts the agent off mid-sentence.
+            barge = node["barge_in"]
+            if not isinstance(barge, dict) or not isinstance(barge.get("after_words"), int) \
+                    or barge["after_words"] < 1:
+                raise ScenarioValidationError(f"{where}.barge_in.after_words must be a positive integer")
+            if node_id == start:
+                raise ScenarioValidationError(
+                    f"{where}.barge_in on the start node has nothing to interrupt"
+                )
     if len(ids) != len(set(ids)):
         raise ScenarioValidationError(f"{scenario_id}.user_plan has duplicate node ids")
     if start not in ids:
@@ -254,6 +278,8 @@ class Scenario:
                 raise ScenarioValidationError(f"{where}.kind is unsupported")
             if milestone.get("severity", "P1") not in {"P0", "P1", "P2"}:
                 raise ScenarioValidationError(f"{where}.severity must be P0|P1|P2")
+            if milestone.get("against") not in (None, "emitted", "heard"):
+                raise ScenarioValidationError(f"{where}.against must be emitted or heard")
         if len(milestone_ids) != len(set(milestone_ids)):
             raise ScenarioValidationError(f"{scenario_id}.milestones contains duplicate ids")
 
@@ -297,6 +323,9 @@ class Scenario:
         for tool, required in prerequisites.items():
             if tool not in tools_raw or not isinstance(required, list) or not set(required) <= set(milestone_ids):
                 raise ScenarioValidationError(f"{scenario_id}: invalid prerequisites for {tool}")
+        holder_only = policies.get("holder_only_content", [])
+        if not isinstance(holder_only, list) or not all(isinstance(item, str) for item in holder_only):
+            raise ScenarioValidationError(f"{scenario_id}.policies.holder_only_content must be list[str]")
         read_only_tools = policies.get("read_only_tools", [])
         if not isinstance(read_only_tools, list) or not all(isinstance(item, str) for item in read_only_tools):
             raise ScenarioValidationError(f"{scenario_id}.policies.read_only_tools must be a list[str]")
